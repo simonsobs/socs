@@ -27,7 +27,7 @@ class GalilAxisControllerAgent:
             by default
     """
 
-    def __init__(self, agent, ip, port=23, configfile=None):
+    def __init__(self, agent, ip, configfile, port=23):
         self.lock = TimeoutLock()
         self.agent = agent
         self.log = agent.log
@@ -69,7 +69,7 @@ class GalilAxisControllerAgent:
                 return False, "Could not acquire lock."
 
             # Establish connection to galil stage controller
-            self.stage = GalilAxis(self.ip, self.port)
+            self.stage = GalilAxis(self.ip, self.port, self.configfile)
             # print('self.ip is ', self.ip)
             # print('self.configfile is', self.configfile)
 
@@ -122,6 +122,7 @@ class GalilAxisControllerAgent:
 
                 try:
                     data = self.stage.get_data()
+                    print('get_data in acq:', data)
                     self.log.debug("{data}", data=session.data)
                     if session.degraded:
                         self.log.info("Connection re-established.")
@@ -150,6 +151,7 @@ class GalilAxisControllerAgent:
 
         return True, 'Acquisition exited cleanly.'
 
+
     def _stop_acq(self, session, params):
         """Stops acquisition of data from the galil stage controller"""
         if self.take_data:
@@ -158,10 +160,11 @@ class GalilAxisControllerAgent:
         else:
             return False, 'acq is not currently running'
 
+
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('lindist', type=float)
-    def move_relative_linear(self, session, params):
-        """move_linear(axis, lindist)
+    def move_relative_linearpos(self, session, params):
+        """set_relative_linearpos(axis, lindist)
 
         **Task** - Move axis stage in linear +/- direction for a specified axis
         and distance.
@@ -171,24 +174,24 @@ class GalilAxisControllerAgent:
             lindist (int): Specified linear distance in millimeters (mm)
 
         Note:
-            The use of `move_linear` vs `move_angular` is important as the
+            The use of `set_linear` vs `set_angular` is important as the
             conversion values for turning mm to encoder counts is different
             from the conversion value for turning degrees to encoder counts.
             Be sure NOT to use this task if you want to move in angular distance.
         """
         axis = params['axis']
         dist = params['lindist']
-        with self.lock.acquire_timeout(0, job='move_relative_linear') as acquired:
+        with self.lock.acquire_timeout(0, job='move_relative_linearpos') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            self.stage.set_linear(axis, dist)
-            time.sleep(0.5)
+            self.stage.set_relative_linearpos(axis, dist)
             value, units = self.stage.query_relative_position(axis=axis, movetype='linear')
             session.add_message(f'{axis} set to relative linear position: {value}{units}')
-
+            
+            # setting the conditions for beginning motion 
             if value == dist:
                 self.stage.begin_motion(axis)
                 self.log.info(f'Starting motion to {dist}{units}')
@@ -197,15 +200,15 @@ class GalilAxisControllerAgent:
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('angdist', type=float)
-    def move_relative_angular(self, session, params):
-        """move_linear(axis, lindist)
+    def move_relative_angpos(self, session, params):
+        """move_relative_angpos(axis, angdist)
 
         **Task** - Move axis stage in linear +/- direction for a specified axis
         and distance.
 
         Parameters:
             axis (str): Axis to set the linear distance for. Ex: 'A'
-            lindist (int): Specified linear distance in millimeters (mm)
+            angdist (int): Specified angular distance in degrees
 
         Note:
             The use of `move_linear` vs `move_angular` is important as the
@@ -215,7 +218,7 @@ class GalilAxisControllerAgent:
         """
         axis = params['axis']
         dist = params['angdist']
-        with self.lock.acquire_timeout(timeout=3, job='move_relative_angular') as acquired:
+        with self.lock.acquire_timeout(timeout=3, job='move_relative_angpos') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
@@ -223,7 +226,7 @@ class GalilAxisControllerAgent:
 
             self.stage.set_angular(axis, dist)
             time.sleep(0.5)
-            value, units = self.stage.query_relative_position(axis=axis, movetype='angular')
+            value, units = self.stage.set_relative_angularpos(axis=axis, angdist=dist)
             session.add_message(f'{axis} set to relative angular position: {value}{units}')
 
             if value == dist:
@@ -234,7 +237,10 @@ class GalilAxisControllerAgent:
 
         return True, f'Set {axis} to {dist}'
 
-    @ocs_agent.param('_')
+
+# TODO: absolute position for linear and angular
+# TODO: add a second choice to get brak status param decorator for the ability to query all brake statuses at once
+    @ocs_agent.param('axis', type=str)
     def get_brake_status(self, session, params):
         """get_brake_status()
 
@@ -247,10 +253,11 @@ class GalilAxisControllerAgent:
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            response = self.stage.query_brake_status()
+            response = self.stage.get_brake_status()
             session.add_message(str(response))
 
         return True, 'Queried brake status'
+
 
     @ocs_agent.param('axis', type=str)
     def release_axis_brake(self, session, params):
@@ -275,6 +282,7 @@ class GalilAxisControllerAgent:
             self.log.info(f'Brake now set to {new_brake_status}')
 
         return True, f'Commanded brake to {new_brake_status} for {axis}.'
+
 
     @ocs_agent.param('axis', type=str)
     def engage_axis_brake(self, session, params):
