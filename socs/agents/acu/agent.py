@@ -2257,6 +2257,9 @@ class ACUAgent:
         # Prepare the point generator.
         free_form = False
         if params["type"] == 1:
+            if turnaround_method == 'three_leg':
+                free_form = True
+
             g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
                                                    az_endpoint2=az_endpoint2,
                                                    az_speed=az_speed, acc=az_accel,

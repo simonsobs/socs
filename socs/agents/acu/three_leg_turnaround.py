@@ -1,8 +1,8 @@
 import numpy as np
 
 
-def gen_3leg_turnaround(t0, az0, el0, v0, turntime, az_flag, el_flag, point_group_batch,
-                        second_leg_time=None, second_leg_velocity=0, step_time=0.1):
+def gen_three_leg_turnaround(t0, az0, el0, v0, turntime, az_flag, el_flag, point_group_batch,
+                             second_leg_time=None, second_leg_velocity=0, step_time=0.05):
     from .drivers import TrackPoint
     """
     Generates the trajectory of a 3part turnaround given the initial position and velocity of the platform.
@@ -96,9 +96,9 @@ def gen_3leg_turnaround(t0, az0, el0, v0, turntime, az_flag, el_flag, point_grou
 
     # Concatenate the times, azimuth positions, and azimuth velocities together.
     # The first point of each leg is a duplicate of the last so we drop those points.
-    ts = np.concatenate([ts_1[1:], ts_2[1:], ts_3[1:]]) + t0
-    azs = np.concatenate([azs_1[1:], azs_2[1:], azs_3[1:]])
-    vs = np.concatenate([vs_1[1:], vs_2[1:], vs_3[1:]])
+    ts = np.concatenate([ts_1[1:], ts_2[1:-1], ts_3[1:]]) + t0
+    azs = np.concatenate([azs_1[1:], azs_2[1:-1], azs_3[1:]])
+    vs = np.concatenate([vs_1[1:], vs_2[1:-1], vs_3[1:]])
 
     # Turn our turnaround solution into TrackPoint's for the ACU.
     turnaround_track = []
