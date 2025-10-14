@@ -139,7 +139,7 @@ class GalilAxis(TCPInterface):
 
         # --- If we got a bad response, exit gracefully ---
         if value is None or isinstance(value, str):
-            print(f"⚠️ Invalid response for _PR{axis}: {value}")
+            print(f"Invalid response for _PR{axis}: {value}")
             return math.nan, units
 
         # --- Convert from counts to units if known ---
@@ -371,9 +371,9 @@ class GalilAxis(TCPInterface):
         return brake_states
 
 
-    def set_motor_type(self, axis, type=1):
+    def set_motor_type(self, axis, motortype=1):
         """set the motor type for each axis. defaults to 1, the servo motor (3-phased brushless)"""
-        resp = self.galil_command(command=f'MT{axis}={type};')
+        resp = self.galil_command(command=f'MT{axis}={motortype};')
         return resp
 
 
@@ -462,12 +462,6 @@ class GalilAxis(TCPInterface):
         return resp
 
 
-    def begin_axis_motion(self, axis):
-        """Set jog speed for axis and begin jogging."""
-        resp = self.galil_command(command=f"BG{axis}")
-        return resp
-
-
     def enable_axis(self, axis=None):
         """Enable servo for an axis (e.g. A, B, C, D)."""
         cmd = f'{SH}{axis};'
@@ -480,83 +474,3 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=f"MO{axis}")
         return resp
 
-'''
-    def command_config(self):
-        """Send all relevant Galil config commands from loaded TOML."""
-        # 1. Global confcomm
-        confcomm = self.config.get('confcomm', "").strip()
-        if confcomm:
-            print(f"Sending confcomm: {confcomm}")
-            self.send_command(confcomm)
-
-        print('in command_config method, sleeping for 2 sec')
-        time.sleep(2)
-
-        # 2. Per-axis init commands
-        #for axis in ['A', 'B', 'C', 'D']:
-        #    self.initialize_axis(axis)
-        #    print(f"Initialized axis {axis}, sleeping for 2 secs...")
-        #    time.sleep(5)
-
-        # 3. Optional maxspeed
-        if 'maxspeed' in self.config:
-            maxspeed = self.config['maxspeed']
-            comm = ''
-            for a in self.config.get('linaxis', '').split():
-                comm += f"SP{a}={maxspeed};"
-            for a in self.config.get('angaxis', '').split():
-                comm += f"SP{a}={maxspeed};"
-            if comm:
-                comm = comm.rstrip(';')  # trim trailing semicolon
-                print(f"Setting maxspeed: {comm}")
-                self.send_command(comm)
-
-    def initialize_axis(self, axis, volts=3):
-        """Use BZ command to initialize axis."""
-        cmd = f"BZ{axis}={volts}"
-        return self.send_command(cmd)
-
-    # ---- Convenience wrappers ----
-    def move_absolute(self, axis, pos):
-        """Move an axis to an absolute position (pos in encoder counts or units)."""
-        cmd = f"PA {axis}={pos};BG {axis}"
-        return self.send_command(cmd)
-
-    def move_relative(self, axis, delta):
-        """Move an axis by delta relative units."""
-        cmd = f"PR {axis}={delta};BG {axis}"
-        return self.send_command(cmd)
-
-    def home_axis(self, axis):
-        """Home an axis."""
-        cmd = f"HM {axis}"
-        return self.send_command(cmd)
-
-
-    def get_position(self, axis):
-        """Query position of an axis."""
-        cmd = f"TP {axis}"
-        return self.send_command(cmd)
-
-
-
-    def query_status(self, code):
-        """Send MG query, e.g. query_status('_MOA')."""
-        return self.send_command(f"MG {code}")
-
-    def change_gain(self, axis, gain):
-        """Change gain of axis."""
-        cmd = f"AG{axis}={gain}"
-        return self.send_command(cmd)
-
-    def query_param(self, code):
-        """Send a generic MG query and return the value."""
-        return self.send_command(f"MG {code}")
-
-
-    def flip_limitswitch_polarity(self, pol=1):
-        """CN -1 means active low, CN +1 is active high. And we want active high"""
-        cmd = f"CN {pol}"
-        return self.send_command(cmd)
-
-    '''
