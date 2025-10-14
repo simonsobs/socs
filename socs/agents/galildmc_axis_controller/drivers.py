@@ -401,7 +401,7 @@ class GalilAxis(TCPInterface):
 
     # home
     def define_position(self, axes, val=0):
-        # Part of the homing process which requires jogging to the reverse limit switch and then defining the position of the axis at that limit as 0"""
+        # Part of the homing process which requires jogging to the reverse limit switch and then defining the position of the axis at that limit as 0
         resp = self.galil_command(command=f'DP{axis}={val};')
         return resp
 
