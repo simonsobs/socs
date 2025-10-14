@@ -6,21 +6,6 @@ import yaml
 
 from socs.tcp import TCPInterface
 
-countspermm = 4000
-countsperdeg = 2000
-maxspeed = 100000
-
-
-#brake_output_map = {'A': 1, 'B': 2, 'C': 3, 'D': 4}
-
-#axes = ['A', 'B', 'C', 'D']
-
-axes = ['E', 'F']
-
-brake_output_map = {'E': 5, 'F': 6}
-
-countspermm = 4000
-countsperdeg = 2000
 
 class GalilAxis(TCPInterface):
     def __init__(self, ip, configfile, port=23, timeout=10):
@@ -56,10 +41,7 @@ class GalilAxis(TCPInterface):
             # Safety stop to avoid infinite loop
             if time.time() - start > 0.3:
                 break
-
-        # Optional: uncomment for debugging only
-        # if drained:
-        #     print(f"[drained] {drained!r}")
+        
         return drained
 
     def galil_command(self, command=None, axis=None, value=None, timeout=3.0, max_retries=4, expect_response=False):
