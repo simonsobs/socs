@@ -120,8 +120,9 @@ class WiregridTiltSensorAgent:
                     self._connect()
                     self.pm.sleep()  # DAQ interval
                     continue
-                # the driver for sensor_type = 'sherborne' does NOT has
+                # the driver for sensor_type = 'sherborne' does NOT have
                 # the function of `get_temp()` now, so ignore the below lines
+                # We also may drop support for the 'sherborne' sensor type soon.
                 # if self.sensor_type == 'sherborne':
                 #    msg, temperatures = self.tiltsensor.get_temp()
                 #    self.log.info(f'self.tiltsensor.get_temp(): {msg}')
