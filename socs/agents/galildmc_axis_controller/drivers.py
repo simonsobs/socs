@@ -16,42 +16,66 @@ class GalilAxis(TCPInterface):
         self.configfile = configfile
 
         super().__init__(self.ip, self.port, self.timeout)
+
     
     def _drain_prompt(self):
-        """Drain the TCP buffer until no more data or a Galil ':' prompt is seen."""
+        """
+        Drain the TCP buffer until no more data or a Galil ':' prompt is seen.
+        If a '?' or empty response is detected, query TC1 for an error code.
+        Handles 'Input buffer full' (TC1=5) by pausing and waiting for the controller
+        to clear before allowing new commands.
+        """
         start = time.time()
         drained = b""
+        received_any = False
 
         while True:
-            # Non-blocking check for available data
-            rlist, _, _ = select.select([self.comm], [], [], 0.05)
-            if not rlist:
+            rlist, _, _ = select.select([self.comm], [], [], 1)
+            if rlist:
+                chunk = self.recv(4096)
+            else:
                 break
 
-            chunk = self.recv(256)
             if not chunk:
                 break
 
+            received_any = True
             drained += chunk
 
-            # If we see a prompt (:) at the end or within the buffer, assume done
             if drained.endswith(b"\r:") or b":" in drained:
                 break
 
-            # Safety stop to avoid infinite loop
-            if time.time() - start > 0.3:
+            if time.time() - start > 3:
                 break
-        
-        return drained
 
-    def galil_command(self, command=None, axis=None, value=None, timeout=3.0, max_retries=4, expect_response=False):
-        """
-        Send a Galil command via TCP and read until ':' prompt appears.
-        Handles empty ('') and '??' responses by draining the leftover ':' prompt
-        before retrying.
-        """
+        if received_any:
+            decoded = drained.decode("ascii", errors="ignore").strip(":\r\n ")
 
-        # --- Build command string ---
+            # --- ambiguous or empty response handling ---
+            if decoded in ("?", "??"):
+                print(f"Error response'{decoded}' — checking TC1 status...")
+
+                # Ask for TC1 diagnostic
+                self.send(b"TC1\r")
+                time.sleep(0.100)
+
+                tc_resp = self.recv().decode("ascii", errors="ignore").strip(":\r\n ")
+
+                if tc_resp.startswith("5"):
+                    print("TC1=5 (Input buffer full) — pausing to let controller clear...")
+                    time.sleep(0.100)
+                    self.send(b"CI -1;\r")
+                else:
+                    print('tc error response not 0 nor 5',  tc_resp)
+                return tc_resp
+            
+
+    def galil_command(self, command=None, axis=None, value=None,
+                  timeout=3.0, expect_response=False):
+        """
+        Send a Galil command via TCP and read until ':' prompt or valid response.
+        All retries and '?' handling are done inside _drain_prompt().
+        """
         if axis is not None and value is not None:
             cmd = f"{command}{axis} = {value}"
         elif axis is not None:
@@ -60,52 +84,28 @@ class GalilAxis(TCPInterface):
             cmd = f"{command} = {value}"
         else:
             cmd = f"{command}"
+
         msg = f"{cmd}\r".encode("ascii")
 
-        for attempt in range(max_retries):
-            self._drain_prompt()        # actively clear leftover ':' or partial echoes
-            self.send(msg)
-
-            resp = b""
-            start = time.time()
-            while True:
-                rlist, _, _ = select.select([self.comm], [], [], 0.05)
-                if rlist:
-                    chunk = self.recv(256)
-                    if not chunk:
-                        time.sleep(0.01)
-                        continue
-                    resp += chunk
-                    if b":" in resp:
-                        break
-                if time.time() - start > timeout:
-                    print(f"Timeout waiting for ':' after '{cmd}' (attempt {attempt+1})")
-                    break
-                time.sleep(0.01)
-
-            decoded = resp.decode("ascii", errors="ignore").strip(":\r\n ")
-            
-            if not expect_response:
-                # verify that ':' or a "" was seen in the raw response, particularly for cases of sending commands that are not queries
-                if b":" or resp == b"":
-                    print(f'{cmd} acknowledged')
-                else:
-                    print(f"No ':' prompt seen for '{cmd}', command may not have completed.")
-
-            # --- Retry logic for '?', '??', or '' ---
-            if decoded in ("", "?", "??"):
-                print(f"Got '{decoded}' from Galil, draining & retrying, attempt ({attempt+1}/{max_retries})...")
+        self._drain_prompt()  # clear any old data 
+        time.sleep(0.500)
+        self.send(msg)
+        resp = self.recv(4096).decode("ascii", errors="ignore").strip(":\r\n")
+        # if we get a '?', handle it right away
+        for attempt in range(3):
+            if "?" in resp:
+                print(f"found question mark in response — retrying ({attempt+1}/3)...")
                 self._drain_prompt()
-                time.sleep(0.1)
-                continue
+                time.sleep(0.5)
+                self.send(msg)
+                resp = self.recv(4096).decode("ascii", errors="ignore").strip(":\r\n")
+            else:
+                break
 
-            try:
-                val = float(decoded)
-                return val
-            except Exception as e:
-                return f"Exception occured with format of response: {decoded}"
-
-        return None
+        try:
+            return float(resp)
+        except Exception as e:
+            print(f'Exception {e} occurred. response is not a float: {resp}')
 
 
     def get_relative_position(self, axis, movetype=None):
@@ -137,7 +137,7 @@ class GalilAxis(TCPInterface):
 
         return value, units
  
-
+    # TODO: add ability to publish encoder units in values of mm and degs
     def get_data(self):
         """
         Query position (_TP), velocity (_TV), and torque (_TT)
@@ -190,7 +190,7 @@ class GalilAxis(TCPInterface):
             data[axis] = axis_data
 
             # delay between axes querying
-            time.sleep(0.1)
+            time.sleep(0.2)
 
         return data
 
@@ -200,7 +200,7 @@ class GalilAxis(TCPInterface):
         self.galil_command(command="BG", axis=axis)
 
 
-    def set_relative_linearpos(self, axis, lindist):
+    def set_relative_linearpos(self, axis, lindist, encodeunits=False):
         """Move all linear axes by a given distance in mm, which is converted
         into encoder counts.
         axis (str), lindist = int/float in mm units"""
@@ -212,11 +212,13 @@ class GalilAxis(TCPInterface):
                 raise RuntimeError(f"Failed to load config file '{self.configfile}': {e}")
         try:
             countspermm = config['galil']['motorsettings']['countspermm']
+            counts = round(lindist * countspermm, 3)
         except Exception as e:
             print(f'Exception occured: {e}')
 
-        counts = round(lindist * countspermm, 3)
-        resp = self.galil_command(command="PR", axis=axis, value=counts)
+        if encodeunits:
+             counts = lindist
+        resp = self.galil_command(command=f"PR{axis}={counts};")
 
         return resp
 
