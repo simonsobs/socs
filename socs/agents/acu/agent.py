@@ -31,10 +31,12 @@ INIT_DEFAULT_SCAN_PARAMS = {
     'ccat': {
         'az_speed': 2,
         'az_accel': 1,
+        'el_freq': .15,
     },
     'satp': {
         'az_speed': 1,
         'az_accel': 1,
+        'el_freq': 0,
     },
 }
 
@@ -234,7 +236,7 @@ class ACUAgent:
                       sun_config=self.sun_config)
         self._reset_sun_params()
 
-        # Scan params (default vel / accel).
+        # Scan params (default vel / accel / el freq).
         self.default_scan_params = \
             dict(INIT_DEFAULT_SCAN_PARAMS[self.platform_type])
         for _k in self.default_scan_params.keys():
@@ -400,6 +402,10 @@ class ACUAgent:
                             agg_params=basic_agg_params,
                             buffer_time=0)
         agent.register_feed('data_qual',
+                            record=True,
+                            agg_params=basic_agg_params,
+                            buffer_time=0)
+        agent.register_feed('scan_params',
                             record=True,
                             agg_params=basic_agg_params,
                             buffer_time=0)
@@ -1787,6 +1793,7 @@ class ACUAgent:
 
     @ocs_agent.param('az_speed', type=float, default=None)
     @ocs_agent.param('az_accel', type=float, default=None)
+    @ocs_agent.param('el_freq', type=float, default=None)
     @ocs_agent.param('reset', default=False, type=bool)
     @inlineCallbacks
     def set_scan_params(self, session, params):
@@ -1799,13 +1806,15 @@ class ACUAgent:
           az_speed (float, optional): The azimuth scan speed.
           az_accel (float, optional): The (average) azimuth
             acceleration at turn-around.
+          el_freq (float, optional): The frequency of elevation nods in
+            type 3 scans.
           reset (bool, optional): If True, reset all params to default
             values before applying any updates passed explicitly here.
 
         """
         if params['reset']:
             self.scan_params.update(self.default_scan_params)
-        for k in ['az_speed', 'az_accel']:
+        for k in ['az_speed', 'az_accel', 'el_freq']:
             if params[k] is not None:
                 self.scan_params[k] = params[k]
         self.log.info('Updated default scan params to {sp}', sp=self.scan_params)
@@ -2015,6 +2024,7 @@ class ACUAgent:
     @ocs_agent.param('el_endpoint1', type=float, default=None)
     @ocs_agent.param('el_endpoint2', type=float, default=None)
     @ocs_agent.param('el_speed', type=float, default=0.)
+    @ocs_agent.param('el_freq', type=float, default=None)
     @ocs_agent.param('num_scans', type=float, default=None)
     @ocs_agent.param('start_time', type=float, default=None)
     @ocs_agent.param('wait_to_start', type=float, default=None)
@@ -2024,6 +2034,8 @@ class ACUAgent:
                               'mid_inc', 'mid_dec'])
     @ocs_agent.param('az_drift', type=float, default=None)
     @ocs_agent.param('az_only', type=bool, default=True)
+    @ocs_agent.param('type', default=1, choices=[1, 2, 3])
+    @ocs_agent.param('az_vel_ref', type=float, default=None)
     @ocs_agent.param('scan_upload_length', type=float, default=None)
     @inlineCallbacks
     def generate_scan(self, session, params):
@@ -2074,12 +2086,18 @@ class ACUAgent:
                 positive az velocity), 'mid_dec' (negative az velocity),
                 or 'mid' (velocity oriented towards endpoint2).
             az_drift (float): if set, this should be a drift velocity
-              in deg/s.  The scan extrema will move accordingly.  This
-              can be used to better follow compact sources as they
-              rise or set through the focal plane.
+                in deg/s.  The scan extrema will move accordingly.  This
+                can be used to better follow compact sources as they
+                rise or set through the focal plane.
             az_only (bool): if True (the default), then only the
                 Azimuth axis is put in ProgramTrack mode, and the El axis
                 is put in Stop mode.
+            type (int): What type of scan to use. Only 1, 2, 3 are valid.
+                Type 1 is a constant elevation scan.
+                Type 2 includes a variation in az speed that scales as sin(az).
+                Type 3 is a Type 2 with an sinusoidal el nod.
+            az_vel_ref (float or None): azimuth to center the velocity profile at.
+                If None then the average of the endpoints is used.
             scan_upload_length (float): number of seconds for each set
                 of uploaded points. If this is not specified, the
                 track manager will try to use as short a time as is
@@ -2093,6 +2111,8 @@ class ACUAgent:
           Process .stop method is called)..
 
         """
+        init_time = time.time()  # for params feed.
+
         if self._get_sun_policy('motion_blocked'):
             return False, "Motion blocked; Sun avoidance in progress."
 
@@ -2102,14 +2122,18 @@ class ACUAgent:
         az_endpoint2 = params['az_endpoint2']
         el_endpoint1 = params['el_endpoint1']
         el_endpoint2 = params['el_endpoint2']
+        az_vel_ref = params['az_vel_ref']
 
         # Params with defaults configured ...
         az_speed = params['az_speed']
         az_accel = params['az_accel']
+        el_freq = params['el_freq']
         if az_speed is None:
             az_speed = self.scan_params['az_speed']
         if az_accel is None:
             az_accel = self.scan_params['az_accel']
+        if el_freq is None:
+            el_freq = self.scan_params['el_freq']
 
         # Do we need to limit the az_accel?  This limit comes from a
         # maximum jerk parameter; the equation below (without the
@@ -2212,18 +2236,72 @@ class ACUAgent:
                 return False, f'Start position seek failed with message: {msg}'
 
         # Prepare the point generator.
-        g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
-                                               az_endpoint2=az_endpoint2,
-                                               az_speed=az_speed, acc=az_accel,
-                                               el_endpoint1=el_endpoint1,
-                                               el_endpoint2=el_endpoint2,
-                                               el_speed=el_speed,
-                                               az_first_pos=plan['init_az'],
-                                               **scan_params)
+        free_form = False
+        if params["type"] == 1:
+            g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
+                                                   az_endpoint2=az_endpoint2,
+                                                   az_speed=az_speed, acc=az_accel,
+                                                   el_endpoint1=el_endpoint1,
+                                                   el_endpoint2=el_endpoint2,
+                                                   el_speed=el_speed,
+                                                   az_first_pos=plan['init_az'],
+                                                   **scan_params)
+        elif params["type"] == 2:
+            free_form = True
+            g = sh.generate_type2_scan(az_endpoint1=az_endpoint1,
+                                       az_endpoint2=az_endpoint2,
+                                       az_speed=az_speed, acc=az_accel,
+                                       el_endpoint1=el_endpoint1,
+                                       az_vel_ref=az_vel_ref,
+                                       az_first_pos=plan['init_az'],
+                                       **scan_params)
+        elif params["type"] == 3:
+            free_form = True
+            azonly = False
+            g = sh.generate_type3_scan(az_endpoint1=az_endpoint1,
+                                       az_endpoint2=az_endpoint2,
+                                       az_speed=az_speed, acc=az_accel,
+                                       el_endpoint1=el_endpoint1,
+                                       el_endpoint2=el_endpoint2,
+                                       el_freq=el_freq,
+                                       az_vel_ref=az_vel_ref,
+                                       az_first_pos=plan['init_az'],
+                                       **scan_params)
+        else:
+            raise ValueError("Scan type must be 1, 2, or 3")
 
-        return (yield self._run_track(
+        scan_params_bundle = {'session_id': session.session_id,
+                              'schema': 1,
+                              'event': 1,
+                              'init_time': init_time,
+                              }
+        scan_params_bundle.update({
+            'az1': az_endpoint1,
+            'az2': az_endpoint2,
+            'az_vel': az_speed,
+            'az_accel': az_accel,
+            'el1': el_endpoint1,
+            'el2': el_endpoint2,
+            'el_freq': el_freq,
+            'type': params['type'],
+            'turnaround_type': sh.TURNAROUNDS_ENUM['standard'],
+        })
+
+        self.agent.publish_to_feed('scan_params',
+                                   {'timestamp': time.time(),
+                                    'block_name': 'info',
+                                    'data': scan_params_bundle})
+
+        ret_val = (yield self._run_track(
             session=session, point_gen=g, step_time=step_time,
-            azonly=azonly, point_batch_count=point_batch_count))
+            azonly=azonly, point_batch_count=point_batch_count, free_form=free_form))
+
+        self.agent.publish_to_feed('scan_params',
+                                   {'timestamp': time.time(),
+                                    'block_name': 'exit',
+                                    'data': {'session_id': session.session_id,
+                                             'event': 2}})
+        return ret_val
 
     @inlineCallbacks
     def _run_track(self, session, point_gen, step_time, azonly=False,
@@ -2403,6 +2481,12 @@ class ACUAgent:
                         except StopIteration:
                             mode = 'stop'
                             stop_message = 'Stop due to end of the planned track.'
+
+                        if len(lines) > FULL_STACK / 2:
+                            # This could occur if group_flag was always set, for example.
+                            mode = 'abort'
+                            self.log.warn('Problem with point generator; too many points.')
+                            lines = []
 
                     # Grab the minimum batch
                     upload_lines, lines = lines[:new_line_target], lines[new_line_target:]
