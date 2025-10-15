@@ -25,7 +25,8 @@ def create_device_emulator(responses, relay_type, port=9001, encoding='utf-8',
             values. See :class:`.DeviceEmulator` for details.
         relay_type (str): Communication relay type. Either 'serial' or 'tcp'.
         port (int): Port for the TCP relay to listen for connections on.
-            Defaults to 9001. Only used if relay_type is 'tcp'.
+            Defaults to 9001. Using port 0 will randomly select an available
+            port. Only used if relay_type is 'tcp'.
         encoding (str): Encoding for the messages and responses. See
             :func:`socs.testing.device_emulator.DeviceEmulator` for more
             details.
@@ -82,6 +83,8 @@ class DeviceEmulator:
             Defaults to None.
         encoding (str): Encoding for the messages and responses, set by the
             encoding argument.
+        socket_port (int): Port that the DeviceEmulator is listening on if
+            using the 'tcp' relay.
         _type (str): Relay type, either 'serial' or 'tcp'.
         _read (bool): Used to stop the background reading of data recieved on
             the relay.
