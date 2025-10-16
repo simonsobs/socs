@@ -14,19 +14,16 @@ from socs.agents.galildmc_axis_controller.drivers import GalilAxis
 # TODO: update docstrings
 # TODO: check jobs in each task to match name of task
 # TODO Tasks: get_relative_position
+
 class GalilAxisControllerAgent:
-    """ Agent to connect to galil linear stage motors for SAT coupling optics for passband measurements on-site.
+    """ Agent for controlling Galil axis motors used in SAT
+    coupling optics instrument for passband measurements on-site.
 
     Args:
-        ip (str): 
-            IP address for the Galil Stage Motor Controller
-        config-file (str): 
-            .toml config file for initializing hardware axes
-        port (int, optional): 
-            TCP port to connect, default is 23
-        configfile (str, optional):
-            Path to a GalilDMC axis config file. This will be loaded by `input_configfile` 
-            by default
+        ip (str): IP address for the Galil axis motor controller
+        config-file (str): Path to .yaml file config file for initializing motor 
+            and axis settings
+        port (int, optional): TCP port to connect, Default is 23
     """
 
     def __init__(self, agent, ip, configfile, port=23):
@@ -54,11 +51,11 @@ class GalilAxisControllerAgent:
     def init(self, session, params=None):
         """init(auto_acquire=False)
 
-        **Task** - Initalizes connection to the galil stage controller
+        **Task** - Initalize connection to Galil axis controller.
 
         Parameters:
-            auto_acquire(bool): Automatically start acq process after initialization
-                if True. Defaults to False.
+            auto_acquire(bool):  If True, start acquisition immediately after
+            initialization. Defaults to False.
 
         """
         if self.initialized:
@@ -72,15 +69,13 @@ class GalilAxisControllerAgent:
 
             # Establish connection to galil stage controller
             self.stage = GalilAxis(self.ip, self.port, self.configfile)
-            # print('self.ip is ', self.ip)
-            # print('self.configfile is', self.configfile)
 
-            # test connection and display identifying info
+            # test connection
             try:
                 self.stage.get_data()
             except ConnectionError:
-                self.log.error("Could not establish connection to galil stage motor controller")
-                return False, "Galil Stage Controller agent initialization failed"
+                self.log.error("Could not establish connection to galil axis motor controller")
+                return False, "Galil Axis Controller agent initialization failed"
 
         self.initialized = True
 
@@ -89,7 +84,7 @@ class GalilAxisControllerAgent:
             resp = self.agent.start('acq', params={})
             self.log.info(f'Response from acq.start(): {resp[1]}')
 
-        return True, "Galil Stage Controller agent initialized"
+        return True, "Galil Axis Controller agent initialized"
 
     @ocs_agent.param('test_mode', default=False, type=bool)
     def acq(self, session, params):
@@ -99,7 +94,7 @@ class GalilAxisControllerAgent:
 
         Parameters:
             test_mode (bool, optional): Run the process loop only once.
-                This is menat only for testing. Default is False.
+                This is meant only for testing. Default is False.
 
         """
         with self.lock.acquire_timeout(0, job='acq') as acquired:
@@ -124,7 +119,6 @@ class GalilAxisControllerAgent:
 
                 try:
                     data = self.stage.get_data()
-                    print('get_data in acq:', data)
                     self.log.debug("{data}", data=session.data)
                     if session.degraded:
                         self.log.info("Connection re-established.")
