@@ -6,6 +6,11 @@ import yaml
 
 from socs.tcp import TCPInterface
 
+# TODO: set speed
+# TODO: ask shreya about homing procedure; have the methods but don't have a full fledged
+# homing method---do we need one?
+# TODO: change prints to logs?
+
 
 class GalilAxis(TCPInterface):
     def __init__(self, ip, configfile, port=23, timeout=10):
@@ -17,11 +22,10 @@ class GalilAxis(TCPInterface):
 
         super().__init__(self.ip, self.port, self.timeout)
 
-    
     def _drain_prompt(self):
         """
-        Drain the TCP buffer until no more data or a Galil ':' prompt is seen.
-        If a '?' or empty response is detected, query TC1 for an error code.
+        Drain the TCP buffer until a Galil ':' prompt is seen or timeout occurs.
+        If a '?' is detected, query TC1 for an error code.
         Handles 'Input buffer full' (TC1=5) by pausing and waiting for the controller
         to clear before allowing new commands.
         """
@@ -32,7 +36,7 @@ class GalilAxis(TCPInterface):
         while True:
             rlist, _, _ = select.select([self.comm], [], [], 1)
             if rlist:
-                chunk = self.recv(4096)
+                chunk = self.recv()
             else:
                 break
 
@@ -55,26 +59,27 @@ class GalilAxis(TCPInterface):
             if decoded in ("?", "??"):
                 print(f"Error response'{decoded}' — checking TC1 status...")
 
-                # Ask for TC1 diagnostic
                 self.send(b"TC1\r")
                 time.sleep(0.100)
 
                 tc_resp = self.recv().decode("ascii", errors="ignore").strip(":\r\n ")
 
                 if tc_resp.startswith("5"):
-                    print("TC1=5 (Input buffer full) — pausing to let controller clear...")
+                    print("TC1=5 (Input buffer full) — clearing input buffer")
                     time.sleep(0.100)
                     self.send(b"CI -1;\r")
                 else:
-                    print('tc error response not 0 nor 5',  tc_resp)
+                    print('TC error response not 0 nor 5', tc_resp)
                 return tc_resp
-            
 
     def galil_command(self, command=None, axis=None, value=None,
-                  timeout=3.0, expect_response=False):
+                      timeout=3.0, expect_response=False):
         """
-        Send a Galil command via TCP and read until ':' prompt or valid response.
-        All retries and '?' handling are done inside _drain_prompt().
+        Builds and transmits the command string, handles '?' retries for transient
+        errors, and converts numeric responses to floats when possible.
+        Motion-starting commands (BG) skip retries, as '?' responses are expected
+        during active motion.
+
         """
         if axis is not None and value is not None:
             cmd = f"{command}{axis} = {value}"
@@ -87,26 +92,32 @@ class GalilAxis(TCPInterface):
 
         msg = f"{cmd}\r".encode("ascii")
 
-        self._drain_prompt()  # clear any old data 
-        time.sleep(0.500)
+        self._drain_prompt()  # clear any old data
+        time.sleep(0.300)
         self.send(msg)
-        resp = self.recv(4096).decode("ascii", errors="ignore").strip(":\r\n")
-        # if we get a '?', handle it right away
-        for attempt in range(3):
-            if "?" in resp:
-                print(f"found question mark in response — retrying ({attempt+1}/3)...")
-                self._drain_prompt()
-                time.sleep(0.5)
-                self.send(msg)
-                resp = self.recv(4096).decode("ascii", errors="ignore").strip(":\r\n")
-            else:
-                break
+        resp = self.recv().decode("ascii", errors="ignore").strip(":\r\n")
+
+        # if we get a '?', handle it right away, unless it's a begin motion command;
+        # we expect a '?' to occur mid-motion
+        if cmd.startswith("BG"):
+            self._drain_prompt()
+            time.sleep(0.3)
+            self.send(msg)
+        else:
+            for attempt in range(3):
+                if "?" in resp:
+                    print(f"Received {resp} — retrying ({attempt+1}/3)...")
+                    self._drain_prompt()
+                    time.sleep(0.3)
+                    self.send(msg)
+                    resp = self.recv().decode("ascii", errors="ignore").strip(":\r\n")
+                else:
+                    break
 
         try:
             return float(resp)
         except Exception as e:
             print(f'Exception {e} occurred. response is not a float: {resp}')
-
 
     def get_relative_position(self, axis, movetype=None):
         """
@@ -118,10 +129,10 @@ class GalilAxis(TCPInterface):
 
         # --- Query the controller using robust galil_command() ---
         value = self.galil_command("MG _PR", axis)
-
-        # --- If we got a bad response, exit gracefully ---
-        if value is None or isinstance(value, str):
-            print(f"Invalid response for _PR{axis}: {value}")
+        try:
+            value = float(value)
+        except Exception as e:
+            print(f'Exception occurred, returning nana: {e}')
             return math.nan, units
 
         # --- Convert from counts to units if known ---
@@ -136,7 +147,7 @@ class GalilAxis(TCPInterface):
             print(f"Error converting units: {e}")
 
         return value, units
- 
+
     # TODO: add ability to publish encoder units in values of mm and degs
     def get_data(self):
         """
@@ -149,7 +160,7 @@ class GalilAxis(TCPInterface):
                 with open(self.configfile, "r") as f:
                     config = yaml.safe_load(f)
             except Exception as e:
-                raise RuntimeError(f"Failed to load config file '{self.configfile}': {e}") 
+                raise RuntimeError(f"Failed to load config file '{self.configfile}': {e}")
 
         data = {}
         axes = list(config['galil']['motorconfigparams'].keys())
@@ -159,31 +170,31 @@ class GalilAxis(TCPInterface):
 
             # --- Position ---
             pos = self.galil_command("MG _TP", axis, expect_response=True)
-            if pos is None or isinstance(pos, str) and pos in ("", "?", "??"):
+            if pos is None or isinstance(pos, str) and pos in ("?", "??"):
                 pos = math.nan
             axis_data["position"] = pos
 
             # --- Velocity ---
             vel = self.galil_command("MG _TV", axis, expect_response=True)
-            if vel is None or isinstance(vel, str) and vel in ("", "?", "??"):
+            if vel is None or isinstance(vel, str) and vel in ("?", "??"):
                 vel = math.nan
             axis_data["velocity"] = vel
 
             # --- Torque ---
             trq = self.galil_command("MG _TT", axis, expect_response=True)
-            if trq is None or isinstance(trq, str) and trq in ("", "?", "??"):
+            if trq is None or isinstance(trq, str) and trq in ("?", "??"):
                 trq = math.nan
             axis_data["torque"] = trq
-        
+
             # --- Position Error ---
             poserr = self.galil_command("MG _TE", axis, expect_response=True)
-            if poserr is None or isinstance(poserr, str) and trq in ("", "?", "??"):
+            if poserr is None or isinstance(poserr, str) and trq in ("?", "??"):
                 poserr = math.nan
             axis_data["position_error"] = poserr
-            
+
             # --- Gearing Ratio ---
             gr = self.galil_command("MG _GR", axis, expect_response=True)
-            if gr is None or isinstance(gr, str) and trq in ("", "?", "??"):
+            if gr is None or isinstance(gr, str) and trq in ("?", "??"):
                 gr = math.nan
             axis_data["gearing_ratio"] = gr
 
@@ -194,11 +205,19 @@ class GalilAxis(TCPInterface):
 
         return data
 
-
     def begin_motion(self, axis):
         """Begin motion for the specified axis using the BG command."""
         self.galil_command(command="BG", axis=axis)
+        time.sleep(0.1)
 
+        state = self.galil_command(f'MG _BG{axis}', expect_response=True)
+        if state.strip() == '1':
+            print(f'Axis {axis} is in motion.')
+        else:
+            print(f'Axis {axis} did not move. Try again.')
+
+    # TODO: wouldn't have a response that we care about? do we really need to return a response?
+    # maybe we can do a query from get_relative_linearpos?
 
     def set_relative_linearpos(self, axis, lindist, encodeunits=False):
         """Move all linear axes by a given distance in mm, which is converted
@@ -217,11 +236,10 @@ class GalilAxis(TCPInterface):
             print(f'Exception occured: {e}')
 
         if encodeunits:
-             counts = lindist
+            counts = lindist
         resp = self.galil_command(command=f"PR{axis}={counts};")
 
         return resp
-
 
     def set_absolute_linearpos(self, axis, pos):
         """Move all linear axes by a given distance in mm, which is converted
@@ -243,7 +261,6 @@ class GalilAxis(TCPInterface):
 
         return resp
 
-
     def set_relative_angularpos(self, axis, angdist):
         """Move all linear axes by a given distance in mm, which is converted
         into encoder counts.
@@ -254,7 +271,7 @@ class GalilAxis(TCPInterface):
                     config = yaml.safe_load(f)
             except Exception as e:
                 raise RuntimeError(f"Failed to load config file '{self.configfile}': {e}")
-        
+
         try:
             countsperdeg = config['galil']['motorsettings']['countsperdeg']
         except Exception as e:
@@ -264,7 +281,6 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command="PR", axis=axis, value=counts)
 
         return resp
-
 
     def set_absolute_angularpos(self, axis, pos):
         """Move all linear axes by a given distance in mm, which is converted
@@ -287,7 +303,6 @@ class GalilAxis(TCPInterface):
 
         return resp
 
-
     def release_brake(self, axis):
         """Release brake to axis by using the GalilDMC SB command which sets the digital
         output to 1 which somehow means it releases the brake. Galil command expects an int
@@ -299,7 +314,6 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command="SB", value=brake_output)
         return resp
 
-    
     def engage_brake(self, axis):
         """ Engage the brake for the specified axis using the Galil CB command.
         Reads the brake output mapping from the config file (under galil.brakes.output_map)."""
@@ -309,7 +323,6 @@ class GalilAxis(TCPInterface):
             print(f'Exception occured: {e}')
         resp = self.galil_command(command="CB", value=brake_output)
         return resp
-
 
     def get_brake_status(self, axis=None):
         """
@@ -354,12 +367,10 @@ class GalilAxis(TCPInterface):
 
         return brake_states
 
-
     def set_motor_type(self, axis, motortype=1):
         """set the motor type for each axis. defaults to 1, the servo motor (3-phased brushless)"""
         resp = self.galil_command(command=f'MT{axis}={motortype};')
         return resp
-
 
     def disable_off_on_error(self, axis):
         """Disables the Off-On-Error (OE) function for the specified axis, preventing the controller from shutting off motor commands in response to position errors."""
@@ -371,12 +382,10 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=f'AG{axis}={val};')
         return resp
 
-
     def set_torque_limit(self, axis, val=5):
         """ set motor torque limit per axis. Default is 5."""
         resp = self.galil_command(command=f'TL{axis}={val};')
         return resp
-
 
     def set_amp_currentloop_gain(self, axis, val=9):
         """ set amplifier current loop gain per axis. Default is 9."""
@@ -395,7 +404,7 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=f'BM{axis}={val};')
         return resp
 
-    # init    
+    # init
     def initialize_axis(self, axis, val=3):
         """initializes axes configured for sinusoidal commutation. BZ command will drive the motor to 2 different magnetic positions and then set the appropriate commutation angel. Cannot command with BZ unless BA and BM commands are sent first. Default value is 3 volts."""
         resp = self.galil_command(command=f'BZ{axis}={val};')
@@ -407,18 +416,15 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=f'DP{axis}={val};')
         return resp
 
-
     def disable_limit_switch(self, axis):
         """Disable limit switch detection on a given axis (LDx=3)."""
         resp = self.galil_command(command=f'LD{axis}=3;', expect_response=True)
         return resp
 
-
     def set_limitswitch_polarity(self, pol=1):
         """CN -1 means active low, CN +1 is active high. And we want active high"""
         resp = self.galil_command(command=f'CN {pol};')
         return resp
-
 
     def stop_motion(self, axis=None):
         """Stop motion. If axis is None, stop all."""
@@ -426,18 +432,15 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=cmd)
         return resp
 
-
     def set_gearing(self, order):
         """Set gearing: order is order of opertions in string: ',A,,C'."""
         resp = self.galil_command(command=f"GA {order};")
         return resp
 
-
     def set_gearing_ratio(self, order):
         """Set gearing ratios, e.g. GR -1,1 for axes B and D."""
         resp = self.galil_command(command=f"GR {order};")
         return resp
-
 
     def jog_axis(self, axis, speed):
         """Set jog speed for axis and begin jogging."""
@@ -445,16 +448,13 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=cmd)
         return resp
 
-
     def enable_axis(self, axis=None):
         """Enable servo for an axis (e.g. A, B, C, D)."""
         cmd = f'{SH}{axis};'
         resp = self.galil_command(command=cmd)
         return resp
 
-
     def disable_axis(self, axis):
         """Motor off for an axis."""
         resp = self.galil_command(command=f"MO{axis}")
         return resp
-
