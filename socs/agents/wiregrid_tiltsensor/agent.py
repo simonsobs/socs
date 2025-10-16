@@ -33,7 +33,7 @@ class WiregridTiltSensorAgent:
         self.ip = ip
         self.port = int(port)
         self.sensor_type = sensor_type
-        self.tiltsensor = connect(self.ip, self.port, self.sensor_type)
+        self._connect()
         self.pm = Pacemaker(2, quantize=True)
 
         agg_params = {'frame_length': 60}
@@ -41,6 +41,19 @@ class WiregridTiltSensorAgent:
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=1.)
+
+    ######################
+    # Internal functions #
+    ######################
+
+    # Return: Nothing
+
+    def _connect(self):
+        self.tiltsensor = connect(self.ip, self.port, self.sensor_type)
+
+    ##################
+    # Main functions #
+    ##################
 
     def acq(self, session, params=None):
         """acq()
@@ -99,15 +112,34 @@ class WiregridTiltSensorAgent:
                 # data taking
                 current_time = time.time()
                 msg, angles = self.tiltsensor.get_angle()
-                if self.sensor_type == 'sherborne':
-                    msg, temperatures = self.tiltsensor.get_temp()
+                self.log.info(f'self.tiltsensor.get_angle(): {msg}')
+                if angles[0] == -999:
+                    msg = 'Failed to get angle. -> Reconnect to the sensor'
+                    self.log.warn(msg)
+                    del self.tiltsensor
+                    self._connect()
+                    self.pm.sleep()  # DAQ interval
+                    continue
+                # the driver for sensor_type = 'sherborne' does NOT have
+                # the function of `get_temp()` now, so ignore the below lines
+                # We also may drop support for the 'sherborne' sensor type soon.
+                # if self.sensor_type == 'sherborne':
+                #    msg, temperatures = self.tiltsensor.get_temp()
+                #    self.log.info(f'self.tiltsensor.get_temp(): {msg}')
+                #    if temperatures[0] == -999:
+                #        msg = 'Failed to get temperature. -> Reconnect to the sensor'
+                #        self.log.warn(msg)
+                #        del self.tiltsensor
+                #        self._connect()
+                #        self.pm.sleep()  # DAQ interval
+                #        continue
 
                 tiltsensor_data['timestamp'] = current_time
                 tiltsensor_data['data']['angleX'] = angles[0]
                 tiltsensor_data['data']['angleY'] = angles[1]
-                if self.sensor_type == 'sherborne':
-                    tiltsensor_data['data']['temperatureX'] = temperatures[0]
-                    tiltsensor_data['data']['temperatureY'] = temperatures[1]
+                # if self.sensor_type == 'sherborne':
+                #     tiltsensor_data['data']['temperatureX'] = temperatures[0]
+                #     tiltsensor_data['data']['temperatureY'] = temperatures[1]
 
                 self.agent.publish_to_feed('wgtiltsensor', tiltsensor_data)
 

@@ -27,7 +27,7 @@ class DWL:
 
     def __del__(self):
         print(f"Disconnecting from TCP IP {self.tcp_ip} at port {self.tcp_port}")
-        self.ser.close()
+        self.ser.sock.close()
         return
 
     def get_angle(self):
@@ -57,7 +57,7 @@ class DWL:
             if self.isSingle:
                 val = (-999)
             else:
-                val = (-999, 999)
+                val = (-999, -999)
             return msg, val
 
         # check header matching and calculate the angles
