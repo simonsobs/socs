@@ -119,7 +119,6 @@ class GalilAxisControllerAgent:
 
                 try:
                     data = self.stage.get_data()
-                    self.log.debug("{data}", data=session.data)
                     if session.degraded:
                         self.log.info("Connection re-established.")
                         session.degraded = False
