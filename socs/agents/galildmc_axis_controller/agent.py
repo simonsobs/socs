@@ -26,7 +26,7 @@ class GalilAxisControllerAgent:
         port (int, optional): TCP port to connect, Default is 23
     """
 
-    def __init__(self, agent, ip, configfile, port=23):
+    def __init__(self, agent, ip, configfile=None, port=23):
         self.lock = TimeoutLock()
         self.agent = agent
         self.log = agent.log
@@ -68,7 +68,7 @@ class GalilAxisControllerAgent:
                 return False, "Could not acquire lock."
 
             # Establish connection to galil stage controller
-            self.stage = GalilAxis(self.ip, self.port, self.configfile)
+            self.stage = GalilAxis(self.ip, self.configfile, self.port)
 
             # test connection
             try:
@@ -106,7 +106,7 @@ class GalilAxisControllerAgent:
 
             self.take_data = True
 
-            pm = Pacemaker(1)  # , quantize=True)
+            pm = Pacemaker(0.1)  # , quantize=True)
             while self.take_data:
                 pm.sleep()
                 # Reliqinuish sampling lock occassionally
@@ -734,7 +734,7 @@ class GalilAxisControllerAgent:
         **Task** - ??
 
         """
-        pol = params['polarity']
+        axis = params['axis']
         with self.lock.acquire_timeout(timeout=5, job='stop_axis_motion') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
@@ -904,7 +904,7 @@ def main(args=None):
     agent.register_task('set_relative_linearpos', galilaxis_agent.set_relative_linearpos)
     agent.register_task('set_absolute_linearpos', galilaxis_agent.set_absolute_linearpos)
     agent.register_task('set_relative_angpos', galilaxis_agent.set_relative_angpos)
-    agent.register_task('set_absolute_angpos', galilaxis_agent.set_absolut_angpos)
+    agent.register_task('set_absolute_angpos', galilaxis_agent.set_absolute_angpos)
     agent.register_task('get_brake_status', galilaxis_agent.get_brake_status)
     agent.register_task('release_axis_brake', galilaxis_agent.release_axis_brake)
     agent.register_task('engage_axis_brake', galilaxis_agent.engage_axis_brake)
