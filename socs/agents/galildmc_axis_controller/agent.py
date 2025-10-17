@@ -14,6 +14,28 @@ from socs.agents.galildmc_axis_controller.drivers import GalilAxis
 # TODO: update docstrings
 # TODO: check jobs in each task to match name of task
 # TODO Tasks: get_relative_position
+# TODO: make sure to return tuple for ocs to not yell at you at the end of each task
+# TODO: fix the way get_data loops through because i think it's too slow
+
+def read_config(configfile):
+    """ read and parse YAML config for axes
+    config file is str"""
+    try:
+        with open(configfile, 'r') as f:
+            cfg = yaml.safe_load(f) or {}
+    except Exception as e:
+        raise RuntimeError(f"Failed to read YAML '{configfile}': {e}")
+
+    gal = cfg.get('galil')
+    if not isinstance(gal, dict):
+        raise ValueError("Config missing top-level 'galil' section.")
+
+    mparams = gal.get('motorconfigparams')
+    if not isinstance(mparams, dict) or not mparams:
+        raise ValueError("galil.motorconfigparams must be a non-empty dict of axes.")
+
+    return cfg
+
 
 class GalilAxisControllerAgent:
     """ Agent for controlling Galil axis motors used in SAT
@@ -26,7 +48,7 @@ class GalilAxisControllerAgent:
         port (int, optional): TCP port to connect, Default is 23
     """
 
-    def __init__(self, agent, ip, configfile=None, port=23):
+    def __init__(self, agent, ip, configfile, port=23):
         self.lock = TimeoutLock()
         self.agent = agent
         self.log = agent.log
@@ -36,6 +58,15 @@ class GalilAxisControllerAgent:
 
         self.initialized = False
         self.take_data = False
+
+        self.stage = None
+
+        # Configuration state
+        self.cfg = None
+        self.motorsettings = None
+        self.axis_map = None
+        self.axes = None
+
 
         # Register data feeds
         agg_params = {
@@ -47,9 +78,10 @@ class GalilAxisControllerAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
+    @ocs_agent.param('configfile', type=str, default=None)
     @ocs_agent.param('auto_acquire', default=False, type=bool)
     def init(self, session, params=None):
-        """init(auto_acquire=False)
+        """init(configfile=None, auto_acquire=False)
 
         **Task** - Initalize connection to Galil axis controller.
 
@@ -67,17 +99,33 @@ class GalilAxisControllerAgent:
                               "{self.lock.job} is already running")
                 return False, "Could not acquire lock."
 
-            # Establish connection to galil stage controller
-            self.stage = GalilAxis(self.ip, self.configfile, self.port)
-
-            # test connection
+            # Get axes from config file to establish connection to galil stage controller
             try:
-                self.stage.get_data()
+                cfg = read_config(self.configfile)
+            except Exception as e:
+                return False, f'Config load failed: {e}. Could not start connection.'
+
+            self.cfg = cfg 
+            gal = self.cfg['galil']
+            self.axes = list(gal['motorconfigparams'].keys())
+
+            # Establish connection
+            self.stage = GalilAxis(ip=self.ip, port=self.port, configfile=self.configfile)
+
+            # Test connection
+            try:
+                self.stage.get_data(self.axes)
             except ConnectionError:
                 self.log.error("Could not establish connection to galil axis motor controller")
                 return False, "Galil Axis Controller agent initialization failed"
 
         self.initialized = True
+
+        # load configfile if provided as init argument
+        if params.get('configfile'):
+            ok, msg = self.input_configfile(session, {'configfile': params['configfile']})
+            if not ok:
+                return False, f'Config load failsed: {msg}'
 
         # start data acquistion if requested
         if params['auto_acquire']:
@@ -106,7 +154,7 @@ class GalilAxisControllerAgent:
 
             self.take_data = True
 
-            pm = Pacemaker(0.1)  # , quantize=True)
+            pm = Pacemaker(0.5)  # , quantize=True)
             while self.take_data:
                 pm.sleep()
                 # Reliqinuish sampling lock occassionally
@@ -118,7 +166,8 @@ class GalilAxisControllerAgent:
                         continue
 
                 try:
-                    data = self.stage.get_data()
+                    data = self.stage.get_data(self.axes)
+                    print('data', data)
                     if session.degraded:
                         self.log.info("Connection re-established.")
                         session.degraded = False
@@ -185,7 +234,7 @@ class GalilAxisControllerAgent:
             self.stage.set_relative_linearpos(axis, dist)
             value, units = self.stage.query_relative_position(axis=axis, movetype='linear')
             session.add_message(f'{axis} set to relative linear position: {value}{units}')
-            
+
             # setting the conditions for beginning motion 
             if value == dist:
                 self.stage.begin_motion(axis)
@@ -285,7 +334,7 @@ class GalilAxisControllerAgent:
         **Task** - Query brakes status for all 4 axess
 
         """
-        with self.lock.acquire_timeout(timeout=5, job='get_brake_status') as acquired:
+        with self.lock.acquire_timeout(timeout=3, job='get_brake_status') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
@@ -296,6 +345,23 @@ class GalilAxisControllerAgent:
 
         return True, 'Queried brake status'
 
+    @ocs_agent.param('axis', type=str)
+    def check_axis_onoff(self, session, params):
+        """check_axis_onoff()
+
+        **Task** - Check if an axis is enabled
+
+        """
+        with self.lock.acquire_timeout(timeout=3, job='check_axis_onoff') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            response = self.stage.get_brake_status()
+            session.add_message(str(response))
+
+        return True, 'Queried whether axis is on or off'
 
     @ocs_agent.param('axis', type=str)
     def release_axis_brake(self, session, params):
@@ -398,7 +464,8 @@ class GalilAxisControllerAgent:
 
 
     @ocs_agent.param('axis', type=str)
-    def disable_off_on_error(self, session, params):
+    @ocs_agent.param('errtype', type=int)
+    def set_off_on_error(self, session, params):
         """disable_off_on_error(axis)
 
         **Task** - Disables the off-on-error function for the specified axis, 
@@ -410,14 +477,15 @@ class GalilAxisControllerAgent:
 
         """
         axis = params['axis']
-        with self.lock.acquire_timeout(timeout=5, job='disable_off_on_error') as acquired:
+        errtype = params['errtype']
+        with self.lock.acquire_timeout(timeout=3, job='disable_off_on_error') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            self.stage.disable_off_on_error(axis)
-            self.log.info(f'Off-on-error for {axis} disabled')
+            self.stage.set_off_on_error(axis, errtype)
+            self.log.info(f'Off-on-error for {axis} is set to {errtype}')
 
         return True
 
@@ -425,7 +493,7 @@ class GalilAxisControllerAgent:
     # TODO, add default value for val
     # TODO: finish the docstring
     @ocs_agent.param('axis', type=str)
-    @ocs_agent.param('val', type=float)
+    @ocs_agent.param('val', type=int)
     def set_amp_gain(self, session, params):
         """set_amp_gain(axis, val)
 
@@ -471,13 +539,12 @@ class GalilAxisControllerAgent:
                 return False, "Could not acquire lock"
 
             self.stage.set_torque_limit(axis, val)
-            self.log.info(f'Torque limit for {axis} set to {val} volts')
 
-        return True
+        return True, f'Torque limit for {axis} set to {val} volts'
 
 
     @ocs_agent.param('axis', type=str)
-    @ocs_agent.param('val', type=float)
+    @ocs_agent.param('val', type=int)
     def set_amp_currentloop_gain(self, session, params):
         """set_amp_currentloop_gain(axis, val)
 
@@ -497,9 +564,8 @@ class GalilAxisControllerAgent:
                 return False, "Could not acquire lock"
 
             self.stage.set_amp_currentloop_gain(axis, val)
-            self.log.info(f'Torque limit for {axis} set to {val}')
 
-        return True
+        return True, f'Amp current loop gain set to {val} for axis {axis}'
 
     # TODO: fix the docstring
     @ocs_agent.param('axis', type=str)
@@ -605,9 +671,8 @@ class GalilAxisControllerAgent:
                 return False, "Could not acquire lock"
 
             self.stage.jog_axis(axis, speed)
-            self.log.info(f"{axis}'s speed is now set to {speed}")
 
-        return True
+        return True. f'{axis} speed is now set to {speed}'
 
     # TODO: docstrings
     @ocs_agent.param('axis', type=str)
@@ -629,9 +694,12 @@ class GalilAxisControllerAgent:
                 return False, "Could not acquire lock"
 
             self.stage.enable_axis(axis)
-            self.log.info(f"{axis} is enabled.")
+            status = self.stage.check_axis_onoff(axis=axis)
+            if status == 1:
+                self.log.info('Motor axis is not enabled. Try again.')
 
-        return True
+
+        return True, f'{axis} is enabled.'
 
 
     # TODO: docstrings
@@ -808,7 +876,6 @@ class GalilAxisControllerAgent:
 
 
         """
-
         configfile = params['configfile']
         if configfile is None:
             configfile = self.configfile
@@ -819,14 +886,22 @@ class GalilAxisControllerAgent:
         with self.lock.acquire_timeout(job='input_configfile') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
-                              f"{self._lock.job} is already running")
+                              f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
+            
+            
+            cfg = read_config(configfile)
+            # TODO: do we really need another self.cfg here?
+            try:
+                gal = cfg.get('galil', {})
+                self.cfg = cfg
+                self.motorsettings = gal.get('motorsettings', {})
+                self.axis_map = gal.get('motorconfigparams', {})
+                self.axes = list(self.axis_map.keys())
+                self.stage.set_config(cfg)
+            except Exception as e:
+                return False, f'Config parse error: {e}'
 
-            with open(configfile) as f:
-                config = yaml.safe_load(f)
-            
-            axes = list(config['galil']['motorconfigparams'].keys())
-            
             for a in axes:
                 # set motor type
                 motortype = config['galil']['motorconfigparams'][a]['MT']
@@ -873,8 +948,8 @@ def make_parser(parser=None):
     # Add options specific to this agent
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip')
-    pgroup.add_argument('--configfile')
     pgroup.add_argument('--port', default=23)
+    pgroup.add_argument('--configfile')
     pgroup.add_argument('--mode', choices=['init', 'acq'])
 
     return parser
@@ -899,7 +974,7 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
 
     # create agent instance and run log creation
-    galilaxis_agent = GalilAxisControllerAgent(agent, args.ip, args.port)
+    galilaxis_agent = GalilAxisControllerAgent(agent, args.ip,  args.configfile)
     agent.register_task('init', galilaxis_agent.init, startup=init_params)
     agent.register_task('set_relative_linearpos', galilaxis_agent.set_relative_linearpos)
     agent.register_task('set_absolute_linearpos', galilaxis_agent.set_absolute_linearpos)
@@ -911,7 +986,7 @@ def main(args=None):
     agent.register_task('begin_axis_motion', galilaxis_agent.begin_axis_motion)
     agent.register_task('stop_axis_motion', galilaxis_agent.stop_axis_motion)
     agent.register_task('set_motortype', galilaxis_agent.set_motortype)
-    agent.register_task('disable_off_on_error', galilaxis_agent.disable_off_on_error)
+    agent.register_task('set_off_on_error', galilaxis_agent.set_off_on_error)
     agent.register_task('set_amp_gain', galilaxis_agent.set_amp_gain)
     agent.register_task('set_torque_limit', galilaxis_agent.set_torque_limit)
     agent.register_task('set_amp_currentloop_gain', galilaxis_agent.set_amp_currentloop_gain)
@@ -922,6 +997,7 @@ def main(args=None):
     agent.register_task('enable_axis', galilaxis_agent.enable_axis)
     agent.register_task('enable_sin_commutation', galilaxis_agent.enable_sin_commutation)
     agent.register_task('disable_axis', galilaxis_agent.disable_axis)
+    agent.register_task('check_axis_onoff', galilaxis_agent.check_axis_onoff)
     agent.register_task('disable_limit_switch', galilaxis_agent.disable_limit_switch)
     agent.register_task('set_limitswitch_polarity', galilaxis_agent.set_limitswitch_polarity)
     agent.register_task('set_gearing', galilaxis_agent.set_gearing)

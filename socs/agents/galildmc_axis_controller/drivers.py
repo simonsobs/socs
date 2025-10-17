@@ -10,17 +10,35 @@ from socs.tcp import TCPInterface
 # TODO: ask shreya about homing procedure; have the methods but don't have a full fledged
 # homing method---do we need one?
 # TODO: change prints to logs?
+# TODO use the _safe_float method that was just written
 
 
 class GalilAxis(TCPInterface):
-    def __init__(self, ip, configfile, port=23, timeout=10):
+    def __init__(self, ip, port=23, configfile=None, timeout=10):
         """Interface class for connecting to GalilStageController for SO SAT Coupling Optics."""
         self.ip = ip
         self.port = port
-        self.timeout = timeout
         self.configfile = configfile
+        self.timeout = timeout
 
         super().__init__(self.ip, self.port, self.timeout)
+
+    def _safe_float(self, val):
+        """Convert Galil return string to float or NaN on error/'?'/empty."""
+        if val is None:
+            return math.nan
+        if isinstance(val, str):
+            s = val.strip()
+            if s in ("", "?", "??"):
+                return math.nan
+            try:
+                return float(s)
+            except Exception:
+                return math.nan
+        try:
+            return float(val)
+        except Exception:
+            return math.nan
 
     def _drain_prompt(self):
         """
@@ -99,14 +117,15 @@ class GalilAxis(TCPInterface):
 
         # if we get a '?', handle it right away, unless it's a begin motion command;
         # we expect a '?' to occur mid-motion
-        if cmd.startswith("BG"):
+        if 'MG' not in cmd:
             self._drain_prompt()
             time.sleep(0.3)
             self.send(msg)
+            resp = ''
         else:
             for attempt in range(3):
-                if "?" in resp:
-                    print(f"Received {resp} — retrying ({attempt+1}/3)...")
+                if '?' or '??' in resp:
+                    #print(f"Received {resp} — retrying ({attempt+1}/3)...")
                     self._drain_prompt()
                     time.sleep(0.3)
                     self.send(msg)
@@ -114,10 +133,11 @@ class GalilAxis(TCPInterface):
                 else:
                     break
 
-        try:
-            return float(resp)
-        except Exception as e:
-            print(f'Exception {e} occurred. response is not a float: {resp}')
+        #try:
+        #    return float(resp)
+        #except Exception as e:
+        #    print(f'Exception {e} occurred. response is not a float: {resp}')
+        return resp
 
     def get_relative_position(self, axis, movetype=None):
         """
@@ -149,53 +169,59 @@ class GalilAxis(TCPInterface):
         return value, units
 
     # TODO: add ability to publish encoder units in values of mm and degs
-    def get_data(self):
+    def get_data(self, axes):
         """
         Query position (_TP), velocity (_TV), and torque (_TT)
         for each active Galil axis using the robust galil_command().
         Returns a dict ready for OCS publication.
+        axes is list of axes like ['A', 'B', 'C']
         """
-        if isinstance(self.configfile, str):
-            try:
-                with open(self.configfile, "r") as f:
-                    config = yaml.safe_load(f)
-            except Exception as e:
-                raise RuntimeError(f"Failed to load config file '{self.configfile}': {e}")
+        if not axes or not isinstance(axes, list):
+            raise ValueError("get_data() requires a list of axes from agent (e.g. ['E','F']).")
 
         data = {}
-        axes = list(config['galil']['motorconfigparams'].keys())
 
         for axis in axes:
             axis_data = {}
 
             # --- Position ---
             pos = self.galil_command("MG _TP", axis, expect_response=True)
-            if pos is None or isinstance(pos, str) and pos in ("?", "??"):
+            if pos is None or pos in ('?', '??', ''):
                 pos = math.nan
+            else:
+                pos = float(pos)
             axis_data["position"] = pos
 
             # --- Velocity ---
             vel = self.galil_command("MG _TV", axis, expect_response=True)
-            if vel is None or isinstance(vel, str) and vel in ("?", "??"):
+            if vel is None or vel in ('?', '??', ''):
                 vel = math.nan
+            else:
+                vel = float(vel)
             axis_data["velocity"] = vel
 
             # --- Torque ---
             trq = self.galil_command("MG _TT", axis, expect_response=True)
-            if trq is None or isinstance(trq, str) and trq in ("?", "??"):
+            if trq is None or trq in ('?', '??', ''):
                 trq = math.nan
+            else:
+                trq = float(trq)
             axis_data["torque"] = trq
 
             # --- Position Error ---
             poserr = self.galil_command("MG _TE", axis, expect_response=True)
-            if poserr is None or isinstance(poserr, str) and trq in ("?", "??"):
+            if poserr is None or poserr in ('?', '??', ''):
                 poserr = math.nan
+            else:
+                poserr = float(poserr)
             axis_data["position_error"] = poserr
 
             # --- Gearing Ratio ---
             gr = self.galil_command("MG _GR", axis, expect_response=True)
-            if gr is None or isinstance(gr, str) and trq in ("?", "??"):
+            if gr is None or gr in ('?', '??', ''):
                 gr = math.nan
+            else:
+                gr = float(gr)
             axis_data["gearing_ratio"] = gr
 
             data[axis] = axis_data
@@ -205,19 +231,22 @@ class GalilAxis(TCPInterface):
 
         return data
 
+    def is_running(self, axis):
+        """Checks if the axis is running"""
+        cmd = 'MG _BG'
+        resp = self.galil_command(cmd, axis)
+        return resp
+
     def begin_motion(self, axis):
         """Begin motion for the specified axis using the BG command."""
         self.galil_command(command="BG", axis=axis)
-        time.sleep(0.1)
+        time.sleep(1)
 
-        state = self.galil_command(f'MG _BG{axis}', expect_response=True)
-        if state.strip() == '1':
+        state = self.is_running(axis)
+        if state == '1':
             print(f'Axis {axis} is in motion.')
         else:
             print(f'Axis {axis} did not move. Try again.')
-
-    # TODO: wouldn't have a response that we care about? do we really need to return a response?
-    # maybe we can do a query from get_relative_linearpos?
 
     def set_relative_linearpos(self, axis, lindist, encodeunits=False):
         """Move all linear axes by a given distance in mm, which is converted
@@ -372,9 +401,9 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=f'MT{axis}={motortype};')
         return resp
 
-    def disable_off_on_error(self, axis):
-        """Disables the Off-On-Error (OE) function for the specified axis, preventing the controller from shutting off motor commands in response to position errors."""
-        resp = self.galil_command(command=f'OE{axis}=0;')
+    def set_off_on_error(self, axis, errtype):
+        """Set the Off-On-Error (OE) function for the specified axis. 1 enables it, 0 disables it."""
+        resp = self.galil_command(command=f'OE{axis}={errtype};')
         return resp
 
     def set_amp_gain(self, axis, val=2):
@@ -448,13 +477,18 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=cmd)
         return resp
 
-    def enable_axis(self, axis=None):
+    def enable_axis(self, axis):
         """Enable servo for an axis (e.g. A, B, C, D)."""
-        cmd = f'{SH}{axis};'
+        cmd = f'SH{axis};'
         resp = self.galil_command(command=cmd)
         return resp
 
     def disable_axis(self, axis):
         """Motor off for an axis."""
         resp = self.galil_command(command=f"MO{axis}")
+        return resp
+
+    def check_axis_onoff(self, axis):
+        """Motor off for an axis."""
+        resp = self.galil_command(command=f"MG _MO{axis}")
         return resp
