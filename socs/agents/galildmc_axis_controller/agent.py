@@ -17,6 +17,7 @@ from socs.agents.galildmc_axis_controller.drivers import GalilAxis
 # TODO: make sure to return tuple for ocs to not yell at you at the end of each task
 # TODO: check input_configfile and if it needs to be updated
 # TODO: unable to format event for logger for getting motor state
+# TODO: safety checks when thinking about the positional error between two axes --> alarm? David?
 
 def read_config(configfile):
     """ read and parse YAML config for axes
