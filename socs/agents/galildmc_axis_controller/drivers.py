@@ -14,31 +14,13 @@ from socs.tcp import TCPInterface
 
 
 class GalilAxis(TCPInterface):
-    def __init__(self, ip, port=23, configfile=None, timeout=10):
+    def __init__(self, ip, port=23, timeout=10):
         """Interface class for connecting to GalilStageController for SO SAT Coupling Optics."""
         self.ip = ip
         self.port = port
-        self.configfile = configfile
         self.timeout = timeout
 
         super().__init__(self.ip, self.port, self.timeout)
-
-    def _safe_float(self, val):
-        """Convert Galil return string to float or NaN on error/'?'/empty."""
-        if val is None:
-            return math.nan
-        if isinstance(val, str):
-            s = val.strip()
-            if s in ("", "?", "??"):
-                return math.nan
-            try:
-                return float(s)
-            except Exception:
-                return math.nan
-        try:
-            return float(val)
-        except Exception:
-            return math.nan
 
     def _drain_prompt(self):
         """
@@ -91,55 +73,66 @@ class GalilAxis(TCPInterface):
                 return tc_resp
 
     def galil_command(self, command=None, axis=None, value=None,
-                      timeout=3.0, expect_response=False):
+                      expect_response=False, retries=3):
         """
-        Builds and transmits the command string, handles '?' retries for transient
-        errors, and converts numeric responses to floats when possible.
-        Motion-starting commands (BG) skip retries, as '?' responses are expected
-        during active motion.
+        Send a command to the Galil controller and optionally return its response.
 
+        Parameters
+        ----------
+        command : str
+            The Galil command (e.g., 'TP', 'BG', 'SP', etc.)
+        axis : str, optional
+            The axis letter (e.g., 'A', 'B', 'E', etc.)
+        value : float or str, optional
+            Value to assign if applicable (e.g., SP=1000).
+        expect_response : bool
+            Whether to expect and return a response (True for queries like TP, TV, TT, TE).
+        retries : int
+            Number of retries if a '?' response is received.
+
+        Returns
+        -------
+        str | None
+            The controller's response (if expect_response=True), otherwise None.
         """
+
+        # --- Build command string ---
         if axis is not None and value is not None:
-            cmd = f"{command}{axis} = {value}"
+            cmd = f"{command}{axis}={value}"
         elif axis is not None:
             cmd = f"{command}{axis}"
-        elif command and value:
-            cmd = f"{command} = {value}"
+        elif value is not None:
+            cmd = f"{command}={value}"
         else:
             cmd = f"{command}"
 
         msg = f"{cmd}\r".encode("ascii")
 
-        self._drain_prompt()  # clear any old data
-        time.sleep(0.300)
+        # ---drain the prompt ---
+        self._drain_prompt()
+        time.sleep(0.100)
         self.send(msg)
-        resp = self.recv().decode("ascii", errors="ignore").strip(":\r\n")
 
-        # if we get a '?', handle it right away, unless it's a begin motion command;
-        # we expect a '?' to occur mid-motion
-        if 'MG' not in cmd:
-            self._drain_prompt()
-            time.sleep(0.3)
-            self.send(msg)
+
+        if not expect_response:
             resp = ''
-        else:
-            for attempt in range(3):
-                if '?' or '??' in resp:
-                    #print(f"Received {resp} — retrying ({attempt+1}/3)...")
-                    self._drain_prompt()
-                    time.sleep(0.3)
-                    self.send(msg)
-                    resp = self.recv().decode("ascii", errors="ignore").strip(":\r\n")
-                else:
-                    break
+            return resp
 
-        #try:
-        #    return float(resp)
-        #except Exception as e:
-        #    print(f'Exception {e} occurred. response is not a float: {resp}')
+        # --- receive and retry on '?' ---
+        for attempt in range(retries):
+            resp = self.recv().decode("ascii", errors="ignore").strip(":\r\n")
+
+            if resp in ("?", "??", ""):
+                self._drain_prompt()
+                time.sleep(0.1)
+                self.send(msg)
+                continue
+            else:
+                break
+
         return resp
 
-    def get_relative_position(self, axis, movetype=None):
+    def get_relative_position(self, axis, movetype=None, counts_per_mm=None, counts_per_deg=None):
         """
         Query the relative position set for a specified axis using galil_command.
         Converts counts to physical units if movetype is 'linear' or 'angular'.
@@ -148,93 +141,81 @@ class GalilAxis(TCPInterface):
         units = units_map.get(movetype, '')
 
         # --- Query the controller using robust galil_command() ---
-        value = self.galil_command("MG _PR", axis)
+        value = self.galil_command("MG _PR", axis, expect_response=True)
         try:
             value = float(value)
         except Exception as e:
-            print(f'Exception occurred, returning nana: {e}')
+            print(f'Exception occurred, returning nan: {e}')
             return math.nan, units
 
-        # --- Convert from counts to units if known ---
-        try:
-            if movetype == 'linear':
-                value /= self.countspermm
-            elif movetype == 'angular':
-                value /= self.countsperdeg
-        except AttributeError:
-            print("countspermm / countsperdeg not defined on this class.")
-        except Exception as e:
-            print(f"Error converting units: {e}")
+        # If no movetype, just return raw counts
+        if movetype is None:
+            return value
 
-        return value, units
+        # Optional conversion if provided
+        if movetype == 'linear' and counts_per_mm:
+            value /= counts_per_mm
+            return value, 'mm'
+        elif movetype == 'angular' and counts_per_deg:
+            value /= counts_per_deg
+            return value, 'deg'
 
     # TODO: add ability to publish encoder units in values of mm and degs
     def get_data(self, axes):
         """
-        Query position (_TP), velocity (_TV), and torque (_TT)
-        for each active Galil axis using the robust galil_command().
-        Returns a dict ready for OCS publication.
-        axes is list of axes like ['A', 'B', 'C']
+        Query position (TP), velocity (TV), torque (TT), and position error (TE)
+        for all axes in one batch, then subset results for the requested axes.
+
+        Parameters
+        ----------
+        axes : list[str]
+            List of axes (e.g. ['E','F']) that the OCS agent cares about.
+
+        Returns
+        -------
+        dict
+            Dictionary of axis data keyed by axis letter.
         """
         if not axes or not isinstance(axes, list):
-            raise ValueError("get_data() requires a list of axes from agent (e.g. ['E','F']).")
+            raise ValueError("get_data() requires a list of axes, e.g. ['E','F'].")
 
         data = {}
 
+        # Order of axes is always A–H on Galil (up to 8 possible)
+        all_axes = ['A','B','C','D','E','F','G','H']
+
+        tp = [float(x) for x in self.galil_command('TP', expect_response=True).split(',')]
+        tv = [float(x) for x in self.galil_command('TV', expect_response=True).split(',')]
+        tt = [float(x) for x in self.galil_command('TT', expect_response=True).split(',')]
+        te = [float(x) for x in self.galil_command('TE', expect_response=True).split(',')]
+
+        # Determine how many valid axes are reported (Galil reports starting from A)
+        n_axes = max(len(tp), len(tv), len(tt), len(te))
+        active_axes = all_axes[:n_axes]
+
+        # --- Build dict per axis ---
+        for i, axis in enumerate(active_axes):
+            if axis not in axes:
+                continue  # skip axes user doesn't care about
+
+            data[axis] = {
+                'position': tp[i] ,
+                'velocity': tv[i] ,
+                'torque':   tt[i] ,
+                'position_error': te[i]
+            }
+
         for axis in axes:
-            axis_data = {}
+            gr = float(self.galil_command(command=f'MG _GR{axis}', expect_response=True))
+            data[axis]["gearing_ratio"] = gr
 
-            # --- Position ---
-            pos = self.galil_command("MG _TP", axis, expect_response=True)
-            if pos is None or pos in ('?', '??', ''):
-                pos = math.nan
-            else:
-                pos = float(pos)
-            axis_data["position"] = pos
-
-            # --- Velocity ---
-            vel = self.galil_command("MG _TV", axis, expect_response=True)
-            if vel is None or vel in ('?', '??', ''):
-                vel = math.nan
-            else:
-                vel = float(vel)
-            axis_data["velocity"] = vel
-
-            # --- Torque ---
-            trq = self.galil_command("MG _TT", axis, expect_response=True)
-            if trq is None or trq in ('?', '??', ''):
-                trq = math.nan
-            else:
-                trq = float(trq)
-            axis_data["torque"] = trq
-
-            # --- Position Error ---
-            poserr = self.galil_command("MG _TE", axis, expect_response=True)
-            if poserr is None or poserr in ('?', '??', ''):
-                poserr = math.nan
-            else:
-                poserr = float(poserr)
-            axis_data["position_error"] = poserr
-
-            # --- Gearing Ratio ---
-            gr = self.galil_command("MG _GR", axis, expect_response=True)
-            if gr is None or gr in ('?', '??', ''):
-                gr = math.nan
-            else:
-                gr = float(gr)
-            axis_data["gearing_ratio"] = gr
-
-            data[axis] = axis_data
-
-            # delay between axes querying
-            time.sleep(0.2)
 
         return data
 
     def is_running(self, axis):
         """Checks if the axis is running"""
-        cmd = 'MG _BG'
-        resp = self.galil_command(cmd, axis)
+        cmd = f'MG _BG{axis}'
+        resp = self.galil_command(cmd, expect_response=True)
         return resp
 
     def begin_motion(self, axis):
@@ -248,173 +229,107 @@ class GalilAxis(TCPInterface):
         else:
             print(f'Axis {axis} did not move. Try again.')
 
-    def set_relative_linearpos(self, axis, lindist, encodeunits=False):
-        """Move all linear axes by a given distance in mm, which is converted
-        into encoder counts.
-        axis (str), lindist = int/float in mm units"""
-        if isinstance(self.configfile, str):
-            try:
-                with open(self.configfile, "r") as f:
-                    config = yaml.safe_load(f)
-            except Exception as e:
-                raise RuntimeError(f"Failed to load config file '{self.configfile}': {e}")
-        try:
-            countspermm = config['galil']['motorsettings']['countspermm']
-            counts = round(lindist * countspermm, 3)
-        except Exception as e:
-            print(f'Exception occured: {e}')
+    def set_relative_position(self, axis, distance, counts_per_unit=None, encodeunits=False):
+        """Move axis by a relative distance (in units or encoder counts)."""
+        if not encodeunits and counts_per_unit is None:
+            raise ValueError("counts_per_unit required when encodeunits=False")
 
-        if encodeunits:
-            counts = lindist
-        resp = self.galil_command(command=f"PR{axis}={counts};")
+        counts = distance if encodeunits else round(distance * counts_per_unit, 3)
+        return self.galil_command("PR", axis=axis, value=counts)
 
-        return resp
+    def set_absolute_position(self, axis, position, counts_per_unit=None, encodeunits=False):
+        """Set absolute position (PA) for an axis in units or encoder counts."""
+        if not encodeunits and counts_per_unit is None:
+            raise ValueError("counts_per_unit required when encodeunits=False")
 
-    def set_absolute_linearpos(self, axis, pos):
-        """Move all linear axes by a given distance in mm, which is converted
-        into encoder counts.
-        axis (str), pos = int/float; the actual position you want it to go to"""
-        if isinstance(self.configfile, str):
-            try:
-                with open(self.configfile, "r") as f:
-                    config = yaml.safe_load(f)
-            except Exception as e:
-                raise RuntimeError(f"Failed to load config file '{self.configfile}': {e}")
-        try:
-            countspermm = config['galil']['motorsettings']['countspermm']
-        except Exception as e:
-            print(f'Exception occured: {e}')
+        counts = position if encodeunits else round(position * counts_per_unit, 3)
+        return self.galil_command("PA", axis=axis, value=counts)
 
-        counts = round(pos * countspermm, 3)
-        resp = self.galil_command(command="PA", axis=axis, value=counts)
-
-        return resp
-
-    def set_relative_angularpos(self, axis, angdist):
-        """Move all linear axes by a given distance in mm, which is converted
-        into encoder counts.
-        axis (str), angdist = int/float in degree units"""
-        if isinstance(self.configfile, str):
-            try:
-                with open(self.configfile, "r") as f:
-                    config = yaml.safe_load(f)
-            except Exception as e:
-                raise RuntimeError(f"Failed to load config file '{self.configfile}': {e}")
-
-        try:
-            countsperdeg = config['galil']['motorsettings']['countsperdeg']
-        except Exception as e:
-            print(f'Exception occured: {e}')
-
-        counts = round(angdist * countsperdeg, 3)
-        resp = self.galil_command(command="PR", axis=axis, value=counts)
-
-        return resp
-
-    def set_absolute_angularpos(self, axis, pos):
-        """Move all linear axes by a given distance in mm, which is converted
-        into encoder counts.
-        axis (str), pos  = int/float; the angular position you actually wanna go to"""
-        if isinstance(self.configfile, str):
-            try:
-                with open(self.configfile, "r") as f:
-                    config = yaml.safe_load(f)
-            except Exception as e:
-                raise RuntimeError(f"Failed to load config file '{self.configfile}': {e}")
-
-        try:
-            countsperdeg = config['galil']['motorsettings']['countsperdeg']
-        except Exception as e:
-            print(f'Exception occured: {e}')
-
-        counts = round(pos * countsperdeg, 3)
-        resp = self.galil_command(command="PA", axis=axis, value=counts)
-
-        return resp
-
-    def release_brake(self, axis):
+    def release_brake(self, output_num):
         """Release brake to axis by using the GalilDMC SB command which sets the digital
         output to 1 which somehow means it releases the brake. Galil command expects an int
         for digital output number"""
-        try:
-            digital_output = self.configfile['galil']['brakes']['output_map'][axis]
-        except Exception as e:
-            print(f'Exception occured: {e}')
-        resp = self.galil_command(command="SB", value=brake_output)
+        resp = self.galil_command(command="SB", value=output_num)
         return resp
 
-    def engage_brake(self, axis):
+    def engage_brake(self, output_num):
         """ Engage the brake for the specified axis using the Galil CB command.
         Reads the brake output mapping from the config file (under galil.brakes.output_map)."""
-        try:
-            digital_output = self.configfile['galil']['brakes']['output_map'][axis]
-        except Exception as e:
-            print(f'Exception occured: {e}')
-        resp = self.galil_command(command="CB", value=brake_output)
+        resp = self.galil_command(command="CB", value=output_num)
         return resp
 
-    def get_brake_status(self, axis=None):
-        """
-        Query brake status for one or all axes using @OUT[n].
-        Reads brake output mapping from galil.brakes.output_map in the config file.
-        If axis is specified, only that brake is queried.
-        """
-        if isinstance(self.configfile, str):
-            try:
-                with open(self.configfile, "r") as f:
-                    config = yaml.safe_load(f)
-            except Exception as e:
-                raise RuntimeError(f"Failed to load config file '{self.configfile}': {e}")
+    def get_brake_status(self, axis, output_map):
+        """Return brake status for axis via @OUT[n]."""
+        output_num = output_map[axis]
+        query_str = f"@OUT[{output_num}]"
+        val = self.galil_command(command="MG", value=query_str)
 
-        brake_states = {}
+        try:
+            state = int(round(float(val)))
+        except (TypeError, ValueError):
+            print(f"Could not parse brake value '{val}' for axis {axis}.")
+            return {axis: {"state": None, "status": "Unknown"}}
 
-        output_map = config['galil']['brakes']['output_map']
+        if state == 1:
+            status = "Brake Released"
+        if state == 0:
+            status = "Brake Engaged"
 
-        # If a specific axis was given, limit to that one
-        if axis:
-            output_map = {axis: output_map.get(axis)}
+        return {axis: {"state": state, "status": status}}
 
-        for label, output_num in output_map.items():
-            # the digital output string for querying brake status: MG @OUT[n]
-            query_str = f"@OUT[{output_num}]"
-            val = self.galil_command(command="MG", value=query_str)
-
-            try:
-                num_val = float(val)
-                state = int(round(num_val))
-            except (TypeError, ValueError):
-                print(f"Could not parse brake value '{val}' for axis {label}.")
-                brake_states[label] = {"state": None, "status": "Unknown"}
-                continue
-
-            if state == 1:
-                status = "Brake Released"
-            elif state == 0:
-                status = "Brake Engaged"
-
-            brake_states[label] = {"state": state, "status": status}
-
-        return brake_states
-
-    def set_motor_type(self, axis, motortype=1):
+    def get_motor_type(self, axis):
+        """Return motor type for given axis via MG _MT{axis}."""
+        resp = self.galil_command(f"MG _MT", axis=axis, expect_response=True)
+        return resp
+    
+    def get_gearing_ratio(self, axis):
+        """Return gearing ratio for given axis."""
+        resp= float(self.galil_command(command=f'MG _GR{axis}', expect_response=True))
+        return resp
+    
+    def set_motor_type(self, axis, motortype):
         """set the motor type for each axis. defaults to 1, the servo motor (3-phased brushless)"""
         resp = self.galil_command(command=f'MT{axis}={motortype};')
         return resp
+
+    def get_off_on_error(self, axis):
+        """Query the Off-On-Error (OE) state for an axis and return raw + human-readable."""
+        resp = self.galil_command("MG _OE", axis=axis, expect_response=True)
+        try:
+            val = int(float(resp))
+        except Exception:
+            print(f"Unexpected response from MG _OE{axis}: {resp}")
+            return None, "unknown"
+
+        human_state = "enabled" if val == 1 else "disabled" if val == 0 else f"unknown ({val})"
+        return val, human_state
 
     def set_off_on_error(self, axis, errtype):
         """Set the Off-On-Error (OE) function for the specified axis. 1 enables it, 0 disables it."""
         resp = self.galil_command(command=f'OE{axis}={errtype};')
         return resp
 
+    def get_amp_gain(self, axis):
+        """Query the amplifier gain (AG) value for an axis."""
+        return self.galil_command("MG _AG", axis=axis, expect_response=True)
+
     def set_amp_gain(self, axis, val=2):
         """ set amplifier current/voltage gain for internal amplifier per axis. Default is 2"""
         resp = self.galil_command(command=f'AG{axis}={val};')
         return resp
 
+    def get_torque_limit(self, axis):
+        """Query the motor torque limit (TL) value for an axis."""
+        return self.galil_command("MG _TL", axis=axis, expect_response=True)
+
     def set_torque_limit(self, axis, val=5):
         """ set motor torque limit per axis. Default is 5."""
         resp = self.galil_command(command=f'TL{axis}={val};')
         return resp
+
+    def get_amp_currentloop_gain(self, axis):
+        """Query the amplifier current loop gain (AU) value for an axis."""
+        return self.galil_command("MG _AU", axis=axis, expect_response=True)
 
     def set_amp_currentloop_gain(self, axis, val=9):
         """ set amplifier current loop gain per axis. Default is 9."""
@@ -455,9 +370,9 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=f'CN {pol};')
         return resp
 
-    def stop_motion(self, axis=None):
+    def stop_motion(self, axis):
         """Stop motion. If axis is None, stop all."""
-        cmd = "ST;" if axis is None else f"ST {axis};"
+        cmd = f"ST {axis};"
         resp = self.galil_command(command=cmd)
         return resp
 
@@ -477,18 +392,36 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=cmd)
         return resp
 
-    def enable_axis(self, axis):
-        """Enable servo for an axis (e.g. A, B, C, D)."""
-        cmd = f'SH{axis};'
-        resp = self.galil_command(command=cmd)
-        return resp
+    def set_motor_state(self, axis, state):
+        """Enable or disable a motor, then verify its state (0='on', 1='off')."""
+        state = state.lower().strip()
+        if state not in ('enable', 'disable'):
+            raise ValueError("state must be 'enable' or 'disable'.")
 
-    def disable_axis(self, axis):
-        """Motor off for an axis."""
-        resp = self.galil_command(command=f"MO{axis}")
-        return resp
+        # --- Execute command ---
+        if state == 'enable':
+            self.galil_command("SH", axis=axis)
+        elif state == 'disable':
+            self.galil_command("MO", axis=axis)
 
-    def check_axis_onoff(self, axis):
-        """Motor off for an axis."""
-        resp = self.galil_command(command=f"MG _MO{axis}")
-        return resp
+        # --- Allow controller to settle ---
+        time.sleep(1.0)
+
+        # --- Query new state ---
+        status, human_state = self.get_motor_state(axis=axis)
+
+        return status, human_state
+
+    def get_motor_state(self, axis):
+        """Query and interpret whether a motor is ON or OFF for a given axis."""
+        resp = self.galil_command(command=f"MG _MO{axis}", expect_response=True)
+        try:
+            state = int(float(resp))
+        except Exception:
+            print(f"Unexpected response from MG _MO{axis}: {resp}")
+            return None, "unknown"
+
+        # --- Interpret the raw output ---
+        human_state = "off" if state == 1 else "on" if state == 0 else f"unknown ({state})"
+        return state, human_state
+
