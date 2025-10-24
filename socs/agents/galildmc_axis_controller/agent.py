@@ -75,7 +75,6 @@ class GalilAxisControllerAgent:
         self.counts_per_mm = None
         self.counts_per_deg = None
 
-
         # Register data feeds
         agg_params = {
             'frame_length': 60,
@@ -271,13 +270,12 @@ class GalilAxisControllerAgent:
                     self.counts_per_mm if movetype == 'linear' else self.counts_per_deg
                 )
 
-
             self.stage.set_relative_position(axis, distance,
                                              counts_per_unit=counts_per_unit,
                                              encodeunits=encodeunits)
 
             self.log.info(f"Set relative {movetype} position for {axis}: {dist} "
-                  f"{'encoder units' if encodeunits else 'mm'}")
+                          f"{'encoder units' if encodeunits else 'mm'}")
 
         return True, f"Axis {axis} set to relative position: {distance}."
 
@@ -369,7 +367,7 @@ class GalilAxisControllerAgent:
             response = self.stage.get_motor_state(axis=axis)
             session.log.info(f'Motor state is: {response}')
 
-        return True, f'Motor state is: {response}' 
+        return True, f'Motor state is: {response}'
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('state', type=str, choices=['engage', 'release'])
@@ -405,7 +403,6 @@ class GalilAxisControllerAgent:
 
         return True, f"Set brake status to: {state}."
 
-
     @ocs_agent.param('axis', type=str)
     def begin_axis_motion(self, session, params):
         """begin_axis_motion(axis)
@@ -428,7 +425,6 @@ class GalilAxisControllerAgent:
 
         return True, f'Commanded {axis} to move.'
 
-
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('motortype', type=int)
     def set_motor_type(self, session, params):
@@ -441,7 +437,7 @@ class GalilAxisControllerAgent:
 
         """
         axis = params['axis']
-        motortype = params['motortype'] 
+        motortype = params['motortype']
         with self.lock.acquire_timeout(timeout=5, job='set_motor_type') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
@@ -573,7 +569,6 @@ class GalilAxisControllerAgent:
 
         return True, f"Amplifer Gain for {axis}: {resp}"
 
-
     @ocs_agent.param('axis', type=str)
     def get_amp_currentloop_gain(self, session, params):
         """get_amp_currentloop_gain(axis)
@@ -593,7 +588,6 @@ class GalilAxisControllerAgent:
             resp = self.stage.get_amp_currentloop_gain(axis)
 
         return True, f"Amplifer Current Loop Gain for {axis}: {resp}"
-
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=float)
@@ -620,7 +614,6 @@ class GalilAxisControllerAgent:
             self.stage.set_torque_limit(axis, val)
 
         return True, f'Torque limit for {axis} set to {val} volts'
-
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=int)
@@ -743,7 +736,6 @@ class GalilAxisControllerAgent:
 
         return True, f'Initialized {axis} to {val} setting'
 
-
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=float)
     def define_position(self, session, params):
@@ -769,7 +761,6 @@ class GalilAxisControllerAgent:
             self.stage.define_position(axis, val)
 
         return True, f'{axis} position now set to {val}'
-
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('speed', type=float)
@@ -801,7 +792,6 @@ class GalilAxisControllerAgent:
 
         return True, f'{axis} speed is now set to {speed}'
 
-
     @ocs_agent.param('axis', type=str)
     def enable_sin_commutation(self, session, params):
         """enable_sin_commutation(axis)
@@ -824,7 +814,6 @@ class GalilAxisControllerAgent:
 
         return True
 
-
     @ocs_agent.param('axis', type=str)
     def disable_limit_switch(self, session, params):
         """disable_limit_switch(axis)
@@ -846,7 +835,6 @@ class GalilAxisControllerAgent:
             self.log.info(f'Limit switch for {axis} is disabled.')
 
         return True, f'Limit switch for {axis} is disabled.'
-
 
     @ocs_agent.param('polarity', type=int)
     def set_limitswitch_polarity(self, session, params):
@@ -892,7 +880,6 @@ class GalilAxisControllerAgent:
             self.stage.stop_motion(axis)
 
         return True, f'Stopped motion for {axis}.'
-
 
     @ocs_agent.param('order', type=str)
     def set_gearing(self, session, params):
@@ -987,7 +974,6 @@ class GalilAxisControllerAgent:
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-
             cfg = read_config(configfile)
             try:
                 gal = cfg.get('galil', {})
@@ -1029,7 +1015,7 @@ class GalilAxisControllerAgent:
                     # set magnetic cycle
                     mag = gal['initaxisparams']['BM']
                     self.stage.set_magnetic_cycle(axis=a, val=mag)
-                    # initialize 
+                    # initialize
                     val == gal['initaxisparams']['BZ']
                     self.stage.initialize_axis(axis=a, val=val)
 
@@ -1071,7 +1057,7 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
 
     # create agent instance and run log creation
-    galilaxis_agent = GalilAxisControllerAgent(agent, args.ip,  args.configfile)
+    galilaxis_agent = GalilAxisControllerAgent(agent, args.ip, args.configfile)
     agent.register_task('init', galilaxis_agent.init, startup=init_params)
     agent.register_task('set_relative_position', galilaxis_agent.set_relative_position)
     agent.register_task('set_absolute_position', galilaxis_agent.set_absolute_position)

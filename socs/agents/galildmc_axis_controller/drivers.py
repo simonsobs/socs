@@ -1,7 +1,8 @@
-import time
-import os
 import math
+import os
 import select
+import time
+
 import serial
 import yaml
 
@@ -94,7 +95,6 @@ class GalilAxis(TCPInterface):
         time.sleep(0.100)
         self.send(msg)
 
-
         if not expect_response:
             resp = ''
             return resp
@@ -152,7 +152,7 @@ class GalilAxis(TCPInterface):
         data = {}
 
         # Order of axes is always A–H on Galil (up to 8 possible)
-        all_axes = ['A','B','C','D','E','F','G','H']
+        all_axes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
         tp = [float(x) for x in self.galil_command('TP', expect_response=True).split(',')]
         tv = [float(x) for x in self.galil_command('TV', expect_response=True).split(',')]
@@ -172,9 +172,9 @@ class GalilAxis(TCPInterface):
                 continue  # skip axes user doesn't care about
 
             data[axis] = {
-                'position': tp[i] ,
-                'velocity': tv[i] ,
-                'torque':   tt[i] ,
+                'position': tp[i],
+                'velocity': tv[i],
+                'torque': tt[i],
                 'position_error': te[i]
             }
 
@@ -182,7 +182,6 @@ class GalilAxis(TCPInterface):
             for axis in axes:
                 gr = float(self.galil_command(command=f'MG _GR{axis}', expect_response=True))
                 data[axis]["gearing_ratio"] = gr
-
 
         return data
 
@@ -283,7 +282,7 @@ class GalilAxis(TCPInterface):
         Return gearing ratio for given axis.
 
         """
-        resp= float(self.galil_command(command=f'MG _GR{axis}', expect_response=True))
+        resp = float(self.galil_command(command=f'MG _GR{axis}', expect_response=True))
         return resp
 
     def set_motor_type(self, axis, motortype):
@@ -492,4 +491,3 @@ class GalilAxis(TCPInterface):
         # --- Interpret the raw output ---
         human_state = "off" if state == 1 else "on" if state == 0 else f"unknown ({state})"
         return state, human_state
-

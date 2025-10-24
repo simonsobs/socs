@@ -107,5 +107,3 @@ Agent API
 
 .. autoclass:: socs.agents.galildmc_axis_controller.agent.GalilAxisControllerAgent
     :members:
-
-
