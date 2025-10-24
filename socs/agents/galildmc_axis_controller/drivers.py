@@ -1,16 +1,11 @@
 import time
+import os
 import math
 import select
 import serial
 import yaml
 
 from socs.tcp import TCPInterface
-
-# TODO: set speed
-# TODO: ask shreya about homing procedure; have the methods but don't have a full fledged
-# homing method---do we need one?
-# TODO: change prints to logs?
-# TODO use the _safe_float method that was just written
 
 
 class GalilAxis(TCPInterface):
@@ -29,6 +24,9 @@ class GalilAxis(TCPInterface):
         Handles 'Input buffer full' (TC1=5) by pausing and waiting for the controller
         to clear before allowing new commands.
         """
+        if os.environ.get("GALIL_TEST_MODE"):
+            return b":"
+
         start = time.time()
         drained = b""
         received_any = False
@@ -77,23 +75,6 @@ class GalilAxis(TCPInterface):
         """
         Send a command to the Galil controller and optionally return its response.
 
-        Parameters
-        ----------
-        command : str
-            The Galil command (e.g., 'TP', 'BG', 'SP', etc.)
-        axis : str, optional
-            The axis letter (e.g., 'A', 'B', 'E', etc.)
-        value : float or str, optional
-            Value to assign if applicable (e.g., SP=1000).
-        expect_response : bool
-            Whether to expect and return a response (True for queries like TP, TV, TT, TE).
-        retries : int
-            Number of retries if a '?' response is received.
-
-        Returns
-        -------
-        str | None
-            The controller's response (if expect_response=True), otherwise None.
         """
 
         # --- Build command string ---
@@ -134,8 +115,9 @@ class GalilAxis(TCPInterface):
 
     def get_relative_position(self, axis, movetype=None, counts_per_mm=None, counts_per_deg=None):
         """
-        Query the relative position set for a specified axis using galil_command.
-        Converts counts to physical units if movetype is 'linear' or 'angular'.
+        Query the relative position set for a specified axis. Converts counts to physical units if
+        movetype is 'linear' or 'angular'.
+
         """
         units_map = {'linear': 'mm', 'angular': 'deg'}
         units = units_map.get(movetype, '')
@@ -160,21 +142,11 @@ class GalilAxis(TCPInterface):
             value /= counts_per_deg
             return value, 'deg'
 
-    # TODO: add ability to publish encoder units in values of mm and degs
     def get_data(self, axes):
         """
         Query position (TP), velocity (TV), torque (TT), and position error (TE)
         for all axes in one batch, then subset results for the requested axes.
 
-        Parameters
-        ----------
-        axes : list[str]
-            List of axes (e.g. ['E','F']) that the OCS agent cares about.
-
-        Returns
-        -------
-        dict
-            Dictionary of axis data keyed by axis letter.
         """
         if not axes or not isinstance(axes, list):
             raise ValueError("get_data() requires a list of axes, e.g. ['E','F'].")
@@ -213,13 +185,19 @@ class GalilAxis(TCPInterface):
         return data
 
     def is_running(self, axis):
-        """Checks if the axis is running"""
+        """
+        Checks if the axis is moving.
+
+        """
         cmd = f'MG _BG{axis}'
         resp = self.galil_command(cmd, expect_response=True)
         return resp
 
     def begin_motion(self, axis):
-        """Begin motion for the specified axis using the BG command."""
+        """
+        Begin motion for the specified axis using the BG command.
+
+        """
         self.galil_command(command="BG", axis=axis)
         time.sleep(1)
 
@@ -230,7 +208,10 @@ class GalilAxis(TCPInterface):
             print(f'Axis {axis} did not move. Try again.')
 
     def set_relative_position(self, axis, distance, counts_per_unit=None, encodeunits=False):
-        """Move axis by a relative distance (in units or encoder counts)."""
+        """
+        Move axis by a relative distance (in units or encoder counts.
+
+        """
         if not encodeunits and counts_per_unit is None:
             raise ValueError("counts_per_unit required when encodeunits=False")
 
@@ -238,7 +219,10 @@ class GalilAxis(TCPInterface):
         return self.galil_command("PR", axis=axis, value=counts)
 
     def set_absolute_position(self, axis, position, counts_per_unit=None, encodeunits=False):
-        """Set absolute position (PA) for an axis in units or encoder counts."""
+        """
+        Set absolute position for an axis in units or encoder counts.
+
+        """
         if not encodeunits and counts_per_unit is None:
             raise ValueError("counts_per_unit required when encodeunits=False")
 
@@ -246,20 +230,27 @@ class GalilAxis(TCPInterface):
         return self.galil_command("PA", axis=axis, value=counts)
 
     def release_brake(self, output_num):
-        """Release brake to axis by using the GalilDMC SB command which sets the digital
-        output to 1 which somehow means it releases the brake. Galil command expects an int
-        for digital output number"""
+        """
+        Release brake to axis by using the GalilDMC SB command which sets the digital
+        output to 1.
+
+        """
         resp = self.galil_command(command="SB", value=output_num)
         return resp
 
     def engage_brake(self, output_num):
-        """ Engage the brake for the specified axis using the Galil CB command.
-        Reads the brake output mapping from the config file (under galil.brakes.output_map)."""
+        """
+        Engage the brake for the specified axis using the Galil CB command.
+
+        """
         resp = self.galil_command(command="CB", value=output_num)
         return resp
 
     def get_brake_status(self, axis, output_map):
-        """Return brake status for axis via @OUT[n]."""
+        """
+        Return brake status for axis via @OUT[n].
+
+        """
         output_num = output_map[axis]
         query_str = f"@OUT[{output_num}]"
         val = self.galil_command(command="MG", value=query_str)
@@ -278,22 +269,34 @@ class GalilAxis(TCPInterface):
         return {axis: {"state": state, "status": status}}
 
     def get_motor_type(self, axis):
-        """Return motor type for given axis via MG _MT{axis}."""
+        """
+        Return motor type for given axis via MG _MT{axis}.
+
+        """
         resp = self.galil_command(f"MG _MT", axis=axis, expect_response=True)
         return resp
-    
+
     def get_gearing_ratio(self, axis):
-        """Return gearing ratio for given axis."""
+        """
+        Return gearing ratio for given axis.
+
+        """
         resp= float(self.galil_command(command=f'MG _GR{axis}', expect_response=True))
         return resp
-    
+
     def set_motor_type(self, axis, motortype):
-        """set the motor type for each axis. defaults to 1, the servo motor (3-phased brushless)"""
+        """
+        Set the motor type for each axis. The setting is typically 1, the servo motor (3-phased brushless)
+
+        """
         resp = self.galil_command(command=f'MT{axis}={motortype};')
         return resp
 
     def get_off_on_error(self, axis):
-        """Query the Off-On-Error (OE) state for an axis and return raw + human-readable."""
+        """
+        Query the Off-On-Error (OE) state for an axis and return raw + human-readable.
+
+        """
         resp = self.galil_command("MG _OE", axis=axis, expect_response=True)
         try:
             val = int(float(resp))
@@ -305,95 +308,155 @@ class GalilAxis(TCPInterface):
         return val, human_state
 
     def set_off_on_error(self, axis, errtype):
-        """Set the Off-On-Error (OE) function for the specified axis. 1 enables it, 0 disables it."""
+        """
+        Set the Off-On-Error (OE) function for the specified axis.
+
+        """
         resp = self.galil_command(command=f'OE{axis}={errtype};')
         return resp
 
     def get_amp_gain(self, axis):
-        """Query the amplifier gain (AG) value for an axis."""
+        """
+        Query the amplifier gain (AG) value for an axis.
+
+        """
         return self.galil_command("MG _AG", axis=axis, expect_response=True)
 
-    def set_amp_gain(self, axis, val=2):
-        """ set amplifier current/voltage gain for internal amplifier per axis. Default is 2"""
+    def set_amp_gain(self, axis, val):
+        """
+        Set amplifier current/voltage gain for internal amplifier per axis.
+
+        """
         resp = self.galil_command(command=f'AG{axis}={val};')
         return resp
 
     def get_torque_limit(self, axis):
-        """Query the motor torque limit (TL) value for an axis."""
+        """
+        Query the motor torque limit (TL) value for an axis.
+        """
         return self.galil_command("MG _TL", axis=axis, expect_response=True)
 
-    def set_torque_limit(self, axis, val=5):
-        """ set motor torque limit per axis. Default is 5."""
+    def set_torque_limit(self, axis, val):
+        """
+        Set motor torque limit per axis.
+
+        """
         resp = self.galil_command(command=f'TL{axis}={val};')
         return resp
 
     def get_amp_currentloop_gain(self, axis):
-        """Query the amplifier current loop gain (AU) value for an axis."""
+        """
+        Query the amplifier current loop gain (AU) value for an axis.
+
+        """
         return self.galil_command("MG _AU", axis=axis, expect_response=True)
 
-    def set_amp_currentloop_gain(self, axis, val=9):
-        """ set amplifier current loop gain per axis. Default is 9."""
+    def set_amp_currentloop_gain(self, axis, val):
+        """
+        Set amplifier current loop gain per axis.
+
+        """
         resp = self.galil_command(command=f'AU{axis}={val};')
         return resp
 
     # init
     def enable_sin_commutation(self, axis):
-        """ for axes with a sinusoidal amplifier, the BA command is necessary to configure each axis for sinusoidal commutation"""
+        """
+        For axes with a sinusoidal amplifier, the BA command is necessary to configure
+        each axis for sinusoidal commutation
+
+        """
         resp = self.galil_command(command=f'BA{axis};')
         return resp
 
     # init
     def set_magnetic_cycle(self, axis, val='3276.8'):
-        """defines the length of the motors magnetic cycle in encoder counts, required for correctly configuring sinusoidal commutation. Default is 3276.8"""
+        """
+        Defines the length of the motors magnetic cycle in encoder counts,
+        required for correctly configuring sinusoidal commutation. Default is 3276.8
+
+        """
         resp = self.galil_command(command=f'BM{axis}={val};')
         return resp
 
     # init
-    def initialize_axis(self, axis, val=3):
-        """initializes axes configured for sinusoidal commutation. BZ command will drive the motor to 2 different magnetic positions and then set the appropriate commutation angel. Cannot command with BZ unless BA and BM commands are sent first. Default value is 3 volts."""
+    def initialize_axis(self, axis, val):
+        """
+        Initializes axes configured for sinusoidal commutation. BZ command
+        will drive the motor to 2 different magnetic positions and then set
+        the appropriate commutation angle. Cannot command with BZ unless BA
+        and BM commands are sent first.
+
+        """
         resp = self.galil_command(command=f'BZ{axis}={val};')
         return resp
 
     # home
     def define_position(self, axes, val=0):
-        # Part of the homing process which requires jogging to the reverse limit switch and then defining the position of the axis at that limit as 0
+        """
+        Redefines current axis position to user specified value.
+        Useful for homing procedure.
+
+        """
         resp = self.galil_command(command=f'DP{axis}={val};')
         return resp
 
     def disable_limit_switch(self, axis):
-        """Disable limit switch detection on a given axis (LDx=3)."""
+        """
+        Disable limit switch detection on a given axis (LDx=3).
+
+        """
         resp = self.galil_command(command=f'LD{axis}=3;', expect_response=True)
         return resp
 
     def set_limitswitch_polarity(self, pol=1):
-        """CN -1 means active low, CN +1 is active high. And we want active high"""
+        """
+        CN -1 means active low, CN +1 is active high. And we want active high.
+
+        """
         resp = self.galil_command(command=f'CN {pol};')
         return resp
 
     def stop_motion(self, axis):
-        """Stop motion. If axis is None, stop all."""
+        """
+        Stop motion.
+
+        """
         cmd = f"ST {axis};"
         resp = self.galil_command(command=cmd)
         return resp
 
     def set_gearing(self, order):
-        """Set gearing: order is order of opertions in string: ',A,,C'."""
+        """
+        Set gearing: order is order of opertions in string: ',A,,C'.
+
+        """
         resp = self.galil_command(command=f"GA {order};")
         return resp
 
     def set_gearing_ratio(self, order):
-        """Set gearing ratios, e.g. GR -1,1 for axes B and D."""
+        """
+        Set gearing ratios, e.g. GR -1,1 for axes B and D.
+
+        """
         resp = self.galil_command(command=f"GR {order};")
         return resp
 
     def jog_axis(self, axis, speed):
-        """Set jog speed for axis and begin jogging."""
+        """
+        Set jog speed for axis. Does not begin motion, just sets up speed
+        for when ready to begin motion.
+
+        """
         cmd = f"JG{axis}={speed};"
         resp = self.galil_command(command=cmd)
         return resp
 
     def set_motor_state(self, axis, state):
-        """Enable or disable a motor, then verify its state (0='on', 1='off')."""
+        """
+        Enable or disable a motor, then verify its state (0='on', 1='off').
+
+        """
         state = state.lower().strip()
         if state not in ('enable', 'disable'):
             raise ValueError("state must be 'enable' or 'disable'.")
@@ -413,7 +476,10 @@ class GalilAxis(TCPInterface):
         return status, human_state
 
     def get_motor_state(self, axis):
-        """Query and interpret whether a motor is ON or OFF for a given axis."""
+        """
+        Query and interpret whether a motor is ON or OFF for a given axis.
+
+        """
         resp = self.galil_command(command=f"MG _MO{axis}", expect_response=True)
         try:
             state = int(float(resp))
