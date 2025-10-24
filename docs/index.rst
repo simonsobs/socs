@@ -43,6 +43,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/devantech_dS378
     agents/fts_agent
     agents/generator
+    agents/galilaxis_controller
     agents/hi6200
     agents/http_camera
     agents/hwp_encoder
