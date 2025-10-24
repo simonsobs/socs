@@ -718,7 +718,6 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                         for track_point in turnaround_track:
                             point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
 
-
                     # Turn around.
                     t += tt[1]
                     az_vel = -1 * az_speed
