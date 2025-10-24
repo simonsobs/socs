@@ -19,6 +19,7 @@ MIN_GROUP_NEW_LEG = 4
 #: Registry for turn-around profile types.
 TURNAROUNDS_ENUM = {
     'standard': 0,
+    'three_leg': 1,
 }
 
 
@@ -656,7 +657,6 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
     if step_time < 0.05:
         raise ValueError('Time step size too small, must be at least '
                          '0.05 seconds')
-    el_vel = el_throw * el_freq * 2 * np.pi * np.cos(t * el_freq * 2 * np.pi)
     az_flag = 0
     el_flag = 0
     if num_batches is None:
@@ -677,8 +677,8 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
     point_group_batch = 0
 
     def get_el(_t):
-        return (el_cent + el_throw * np.sin(_t * el_freq * 2 * np.pi),
-                el_throw * el_freq * 2 * np.pi * np.cos(_t * el_freq * 2 * np.pi))
+        return (el_cent - el_throw * np.cos(_t * el_freq * 2 * np.pi),
+                el_throw * el_freq * 2 * np.pi * np.sin(_t * el_freq * 2 * np.pi))
 
     i = 0
     point_queue = []
@@ -704,9 +704,10 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     t += step_time
                     az += step_time * az_speed / np.sin(np.deg2rad(az - az_cent))
                     az_vel = az_speed
-                    az_flag = 1
+                    az_flag = 0  # 1
                     el_flag = 0
                 elif az == target_az:
+                    point_group_batch = MIN_GROUP_NEW_LEG - 1
                     # Turn around.
                     if turnaround_method == "three_leg":
                         turnaround_track = three_leg_tr.gen_three_leg_turnaround(
@@ -721,27 +722,27 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     # Turn around.
                     t += tt[1]
                     az_vel = -1 * az_speed
-                    az_flag = 1
+                    az_flag = 0  # 1
                     el_flag = 0
                     increasing = False
                     target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed / np.sin(np.deg2rad(az - az_cent)), az_drift)
                     dec_num_scans()
-                    point_group_batch = MIN_GROUP_NEW_LEG - 1
                 else:
                     time_remaining = get_scan_time(az, target_az, az_speed, az_cent)
                     az = target_az
                     t += time_remaining
                     az_vel = az_speed
-                    az_flag = 2
+                    az_flag = 0  # 2
                     el_flag = 0
             else:
                 if get_scan_time(az, target_az, az_speed, az_cent) > 2 * step_time:
                     t += step_time
                     az -= step_time * az_speed / np.sin(np.deg2rad(az - az_cent))
                     az_vel = -1 * az_speed
-                    az_flag = 1
+                    az_flag = 0  # 1
                     el_flag = 0
                 elif az == target_az:
+                    point_group_batch = MIN_GROUP_NEW_LEG - 1
                     if turnaround_method == "three_leg":
                         turnaround_track = three_leg_tr.gen_three_leg_turnaround(
                             t0=t + t0, az0=az, el0=el, v0=az_vel,
@@ -755,18 +756,17 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     # Turn around.
                     t += tt[-1]
                     az_vel = az_speed
-                    az_flag = 1
+                    az_flag = 0  # 1
                     el_flag = 0
                     increasing = True
                     target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed / np.sin(np.deg2rad(az - az_cent)), az_drift)
                     dec_num_scans()
-                    point_group_batch = MIN_GROUP_NEW_LEG - 1
                 else:
                     time_remaining = get_scan_time(az, target_az, az_speed, az_cent)
                     az = target_az
                     t += time_remaining
                     az_vel = -1 * az_speed
-                    az_flag = 2
+                    az_flag = 0  # 2
                     el_flag = 0
 
             if not check_num_scans():
