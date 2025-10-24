@@ -798,7 +798,8 @@ def generate_type2_scan(az_endpoint1, az_endpoint2, az_speed,
                         batch_size=500,
                         az_start='mid_inc',
                         az_first_pos=None,
-                        az_drift=None):
+                        az_drift=None,
+                        turnaround_method='three_leg'):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long type 2 scan.
@@ -858,7 +859,8 @@ def generate_type2_scan(az_endpoint1, az_endpoint2, az_speed,
                                batch_size=batch_size,
                                az_start=az_start,
                                az_first_pos=az_first_pos,
-                               az_drift=az_drift)
+                               az_drift=az_drift,
+                               turnaround_method=turnaround_method)
 
 
 def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None):
