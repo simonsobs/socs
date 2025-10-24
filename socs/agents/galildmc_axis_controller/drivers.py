@@ -142,14 +142,12 @@ class GalilAxis(TCPInterface):
             value /= counts_per_deg
             return value, 'deg'
 
-    def get_data(self, axes):
+    def get_data(self, axes=None):
         """
         Query position (TP), velocity (TV), torque (TT), and position error (TE)
         for all axes in one batch, then subset results for the requested axes.
 
         """
-        if not axes or not isinstance(axes, list):
-            raise ValueError("get_data() requires a list of axes, e.g. ['E','F'].")
 
         data = {}
 
@@ -165,6 +163,9 @@ class GalilAxis(TCPInterface):
         n_axes = max(len(tp), len(tv), len(tt), len(te))
         active_axes = all_axes[:n_axes]
 
+        if axes is None:
+            axes = active_axes
+
         # --- Build dict per axis ---
         for i, axis in enumerate(active_axes):
             if axis not in axes:
@@ -177,9 +178,10 @@ class GalilAxis(TCPInterface):
                 'position_error': te[i]
             }
 
-        for axis in axes:
-            gr = float(self.galil_command(command=f'MG _GR{axis}', expect_response=True))
-            data[axis]["gearing_ratio"] = gr
+        if axes:
+            for axis in axes:
+                gr = float(self.galil_command(command=f'MG _GR{axis}', expect_response=True))
+                data[axis]["gearing_ratio"] = gr
 
 
         return data
