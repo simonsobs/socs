@@ -2151,8 +2151,8 @@ class ACUAgent:
             turnaround_method = self.scan_params['turnaround_method']
 
         # Check if the turnaround method is usable for the called scan type.
-        if turnaround_method != "standard" and params['type'] != 1:
-            raise ValueError("Cannot use non-standard turnaround method with type 2 or 3 scans!")
+        if turnaround_method == "standard" and params['type'] != 1:
+            raise ValueError("Cannot use standard turnaround method with type 2 or 3 scans!")
 
         # Do we need to limit the az_accel?  This limit comes from a
         # maximum jerk parameter; the equation below (without the
@@ -2274,6 +2274,7 @@ class ACUAgent:
             g = sh.generate_type2_scan(az_endpoint1=az_endpoint1,
                                        az_endpoint2=az_endpoint2,
                                        az_speed=az_speed, acc=az_accel,
+                                       turnaround_method=turnaround_method,
                                        el_endpoint1=el_endpoint1,
                                        az_vel_ref=az_vel_ref,
                                        az_first_pos=plan['init_az'],
@@ -2284,6 +2285,7 @@ class ACUAgent:
             g = sh.generate_type3_scan(az_endpoint1=az_endpoint1,
                                        az_endpoint2=az_endpoint2,
                                        az_speed=az_speed, acc=az_accel,
+                                       turnaround_method=turnaround_method,
                                        el_endpoint1=el_endpoint1,
                                        el_endpoint2=el_endpoint2,
                                        el_freq=el_freq,
@@ -2307,7 +2309,7 @@ class ACUAgent:
             'el2': el_endpoint2,
             'el_freq': el_freq,
             'type': params['type'],
-            'turnaround_type': sh.TURNAROUNDS_ENUM['standard'],
+            'turnaround_type': sh.TURNAROUNDS_ENUM[turnaround_method],
         })
 
         self.agent.publish_to_feed('scan_params',
@@ -2507,9 +2509,10 @@ class ACUAgent:
 
                         if len(lines) > FULL_STACK / 2:
                             # This could occur if group_flag was always set, for example.
-                            mode = 'abort'
-                            self.log.warn('Problem with point generator; too many points.')
-                            lines = []
+                            # mode = 'abort'
+                            # self.log.warn('Problem with point generator; too many points.')
+                            # lines = []
+                            break
 
                     # Grab the minimum batch
                     upload_lines, lines = lines[:new_line_target], lines[new_line_target:]
