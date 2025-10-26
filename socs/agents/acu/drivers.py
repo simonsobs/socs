@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-import socs.agents.acu.three_leg_turnaround as three_leg_tr
+import socs.agents.acu.turnarounds as turnarounds
 
 #: The number of seconds in a day.
 DAY = 86400
@@ -453,11 +453,19 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                 elif az == target_az:
                     # Turn around.
+                    if turnaround_method == "standard_gen":
+                        turnaround_track = turnarounds.gen_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
+                                                                      turntime=turntime, turnaround_method='standard',
+                                                                      az_flag=az_flag, el_flag=el_flag,
+                                                                      point_group_batch=point_group_batch)
+                        for track_point in turnaround_track:
+                            point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
+
                     if turnaround_method == "three_leg":
-                        turnaround_track = three_leg_tr.gen_three_leg_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
-                                                                                 turntime=turntime,
-                                                                                 az_flag=az_flag, el_flag=el_flag,
-                                                                                 point_group_batch=point_group_batch)
+                        turnaround_track = turnarounds.gen_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
+                                                                      turntime=turntime, turnaround_method='three_leg',
+                                                                      az_flag=az_flag, el_flag=el_flag,
+                                                                      point_group_batch=point_group_batch)
                         for track_point in turnaround_track:
                             point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
 
@@ -488,11 +496,19 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                 elif az == target_az:
                     # Turn around.
+                    if turnaround_method == "standard_gen":
+                        turnaround_track = turnarounds.gen_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
+                                                                      turntime=turntime, turnaround_method='standard',
+                                                                      az_flag=az_flag, el_flag=el_flag,
+                                                                      point_group_batch=point_group_batch)
+                        for track_point in turnaround_track:
+                            point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
+
                     if turnaround_method == "three_leg":
-                        turnaround_track = three_leg_tr.gen_three_leg_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
-                                                                                 turntime=turntime,
-                                                                                 az_flag=az_flag, el_flag=el_flag,
-                                                                                 point_group_batch=point_group_batch)
+                        turnaround_track = turnarounds.gen_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
+                                                                      turntime=turntime, turnaround_method='three_leg',
+                                                                      az_flag=az_flag, el_flag=el_flag,
+                                                                      point_group_batch=point_group_batch)
                         for track_point in turnaround_track:
                             point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
 

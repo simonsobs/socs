@@ -1797,7 +1797,8 @@ class ACUAgent:
     @ocs_agent.param('az_accel', type=float, default=None)
     @ocs_agent.param('el_freq', type=float, default=None)
     @ocs_agent.param('turnaround_method', type=str, default=None,
-                     choices=[None, 'standard', 'three_leg'])
+                     choices=[None, 'standard', 'standard_gen',
+                              'three_leg'])
     @ocs_agent.param('reset', default=False, type=bool)
     @inlineCallbacks
     def set_scan_params(self, session, params):
@@ -2041,7 +2042,8 @@ class ACUAgent:
     @ocs_agent.param('type', default=1, choices=[1, 2, 3])
     @ocs_agent.param('az_vel_ref', type=float, default=None)
     @ocs_agent.param('turnaround_method', default=None,
-                     choices=[None, 'standard', 'three_leg'])
+                     choices=[None, 'standard', 'standard_gen',
+                              'three_leg'])
     @ocs_agent.param('scan_upload_length', type=float, default=None)
     @inlineCallbacks
     def generate_scan(self, session, params):
@@ -2151,7 +2153,7 @@ class ACUAgent:
             turnaround_method = self.scan_params['turnaround_method']
 
         # Check if the turnaround method is usable for the called scan type.
-        if turnaround_method != "standard" and params['type'] != 1:
+        if turnaround_method == "three_leg" and params['type'] != 1:
             raise ValueError("Cannot use non-standard turnaround method with type 2 or 3 scans!")
 
         # Do we need to limit the az_accel?  This limit comes from a
@@ -2257,7 +2259,7 @@ class ACUAgent:
         # Prepare the point generator.
         free_form = False
         if params["type"] == 1:
-            if turnaround_method == 'three_leg':
+            if turnaround_method in ['standard_gen', 'three_leg']:
                 free_form = True
 
             g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
