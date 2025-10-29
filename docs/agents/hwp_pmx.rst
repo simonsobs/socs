@@ -32,7 +32,7 @@ An example site-config-file block::
 Docker Compose
 ``````````````
 
-An example docker-compose configuration::
+An example docker compose configuration::
 
   ocs-hwp-pmx:
     image: simonsobs/socs:latest

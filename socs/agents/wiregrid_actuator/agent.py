@@ -242,6 +242,18 @@ class WiregridActuatorAgent:
             self.log.error(msg)
             return False, msg
 
+        # Additional small move to ensure the limit switch ON
+        # No limit switch check during this move
+        # `self.actuator.move()` preserves the sign of `distance`.
+        # In contrast, `move_func()` sets the sign automatically based on `is_insert`.
+        # Pass a positive distance for insertion and a negative distance for ejection.
+        ret = self.actuator.move(0.5 * (1. if is_insert else -1.), speedrate=0.2)
+        if not ret:
+            msg = '_insert_eject(): ERROR!:'\
+                  'Failed to move in the additional small move after the last slow move.'
+            self.log.error(msg)
+            return False, msg
+
         # Lock the actuator by the stoppers
         self.actuator.st.set_alloff()
         # Check the stopper until all the stoppers are OFF (locked)
@@ -758,7 +770,9 @@ class WiregridActuatorAgent:
                          'STR2': 0 or 1, (0: OFF, 1:ON)
                          .
                          .
-                         }
+                         },
+                     'position':
+                        'inside' or 'outside' or 'unknown'
                     },
                  'timestamp':1601925677.6914878
                 }
@@ -845,12 +859,26 @@ class WiregridActuatorAgent:
                         zip(onoff_st, self.actuator.st.io_names):
                     data['data']['stopper_{}'.format(name)] = onoff
                     onoff_dict_st[name] = onoff
+                # Data for position
+                if (onoff_dict_ls['LSR1'] == 1 or onoff_dict_ls['LSL1'] == 1) \
+                        and not (onoff_dict_ls['LSR2'] == 1 or onoff_dict_ls['LSL2'] == 1):
+                    position = 'outside'
+                elif (onoff_dict_ls['LSR2'] == 1 or onoff_dict_ls['LSL2'] == 1) \
+                        and not (onoff_dict_ls['LSR1'] == 1 or onoff_dict_ls['LSL1'] == 1):
+                    position = 'inside'
+                else:
+                    position = 'unknown'
+                    self.log.warn(
+                        'acq(): '
+                        'Unknown position!')
+                data['data']['position'] = position
                 # publish data
                 self.agent.publish_to_feed('wgactuator', data)
                 # store session.data
                 field_dict = {'motor': onoff_mt,
                               'limitswitch': onoff_dict_ls,
-                              'stopper': onoff_dict_st}
+                              'stopper': onoff_dict_st,
+                              'position': position}
                 session.data['timestamp'] = current_time
                 session.data['fields'] = field_dict
 

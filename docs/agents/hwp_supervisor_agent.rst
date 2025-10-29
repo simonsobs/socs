@@ -35,6 +35,8 @@ Here is an example of a config block you can add to your ocs site-config file::
             '--hwp-encoder-id', 'hwp-bbb-e1',
             '--hwp-pmx-id', 'hwp-pmx',
             '--hwp-pid-id', 'hwp-pid',
+            '--hwp-pcu-id', 'hwp-pcu',
+            '--hwp-gripper-id', 'hwp-gripper',
             '--ups-id', 'power-ups-az',
             '--ups-minutes-remaining-thresh', 45,
             '--iboot-id', 'power-iboot-hwp-2',
@@ -43,6 +45,13 @@ Here is an example of a config block you can add to your ocs site-config file::
             '--driver-power-agent-type', 'synaccess',
             '--driver-power-cycle-twice',
             '--driver-power-cycle-wait-time', 300,
+
+            '--acu-instance-id', 'acu',
+            '--acu-min-el', 48.0,
+            '--acu-max-el', 90.0,
+            '--acu-max-time-since-update', 30.0,
+            '--mount-velocity-grip-thresh', 0.005,
+            '--grip-max-boresight-angle', 1.0,
         ]}
 
 For SATP1, we use an ibootbar to power the driver, and it is not necessary to
@@ -57,12 +66,20 @@ cycle the driver power twice, so the config will look like::
             '--hwp-encoder-id', 'hwp-bbb-e1',
             '--hwp-pmx-id', 'hwp-pmx',
             '--hwp-pid-id', 'hwp-pid',
+            '--hwp-pcu-id', 'hwp-pcu',
+            '--hwp-gripper-id', 'hwp-gripper',
             '--ups-id', 'power-ups-az',
             '--ups-minutes-remaining-thresh', 45,
             '--iboot-id', 'power-iboot-hwp-2',
             '--driver-iboot-id', 'power-iboot-hwp-2',
             '--driver-iboot-outlets', 1, 2,
             '--driver-power-agent-type', 'iboot',
+
+            '--acu-instance-id', 'acu',
+            '--acu-min-el', 48.0,
+            '--acu-max-el', 90.0,
+            '--acu-max-time-since-update', 30.0,
+            '--mount-velocity-grip-thresh', 0.005,
         ]}
 
 .. note::
@@ -128,6 +145,22 @@ If an operation is started while there is already an action is in progress, the
 current action will be aborted at the next opportunity and replaced with the new
 requested action.  The ``abort_action`` task can be used to abort the current
 action without beginning a new one.
+
+ACU Safety Checks
+```````````````````
+
+If the ACU instance-id is provided in the site-config, the supervisor will check
+the ACU state before spin-up or gripping procedures to ensure the telescope is
+in a safe state to perform the specified operation.
+
+Before spinning up the HWP, the agent will check that
+- The current elevation and commanded elevation are in the range ``(acu-min-el, acu-max-el)``.
+- The ACU state info has been updated within ``acu-max-time-since-update`` seconds.
+
+Before gripping or ungripping the HWP, the agent will check that:
+- The current elevation and commanded elevation are in the range ``(acu-min-el, acu-max-el)``.
+- The ACU state info has been updated within ``acu-max-time-since-update`` seconds.
+- The az and el velocity is less than ``mount-velocity-grip-thresh``.
 
 Examples
 ```````````

@@ -201,12 +201,18 @@ class SupRsyncFilesManager:
             If true, writes sql statements to stdout
     """
 
-    def __init__(self, db_path, create_all=True, echo=False):
+    def __init__(
+        self, db_path: str, create_all: bool = True, echo: bool = False,
+        pool_size: int = 5, max_overflow: int = 10
+    ) -> None:
         db_path = os.path.abspath(db_path)
         if not os.path.exists(os.path.dirname(db_path)):
             os.makedirs(os.path.dirname(db_path))
 
-        self._engine = create_engine(f'sqlite:///{db_path}', echo=echo)
+        self._engine = create_engine(
+            f'sqlite:///{db_path}', echo=echo,
+            pool_size=pool_size, max_overflow=max_overflow,
+        )
         self.Session = sessionmaker(bind=self._engine)
 
         if create_all:
@@ -549,7 +555,8 @@ class SupRsyncFileHandler:
 
     def __init__(self, file_manager, archive_name, remote_basedir,
                  ssh_host=None, ssh_key=None, cmd_timeout=None,
-                 copy_timeout=None, compression=None, bwlimit=None):
+                 copy_timeout=None, compression=None, bwlimit=None,
+                 chmod=None):
         self.srfm = file_manager
         self.archive_name = archive_name
         self.ssh_host = ssh_host
@@ -560,6 +567,7 @@ class SupRsyncFileHandler:
         self.copy_timeout = copy_timeout
         self.compression = compression
         self.bwlimit = bwlimit
+        self.chmod = chmod
 
     def run_on_remote(self, cmd, timeout=None):
         """
@@ -649,6 +657,8 @@ class SupRsyncFileHandler:
                     file_map[remote_path] = file
 
                 cmd = ['rsync', '-Lrt']
+                if self.chmod:
+                    cmd += ['-p', f'--chmod={self.chmod}']
                 if self.compression:
                     cmd.append('-z')
                 if self.bwlimit:

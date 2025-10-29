@@ -3,7 +3,7 @@ source =
     ../socs
 
 omit =
-  # omit versioneer
+  # omit version file
   */_version.py
 
   # omit lab only Agents for now

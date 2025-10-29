@@ -32,18 +32,20 @@ using all of the available arguments::
                      ['--port', 161],
                      ['--mode', 'acq'],
                      ['--snmp-version', 1],
-                     ['--outputs', [1, 2, 3]]]},
+                     ['--outputs', [1, 2, 3]],
+                     ['--sample-period', 10]]},
 
 .. note::
     The ``--address`` argument should be the address of the syncbox on the network.
     This is not the main Meinberg M1000 device.
     The ``--outputs`` argument can be any of the available 3 outputs.
+    The ``--sample-period`` argument is the number of seconds between sampling data.
 
 Docker Compose
 ``````````````
 
 The Meinberg Syncbox Agent should be configured to run in a Docker container. An
-example docker-compose service configuration is shown here::
+example docker compose service configuration is shown here::
 
   ocs-timing-syncbox:
     image: simonsobs/socs:latest

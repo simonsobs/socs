@@ -157,8 +157,14 @@ def run_uxm_relock(bands=None, kwargs=None):
     if kwargs is None:
         kwargs = {}
     S, cfg = get_smurf_control()
-    uxm_relock.uxm_relock(S, cfg, bands=bands, **kwargs)
-    return None
+    _, summary = uxm_relock.uxm_relock(S, cfg, bands=bands, **kwargs)
+    tr = summary['tracking_setup_results']
+    data = {
+        'filepath': tr.filepath,
+        'all_det_num': [len(tr.is_good[tr.bands == iband]) for iband in range(0, 8)],
+        'good_det_num': [len(np.where(tr.is_good[tr.bands == iband])[0]) for iband in range(0, 8)],
+    }
+    return data
 
 
 def take_bias_steps(kwargs=None, rfrac_range=(0.2, 0.9)):
