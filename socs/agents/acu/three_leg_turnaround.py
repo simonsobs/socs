@@ -42,7 +42,11 @@ def gen_three_leg_turnaround(t0, az0, el0, v0, turntime, az_flag, el_flag, point
 
     if second_leg_time is None:
         second_leg_time = turntime / 3.0  # Cut the turnaround into equal thirds unless otherwise specified.
-    second_leg_acceleration = 2.0 * second_leg_velocity / second_leg_time
+    if second_leg_time == 0:
+        assert (second_leg_velocity == 0)
+        second_leg_acceleration = 0.
+    else:
+        second_leg_acceleration = 2.0 * second_leg_velocity / second_leg_time
 
     # Assert we have at least 0.5 seconds for the first and second legs of the turnaround!
     # This limits the turntime to >= 1.5 seconds
@@ -74,10 +78,13 @@ def gen_three_leg_turnaround(t0, az0, el0, v0, turntime, az_flag, el_flag, point
     a_target_2 = a_start_2
     j_start_2 = 0
     j_target_2 = 0
-    ts_2, azs_2, vs_2 = _gen_trajectory(t_start_2, t_target_2, az_start_2,
-                                        v_start_2, v_target_2, a_start_2,
-                                        a_target_2, j_start_2, j_target_2,
-                                        step_time)
+    if second_leg_time == 0:
+        ts_2, azs_2, vs_2 = [t_start_2, t_target_2], [az_start_2, az_start_2], [0., 0.]
+    else:
+        ts_2, azs_2, vs_2 = _gen_trajectory(t_start_2, t_target_2, az_start_2,
+                                            v_start_2, v_target_2, a_start_2,
+                                            a_target_2, j_start_2, j_target_2,
+                                            step_time)
 
     # Solve for the third leg of the turnaround
     t_start_3 = t_target_2
