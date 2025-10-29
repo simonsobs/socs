@@ -2038,11 +2038,12 @@ class ACUAgent:
                               'mid_inc', 'mid_dec'])
     @ocs_agent.param('az_drift', type=float, default=None)
     @ocs_agent.param('az_only', type=bool, default=True)
-    @ocs_agent.param('type', default=1, choices=[1, 2, 3])
+    @ocs_agent.param('scan_type', default=1, choices=[1, 2, 3])
     @ocs_agent.param('az_vel_ref', type=float, default=None)
     @ocs_agent.param('turnaround_method', default=None,
                      choices=[None, 'standard', 'three_leg'])
     @ocs_agent.param('scan_upload_length', type=float, default=None)
+    @ocs_agent.param('type', default=None, choices=[1, 2, 3])
     @inlineCallbacks
     def generate_scan(self, session, params):
         """generate_scan(az_endpoint1, az_endpoint2, \
@@ -2098,7 +2099,7 @@ class ACUAgent:
             az_only (bool): if True (the default), then only the
                 Azimuth axis is put in ProgramTrack mode, and the El axis
                 is put in Stop mode.
-            type (int): What type of scan to use. Only 1, 2, 3 are valid.
+            scan_type (int): What type of scan to use. Only 1, 2, 3 are valid.
                 Type 1 is a constant elevation scan.
                 Type 2 includes a variation in az speed that scales as sin(az).
                 Type 3 is a Type 2 with an sinusoidal el nod.
@@ -2114,6 +2115,8 @@ class ACUAgent:
                 minimize the acceleration at the midpoint of the turnaround.
                 Type 2 and 3 scans will ALWAYS use the baseline turnaround method
                 regardless of selection.
+            type (int): Temporary alias for scan_type. Do not
+                use. Will be removed.
 
         Notes:
           Note that all parameters are optional except for
@@ -2127,6 +2130,11 @@ class ACUAgent:
 
         if self._get_sun_policy('motion_blocked'):
             return False, "Motion blocked; Sun avoidance in progress."
+
+        if params['type'] is not None:
+            self.log.warn('Caller passed "type" instead of "scan_type" arg; moving.')
+            params['scan_type'] = params['type']
+        del params['type']
 
         self.log.info('User scan params: {params}', params=params)
 
@@ -2151,7 +2159,7 @@ class ACUAgent:
             turnaround_method = self.scan_params['turnaround_method']
 
         # Check if the turnaround method is usable for the called scan type.
-        if turnaround_method == "standard" and params['type'] != 1:
+        if turnaround_method == "standard" and params['scan_type'] != 1:
             raise ValueError("Cannot use standard turnaround method with type 2 or 3 scans!")
 
         # Do we need to limit the az_accel?  This limit comes from a
@@ -2194,7 +2202,8 @@ class ACUAgent:
         el_speed = params.get('el_speed', 0.0)
         plan = sh.plan_scan(az_endpoint1, az_endpoint2,
                             el=el_endpoint1, v_az=az_speed, a_az=az_accel,
-                            az_start=scan_params.get('az_start'))
+                            az_start=scan_params.get('az_start'),
+                            scan_type=params['scan_type'])
 
         # Use the plan to set scan upload parameters.
         if scan_params.get('step_time') is None:
@@ -2256,7 +2265,7 @@ class ACUAgent:
 
         # Prepare the point generator.
         free_form = False
-        if params["type"] == 1:
+        if params['scan_type'] == 1:
             if turnaround_method == 'three_leg':
                 free_form = True
 
@@ -2269,7 +2278,7 @@ class ACUAgent:
                                                    el_speed=el_speed,
                                                    az_first_pos=plan['init_az'],
                                                    **scan_params)
-        elif params["type"] == 2:
+        elif params['scan_type'] == 2:
             free_form = True
             g = sh.generate_type2_scan(az_endpoint1=az_endpoint1,
                                        az_endpoint2=az_endpoint2,
@@ -2279,7 +2288,7 @@ class ACUAgent:
                                        az_vel_ref=az_vel_ref,
                                        az_first_pos=plan['init_az'],
                                        **scan_params)
-        elif params["type"] == 3:
+        elif params['scan_type'] == 3:
             free_form = True
             azonly = False
             g = sh.generate_type3_scan(az_endpoint1=az_endpoint1,
@@ -2308,7 +2317,7 @@ class ACUAgent:
             'el1': el_endpoint1,
             'el2': el_endpoint2,
             'el_freq': el_freq,
-            'type': params['type'],
+            'type': params['scan_type'],
             'turnaround_type': sh.TURNAROUNDS_ENUM[turnaround_method],
         })
 
@@ -2483,7 +2492,7 @@ class ACUAgent:
                     if current_modes['Remote'] == 0:
                         self.log.warn('ACU no longer in remote mode!')
                         mode = 'abort'
-                    if session.status == 'stopping':
+                    if session.status == 'stopping' and mode not in ['stop', 'abort']:
                         mode = 'stop'
                         stop_message = 'User-requested stop.'
                         lines = []

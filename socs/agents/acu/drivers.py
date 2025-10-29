@@ -19,7 +19,8 @@ MIN_GROUP_NEW_LEG = 4
 #: Registry for turn-around profile types.
 TURNAROUNDS_ENUM = {
     'standard': 0,
-    'three_leg': 1,
+    # 1: reserved for "standard but explicitly commanded"
+    'three_leg': 2,
 }
 
 
@@ -708,13 +709,14 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                 elif az == target_az:
                     point_group_batch = MIN_GROUP_NEW_LEG - 1
-                    # Turn around.
                     if turnaround_method == "three_leg":
+                        _v = az_vel / np.sin(np.deg2rad(az - az_cent))
                         turnaround_track = three_leg_tr.gen_three_leg_turnaround(
-                            t0=t + t0, az0=az, el0=el, v0=az_vel,
+                            t0=t + t0, az0=az, el0=el, v0=_v,
                             turntime=tt[1],
                             az_flag=az_flag, el_flag=el_flag,
                             step_time=step_time,
+                            second_leg_time=0.,
                             point_group_batch=point_group_batch)
                         for track_point in turnaround_track:
                             point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
@@ -744,10 +746,12 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                 elif az == target_az:
                     point_group_batch = MIN_GROUP_NEW_LEG - 1
                     if turnaround_method == "three_leg":
+                        _v = az_vel / np.sin(np.deg2rad(az - az_cent))
                         turnaround_track = three_leg_tr.gen_three_leg_turnaround(
-                            t0=t + t0, az0=az, el0=el, v0=az_vel,
+                            t0=t + t0, az0=az, el0=el, v0=_v,
                             turntime=tt[-1],
                             step_time=step_time,
+                            second_leg_time=0.,
                             az_flag=az_flag, el_flag=el_flag,
                             point_group_batch=point_group_batch)
                         for track_point in turnaround_track:
@@ -862,7 +866,8 @@ def generate_type2_scan(az_endpoint1, az_endpoint2, az_speed,
                                turnaround_method=turnaround_method)
 
 
-def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None):
+def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None,
+              scan_type=1):
     """Determine some important parameters for running a ProgramTrack
     scan with the desired end points, velocity, and mean turn-around
     acceleration.
@@ -931,6 +936,10 @@ def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None):
     dt = min(max(dt, 0.1), 1.0)
     assert (2 * abs(throw / v_az) / dt >= 5)
     plan['step_time'] = dt
+
+    # In the case of type 2/3 scans, force step_time to be at most 0.1 seconds.
+    if scan_type in [2, 3]:
+        plan['step_time'] = min(0.1, plan['step_time'])
 
     # Turn around prep distance (deg)? 5 point periods, times the vel.
     turnprep_buffer = 5 * dt * v_az
