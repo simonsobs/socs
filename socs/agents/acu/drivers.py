@@ -347,7 +347,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             start at this position (but otherwise proceed in the same
             starting direction).
         az_drift (float): The rate (deg / s) at which to shift the
-            scan endpoints i n time.  This can be used to better track
+            scan endpoints in time.  This can be used to better track
             celestial sources in targeted scans.
         turnaround_method (str): The method used for generating turnaround.
             Default ('standard') generates the baseline minimal jerk trajectory.

@@ -2049,10 +2049,12 @@ class ACUAgent:
         """generate_scan(az_endpoint1, az_endpoint2, \
                          az_speed=None, az_accel=None, \
                          el_endpoint1=None, el_endpoint2=None, \
-                         el_speed=None, \
+                         el_speed=None, el_freq=None, \
                          num_scans=None, start_time=None, \
                          wait_to_start=None, step_time=None, \
                          az_start='end', az_drift=None, az_only=True, \
+                         scan_type=1, az_vel_ref=None, \
+                         turnaround_method=None, \
                          scan_upload_length=None)
 
         **Process** - Scan generator, currently only works for
@@ -2069,6 +2071,7 @@ class ACUAgent:
                 track.
             el_endpoint2 (float): this is ignored.
             el_speed (float): this is ignored.
+            el_freq(float): frequency of the elevation nods for scan_type=3.
             num_scans (int or None): if not None, limits the scan to
                 the specified number of constant velocity legs. The
                 process will exit without error once that has
@@ -2105,16 +2108,14 @@ class ACUAgent:
                 Type 3 is a Type 2 with an sinusoidal el nod.
             az_vel_ref (float or None): azimuth to center the velocity profile at.
                 If None then the average of the endpoints is used.
-            scan_upload_length (float): number of seconds for each set
-                of uploaded points. If this is not specified, the
-                track manager will try to use as short a time as is
-                reasonable.
             turnaround_method (str): The method used for generating turnaround.
                 Default (None) generates the baseline minimal jerk trajectory.
                 'three_leg' generates a three-leg turnaround which attempts to
                 minimize the acceleration at the midpoint of the turnaround.
-                Type 2 and 3 scans will ALWAYS use the baseline turnaround method
-                regardless of selection.
+            scan_upload_length (float): number of seconds for each set
+                of uploaded points. If this is not specified, the
+                track manager will try to use as short a time as is
+                reasonable.
             type (int): Temporary alias for scan_type. Do not
                 use. Will be removed.
 
@@ -2517,10 +2518,12 @@ class ACUAgent:
                             stop_message = 'Stop due to end of the planned track.'
 
                         if len(lines) > FULL_STACK / 2:
-                            # This could occur if group_flag was always set, for example.
-                            # mode = 'abort'
-                            # self.log.warn('Problem with point generator; too many points.')
-                            # lines = []
+                            # This is used to raise an error and
+                            # abort; but it is more likely to occur in
+                            # the case where bad group_flag handling,
+                            # above, is messing things up.  So we just
+                            # break out and let some points get
+                            # processed.
                             break
 
                     # Grab the minimum batch
