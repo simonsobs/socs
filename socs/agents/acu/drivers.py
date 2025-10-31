@@ -724,7 +724,7 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     # Turn around.
                     t += tt[1]
                     az_vel = -1 * az_speed
-                    az_flag = 0  # 1
+                    az_flag = 1  # 1
                     el_flag = 0
                     increasing = False
                     target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed / np.sin(np.deg2rad(az - az_cent)), az_drift)
@@ -760,7 +760,7 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     # Turn around.
                     t += tt[-1]
                     az_vel = az_speed
-                    az_flag = 0  # 1
+                    az_flag = 1  # 1
                     el_flag = 0
                     increasing = True
                     target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed / np.sin(np.deg2rad(az - az_cent)), az_drift)

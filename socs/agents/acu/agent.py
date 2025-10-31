@@ -2157,7 +2157,11 @@ class ACUAgent:
         if el_freq is None:
             el_freq = self.scan_params['el_freq']
         if turnaround_method is None:
-            turnaround_method = self.scan_params['turnaround_method']
+            if params['scan_type'] in [2, 3]:
+                turnaround_method = 'three_leg'
+                self.log.info('Setting turnaround_method="three_leg" for type2/3 scan.')
+            else:
+                turnaround_method = self.scan_params['turnaround_method']
 
         # Check if the turnaround method is usable for the called scan type.
         if turnaround_method == "standard" and params['scan_type'] != 1:
@@ -2451,6 +2455,9 @@ class ACUAgent:
             first_upload_time = None
             wait_stop_timeout = None
 
+            # eesh
+            unabort_failure = False
+
             while True:
                 now = time.time()
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
@@ -2482,6 +2489,8 @@ class ACUAgent:
                     else:
                         if got_progtrack:
                             self.log.warn('Unexpected exit from ProgramTrack mode!')
+                            if mode == 'stop':
+                                unabort_failure = True  #close enough!
                             mode = 'abort'
                         elif now - start_time > MAX_PROGTRACK_SET_TIME:
                             self.log.warn('Failed to set ProgramTrack mode in a timely fashion.')
@@ -2583,6 +2592,8 @@ class ACUAgent:
                                                 'Clear Stack')
 
         if mode == 'abort':
+            if unabort_failure:
+                return True, 'Problems on shutdown but close enough.'
             return False, 'Problems during scan'
         return True, f'Scan ended. {stop_message}'
 
