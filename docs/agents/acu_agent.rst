@@ -154,8 +154,9 @@ ignorance:
   of "az", "el", "third", and "none".  See further explanation in
   :class:`ACUAgent <socs.agents.acu.agent.ACUAgent>`.
 - ``scan_params``: Default scan parameters; currently ``az_speed``
-  (float, deg/s) and ``az_accel`` (float, deg/s/s).  If not specfied,
-  these are given default values depending on the platform type.
+  (float, deg/s) ``az_accel`` (float, deg/s/s), ``el_freq`` (float, Hz),
+  and ``turnaround_method`` (str). If not specfied, these are given
+  default values depending on the platform type.
 
 
 Other agent functions
