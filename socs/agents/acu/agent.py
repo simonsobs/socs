@@ -2490,7 +2490,7 @@ class ACUAgent:
                         if got_progtrack:
                             self.log.warn('Unexpected exit from ProgramTrack mode!')
                             if mode == 'stop':
-                                unabort_failure = True  #close enough!
+                                unabort_failure = True  # close enough!
                             mode = 'abort'
                         elif now - start_time > MAX_PROGTRACK_SET_TIME:
                             self.log.warn('Failed to set ProgramTrack mode in a timely fashion.')
