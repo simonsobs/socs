@@ -96,12 +96,12 @@ def de_irig(val, base_shift=0):
     val : int
        raw IRIG bit info of each 100msec chunk
     base_shift : int, optional
-       number of bit shifts. This should be 0 except for seccods
+       number of bit shifts. This should be 0 except for seconds
 
     Returns
     -------
     int
-       Either of sec/min/hourds/day/year
+       Either of sec/min/hours/day/year
 
     """
     return (((val >> (0 + base_shift)) & 1)
@@ -111,7 +111,7 @@ def de_irig(val, base_shift=0):
             + ((val >> (5 + base_shift)) & 1) * 10
             + ((val >> (6 + base_shift)) & 1) * 20
             + ((val >> (7 + base_shift)) & 1) * 40
-            + ((val >> (8 + base_shift)) & 1) * 80)
+            + ((val >> (8 + base_shift)) & 1) * 80 * (base_shift == 0))
 
 
 def count2time(counts, t_offset=0.):
