@@ -89,6 +89,9 @@ class Serial_TCPServer(object):
                 msg = self.sock.recv(n, socket.MSG_PEEK)
             except (TimeoutError, BlockingIOError):
                 pass
+            except Exception as e:
+                print(f"Caught unexpected {type(e).__name__} exception:")
+                print(f"  {e}")
         # Flush the message out if you got everything
         if len(msg) == n:
             if self.encoded:
@@ -116,6 +119,9 @@ class Serial_TCPServer(object):
                 msg += self.sock.recv(1)
         except (TimeoutError, BlockingIOError):
             pass
+        except Exception as e:
+            print(f"Caught unexpected {type(e).__name__} exception:")
+            print(f"  {e}")
         self.sock.setblocking(1)  # belt and suspenders
         self.settimeout(self.__timeout)
         return msg
@@ -137,6 +143,10 @@ class Serial_TCPServer(object):
                 msg_current = self.sock.recv(n)
             except (TimeoutError, BlockingIOError):
                 msg_current = b''
+            except Exception as e:
+                print(f"Caught unexpected {type(e).__name__} exception:")
+                print(f"  {e}")
+                msg_current = b''
             msg += msg_current
             n_current -= len(msg_current)
 
@@ -153,6 +163,10 @@ class Serial_TCPServer(object):
         try:
             msg = self.sock.recv(n)
         except (TimeoutError, BlockingIOError):
+            msg = ''
+        except Exception as e:
+            print(f"Caught unexpected {type(e).__name__} exception:")
+            print(f"  {e}")
             msg = ''
         return msg
 
@@ -228,6 +242,9 @@ class Serial_TCPServer(object):
                 pass
         except (TimeoutError, BlockingIOError):
             pass
+        except Exception as e:
+            print(f"Caught unexpected {type(e).__name__} exception:")
+            print(f"  {e}")
         self.sock.setblocking(1)
         self.sock.settimeout(self.__timeout)
 
