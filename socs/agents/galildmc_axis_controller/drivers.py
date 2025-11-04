@@ -67,7 +67,6 @@ class GalilAxis(TCPInterface):
                     self.send(b"CI -1;\r")
                 else:
                     print('TC error response not 0 nor 5', tc_resp)
-                return tc_resp
 
     def galil_command(self, command=None, axis=None, value=None,
                       expect_response=False, retries=3):
