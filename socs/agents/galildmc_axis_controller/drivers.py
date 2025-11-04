@@ -24,10 +24,8 @@ class GalilAxis(TCPInterface):
         If a '?' is detected, query TC1 for an error code.
         Handles 'Input buffer full' (TC1=5) by pausing and waiting for the controller
         to clear before allowing new commands.
-        """
-        if os.environ.get("GALIL_TEST_MODE"):
-            return b":"
 
+        """
         start = time.time()
         drained = b""
         received_any = False
