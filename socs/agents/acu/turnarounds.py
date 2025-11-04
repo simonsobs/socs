@@ -1,8 +1,9 @@
 import numpy as np
 
 
-def gen_three_leg_turnaround(t0, az0, el0, v0, turntime, az_flag, el_flag, point_group_batch,
-                             second_leg_time=None, second_leg_velocity=0, step_time=0.05):
+def gen_turnaround(t0, az0, el0, v0, turntime, az_flag, el_flag, point_group_batch,
+                   turnaround_method, second_leg_time=None, second_leg_velocity=0,
+                   step_time=0.05):
     from .drivers import TrackPoint
     """
     Generates the trajectory of a 3part turnaround given the initial position and velocity of the platform.
@@ -40,6 +41,76 @@ def gen_three_leg_turnaround(t0, az0, el0, v0, turntime, az_flag, el_flag, point
     # but more work is necessary to get to that point. We shouldn't mix the two yet!
     el_vel = 0.
 
+    if turnaround_method == "standard":
+        ts, azs, vs = _gen_standard_turnaround(v0, turntime, step_time)
+
+    elif turnaround_method == "three_leg":
+        ts, azs, vs = _gen_three_leg_turnaround(v0, turntime, second_leg_time, second_leg_velocity, step_time)
+
+    ts += t0
+    azs += az0
+
+    # Turn our turnaround solution into TrackPoint's for the ACU.
+    turnaround_track = []
+    for t, az, v in zip(ts, azs, vs):
+        turnaround_track.append(TrackPoint(timestamp=t,
+                                az=az, el=el0, az_vel=v, el_vel=el_vel,
+                                az_flag=az_flag, el_flag=el_flag,
+                                group_flag=int(point_group_batch > 0)))
+
+    return turnaround_track
+
+
+def _gen_standard_turnaround(v0, turntime, step_time=0.05):
+    """
+    Function for generating the times, azimuths, and velocities for a standard turnaround.
+
+    Args:
+        v0 (float): The initial velocity at the start of the turnaround.
+        turntime (float): The total time for the turnaround defined by 2*velocity/acceleration.
+        step_time (float): The step time between points in the turnaround. Defaults to 0.05 seconds (20Hz).
+
+    Returns:
+        ts (float array): Array of times of the turnaround.
+        azs (float array): Array of azimuth positions of the turnaround.
+        vs (float array): Array of azimuth velocities of the turnaround.
+    """
+
+    t_start = 0  # We have to solve the trajectory around 0 or the linear equations become very large. Add t back on later
+    t_target = t_start + turntime
+    az_start = 0
+    az_target = 0  # Turnaround should end at the same azimuth it started at.
+    v_start = v0
+    v_target = -1 * v0
+    a_start = 0  # We always target an acceleration of 0 at the beginning and end of turnaround legs.
+    a_target = 0
+    ts, azs, vs = _gen_trajectory(t_start, t_target, None,
+                                  az_start, az_target, v_start,
+                                  v_target, a_start, a_target,
+                                  step_time, turnaround_method='standard')
+
+    return ts, azs, vs
+
+
+def _gen_three_leg_turnaround(v0, turntime, second_leg_time=None, second_leg_velocity=0, step_time=0.05):
+    """
+    Function for generating the times, azimuths, and velocities for a three_leg turnaround.
+
+    Args:
+        v0 (float): The initial velocity at the start of the turnaround.
+        turntime (float): The total time for the turnaround defined by 2*velocity/acceleration.
+        second_leg_time (float): The time used by the second leg of the turnaround. Defaults to 1 second.
+                               This limits the minimum turnaround time to ~2.0 seconds!
+        second_leg_velocity (float): The velocity targeted by the beginning/end of the second leg of the turnaround. Defaults to 0 deg/s.
+                                   second_leg acceleration = 2.0 * second_leg_velocity / second_leg_time.
+        step_time (float): The step time between points in the turnaround. Defaults to 0.05 seconds (20Hz).
+
+    Returns:
+        ts (float array): Array of times of the turnaround.
+        azs (float array): Array of azimuth positions of the turnaround.
+        vs (float array): Array of azimuth velocities of the turnaround.
+    """
+
     if second_leg_time is None:
         second_leg_time = turntime / 3.0  # Cut the turnaround into equal thirds unless otherwise specified.
     if second_leg_time == 0:
@@ -56,7 +127,7 @@ def gen_three_leg_turnaround(t0, az0, el0, v0, turntime, az_flag, el_flag, point
     # Solve for the first leg of the turnaround
     t_start_1 = 0  # We have to solve the trajectory around 0 or the linear equations become very large. Add t back on later
     t_target_1 = t_start_1 + (turntime - second_leg_time) / 2  # The first and third legs share the same portion of the turnaround time.
-    az_start_1 = az0
+    az_start_1 = 0
     v_start_1 = v0
     v_target_1 = second_leg_velocity * np.sign(v_start_1)
     a_start_1 = 0
@@ -103,19 +174,11 @@ def gen_three_leg_turnaround(t0, az0, el0, v0, turntime, az_flag, el_flag, point
 
     # Concatenate the times, azimuth positions, and azimuth velocities together.
     # The first point of each leg is a duplicate of the last so we drop those points.
-    ts = np.concatenate([ts_1[1:], ts_2[1:-1], ts_3[1:]]) + t0
+    ts = np.concatenate([ts_1[1:], ts_2[1:-1], ts_3[1:]])
     azs = np.concatenate([azs_1[1:], azs_2[1:-1], azs_3[1:]])
     vs = np.concatenate([vs_1[1:], vs_2[1:-1], vs_3[1:]])
 
-    # Turn our turnaround solution into TrackPoint's for the ACU.
-    turnaround_track = []
-    for t, az, v in zip(ts, azs, vs):
-        turnaround_track.append(TrackPoint(timestamp=t,
-                                az=az, el=el0, az_vel=v, el_vel=el_vel,
-                                az_flag=az_flag, el_flag=el_flag,
-                                group_flag=int(point_group_batch > 0)))
-
-    return turnaround_track
+    return ts, azs, vs
 
 
 def _gen_trajectory(t_i, t_f, xn1_i, x0_i, x0_f, x1_i, x1_f, x2_i, x2_f, step_time):

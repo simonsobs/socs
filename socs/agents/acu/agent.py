@@ -1797,7 +1797,8 @@ class ACUAgent:
     @ocs_agent.param('az_accel', type=float, default=None)
     @ocs_agent.param('el_freq', type=float, default=None)
     @ocs_agent.param('turnaround_method', type=str, default=None,
-                     choices=[None, 'standard', 'three_leg'])
+                     choices=[None, 'standard', 'standard_gen',
+                              'three_leg'])
     @ocs_agent.param('reset', default=False, type=bool)
     @inlineCallbacks
     def set_scan_params(self, session, params):
@@ -2041,7 +2042,8 @@ class ACUAgent:
     @ocs_agent.param('scan_type', default=1, choices=[1, 2, 3])
     @ocs_agent.param('az_vel_ref', type=float, default=None)
     @ocs_agent.param('turnaround_method', default=None,
-                     choices=[None, 'standard', 'three_leg'])
+                     choices=[None, 'standard', 'standard_gen',
+                              'three_leg'])
     @ocs_agent.param('scan_upload_length', type=float, default=None)
     @ocs_agent.param('type', default=None, choices=[1, 2, 3])
     @inlineCallbacks
@@ -2271,7 +2273,7 @@ class ACUAgent:
         # Prepare the point generator.
         free_form = False
         if params['scan_type'] == 1:
-            if turnaround_method == 'three_leg':
+            if turnaround_method != 'standard':
                 free_form = True
 
             g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
