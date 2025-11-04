@@ -84,7 +84,7 @@ def _gen_standard_turnaround(v0, turntime, step_time=0.05):
     v_target = -1 * v0
     a_start = 0  # We always target an acceleration of 0 at the beginning and end of turnaround legs.
     a_target = 0
-    ts, azs, vs = _gen_trajectory(t_start, t_target, None,
+    ts, azs, vs = _gen_trajectory(t_start, t_target, 0,
                                   az_start, az_target, v_start,
                                   v_target, a_start, a_target,
                                   step_time, turnaround_method='standard')
@@ -137,7 +137,7 @@ def _gen_three_leg_turnaround(v0, turntime, second_leg_time=None, second_leg_vel
     ts_1, azs_1, vs_1 = _gen_trajectory(t_start_1, t_target_1, az_start_1,
                                         v_start_1, v_target_1, a_start_1,
                                         a_target_1, j_start_1, j_target_1,
-                                        step_time)
+                                        step_time, turnaround_method='three_leg')
 
     # Solve for the second leg of the turnaround
     t_start_2 = t_target_1
@@ -155,7 +155,7 @@ def _gen_three_leg_turnaround(v0, turntime, second_leg_time=None, second_leg_vel
         ts_2, azs_2, vs_2 = _gen_trajectory(t_start_2, t_target_2, az_start_2,
                                             v_start_2, v_target_2, a_start_2,
                                             a_target_2, j_start_2, j_target_2,
-                                            step_time)
+                                            step_time, turnaround_method='three_leg')
 
     # Solve for the third leg of the turnaround
     t_start_3 = t_target_2
@@ -170,7 +170,7 @@ def _gen_three_leg_turnaround(v0, turntime, second_leg_time=None, second_leg_vel
     ts_3, azs_3, vs_3 = _gen_trajectory(t_start_3, t_target_3, az_start_3,
                                         v_start_3, v_target_3, a_start_3,
                                         a_target_3, j_start_3, j_target_3,
-                                        step_time)
+                                        step_time, turnaround_method='three_leg')
 
     # Concatenate the times, azimuth positions, and azimuth velocities together.
     # The first point of each leg is a duplicate of the last so we drop those points.
@@ -181,7 +181,7 @@ def _gen_three_leg_turnaround(v0, turntime, second_leg_time=None, second_leg_vel
     return ts, azs, vs
 
 
-def _gen_trajectory(t_i, t_f, xn1_i, x0_i, x0_f, x1_i, x1_f, x2_i, x2_f, step_time):
+def _gen_trajectory(t_i, t_f, xn1_i, x0_i, x0_f, x1_i, x1_f, x2_i, x2_f, step_time, turnaround_method):
     """
     Generally, generates the trajectory that minimizes the third derivative of the parameter defined by x0.
 
@@ -189,7 +189,25 @@ def _gen_trajectory(t_i, t_f, xn1_i, x0_i, x0_f, x1_i, x1_f, x2_i, x2_f, step_ti
     minimizes the snap of the motion. Because we don't know the final positions of each of the legs we must
     generate the trajectories using the initial and final velocity, acceleration, and jerk, which minimizes the snap.
 
-    In this context, x0 is the function of velocity, x1 is acceleration, x2 is jerk, and xn1 is position.
+    --------------------------------------------------------------------------------------------------------------------------
+
+    When turnaround method is 'standard', x0 is the function of position, x1 is velocity, x2 is acceleration,
+    and xn1 is undefined/unused.
+
+    Args:
+        t_i (float): The initial time of the trajectory.
+        t_f (float): The final time of the trajectory.
+        xn1_i (float): Not used.
+        x0_i (float): The initial position.
+        x0_f (float): The final position.
+        x1_i (float): The initial velocity.
+        x1_f (float): The final velocity.
+        x2_i (float): The initial acceleration.
+        x2_f (float): The final acceleration.
+
+    --------------------------------------------------------------------------------------------------------------------------
+
+    When turnaround_method is 'three_leg', x0 is the function of velocity, x1 is acceleration, x2 is jerk, and xn1 is position.
 
     Args:
         t_i (float): The initial time of the trajectory.
@@ -202,6 +220,8 @@ def _gen_trajectory(t_i, t_f, xn1_i, x0_i, x0_f, x1_i, x1_f, x2_i, x2_f, step_ti
         x2_i (float): The initial jerk.
         x2_f (float): The final jerk.
 
+    --------------------------------------------------------------------------------------------------------------------------
+
     Returns:
         ts (float array): A numpy array of timestamps.
         xs (float array): A numpy array of azimuth positions.
@@ -212,10 +232,16 @@ def _gen_trajectory(t_i, t_f, xn1_i, x0_i, x0_f, x1_i, x1_f, x2_i, x2_f, step_ti
     A = solve_fifth_polynomial_lin_eqs(t_i, t_f, x0_i, x0_f, x1_i, x1_f, x2_i, x2_f)
 
     ts = np.arange(t_i, t_f + step_time, step_time)  # Divide our times into points with step_time spacing
-    vs = np.polyval(A[::-1], ts)
 
-    xs = np.polyval(np.polyint(A[::-1]), ts)
-    xs = xs - xs[0] + xn1_i  # Solve for the positions of each point
+    if turnaround_method == 'standard':
+        xs = np.polyval(A[::-1], ts)
+        vs = np.polyval(np.polyder(A[::-1]), ts)
+
+    elif turnaround_method == 'three_leg':
+        vs = np.polyval(A[::-1], ts)
+
+        xs = np.polyval(np.polyint(A[::-1]), ts)
+        xs = xs - xs[0] + xn1_i  # Solve for the positions of each point
 
     return ts, xs, vs
 

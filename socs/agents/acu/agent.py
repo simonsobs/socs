@@ -2159,13 +2159,13 @@ class ACUAgent:
         if el_freq is None:
             el_freq = self.scan_params['el_freq']
         if turnaround_method is None:
-            if params['scan_type'] in [2, 3]:
-                turnaround_method = 'three_leg'
-                self.log.info('Setting turnaround_method="three_leg" for type2/3 scan.')
-            else:
-                turnaround_method = self.scan_params['turnaround_method']
+            turnaround_method = self.scan_params['turnaround_method']
+            if params['scan_type'] in [2, 3] and turnaround_method == 'standard':
+                turnaround_method = 'standard_gen'
+                self.log.info('Setting turnaround_method="standard_gen" for type2/3 scan.')
 
         # Check if the turnaround method is usable for the called scan type.
+        # This should never happen with the above turnaround_method setting.
         if turnaround_method == "standard" and params['scan_type'] != 1:
             raise ValueError("Cannot use standard turnaround method with type 2 or 3 scans!")
 
