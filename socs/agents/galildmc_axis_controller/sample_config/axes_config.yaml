@@ -9,7 +9,7 @@ galil:
   motorconfigparams:
     E:              # linear axis
       MT: '1' # motor type
-      OE: '1' # 
+      OE: '1' #
       AG: '0'
       TL: '2'
       AU: '0'
@@ -20,7 +20,7 @@ galil:
       TL: '2'
       AU: '0'
   initaxisparams:
-    BA: 'False'          # if True command will run as BAE / BAF / BAA / BAB 
+    BA: 'False'          # if True command will run as BAE / BAF / BAA / BAB
     BM: '3276.8'
     BZ: '3'
   hold_limits:
