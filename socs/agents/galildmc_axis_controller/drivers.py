@@ -175,11 +175,6 @@ class GalilAxis(TCPInterface):
                 'position_error': te[i]
             }
 
-        #if axes:
-        #    for axis in axes:
-        #        gr = float(self.galil_command(command=f'MG _GR{axis}', expect_response=True))
-        #        data[axis]["gearing_ratio"] = gr
-
         return data
 
     def is_running(self, axis):
