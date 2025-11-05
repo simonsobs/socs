@@ -8,7 +8,6 @@ import yaml
 
 from socs.tcp import TCPInterface
 
-
 class GalilAxis(TCPInterface):
     def __init__(self, ip, port=23, timeout=10):
         """Interface class for connecting to GalilStageController for SO SAT Coupling Optics."""
@@ -28,45 +27,36 @@ class GalilAxis(TCPInterface):
         """
         start = time.time()
         drained = b""
-        received_any = False
 
-        while True:
-            rlist, _, _ = select.select([self.comm], [], [], 1)
-            if rlist:
-                chunk = self.recv()
-            else:
-                break
+        # check if anything in buffer
+        rlist, _, _ = select.select([self.comm], [], [], 0.2)
+        if rlist:
+            chunk = self.recv()
+            if chunk:
+                drained += chunk
 
-            if not chunk:
-                break
-
-            received_any = True
-            drained += chunk
-
-            if drained.endswith(b"\r:") or b":" in drained:
-                break
-
-            if time.time() - start > 3:
-                break
-
-        if received_any:
-            decoded = drained.decode("ascii", errors="ignore").strip(":\r\n ")
-
-            # --- ambiguous or empty response handling ---
-            if decoded in ("?", "??"):
-                print(f"Error response'{decoded}' — checking TC1 status...")
-
-                self.send(b"TC1\r")
-                time.sleep(0.100)
-
-                tc_resp = self.recv().decode("ascii", errors="ignore").strip(":\r\n ")
-
-                if tc_resp.startswith("5"):
-                    print("TC1=5 (Input buffer full) — clearing input buffer")
-                    time.sleep(0.100)
-                    self.send(b"CI -1;\r")
+                # --- if ':' in buffer, galil is ready to receive command, return True ---
+                if drained.endswith(b"\r:") or b":" in drained:
+                    return True
                 else:
-                    print('TC error response not 0 nor 5', tc_resp)
+                    # means more drainage necessary
+                    print(f"Drained {len(drained)} bytes, but no ':' prompt seen.")
+                    return False
+        else:
+            # no data pending in buffer -- ready to send new command!
+            return True
+
+    def _is_ready(self, max_attempts=3, delay=0.05):
+        """Try up to max_attempts to drain prompt until controller is ready."""
+        for attempt in range(max_attempts):
+            if self._drain_prompt():
+                return True
+            time.sleep(delay)
+
+        raise Exception(
+            "':' not seen to indicate Galil ready to receive command. "
+            "Flushed out buffer 3 times — likely needs to be flushed more."
+        )
 
     def galil_command(self, command=None, axis=None, value=None,
                       expect_response=False, retries=3):
@@ -87,28 +77,38 @@ class GalilAxis(TCPInterface):
 
         msg = f"{cmd}\r".encode("ascii")
 
-        # ---drain the prompt ---
-        self._drain_prompt()
-        time.sleep(0.100)
+        # check if Galil is ready to receive commands
+        self._is_ready()
+
+        # if ready, send msg
         self.send(msg)
 
         if not expect_response:
             resp = ''
             return resp
+        else:
+            for attempt in range(retries):
+                resp = self.recv().decode("ascii", errors="ignore").strip(":\r\n")
 
-        # --- receive and retry on '?' ---
-        for attempt in range(retries):
-            resp = self.recv().decode("ascii", errors="ignore").strip(":\r\n")
+                if resp in ("?", "??"):
+                    self._drain_prompt()
+                    self.send(b"TC1\r") # ask galil why '?'
+                    tc_resp = self.recv().decode("ascii", errors="ignore").strip(":\r\n ")
 
-            if resp in ("?", "??", ""):
-                self._drain_prompt()
-                time.sleep(0.1)
-                self.send(msg)
-                continue
-            else:
-                break
+                    if tc_resp.startswith("5"):
+                        print("TC1=5 (Input buffer full) — clearing input buffer")
+                        self.send(b"CI -1;\r")
+                    else:
+                        print(f"TC error response: {tc_resp}")
 
-        return resp
+                    time.sleep(0.1)
+                    self.send(msg)
+                    continue
+
+                else:
+                    break
+
+            return resp
 
     def get_relative_position(self, axis, movetype=None, counts_per_mm=None, counts_per_deg=None):
         """
@@ -175,10 +175,10 @@ class GalilAxis(TCPInterface):
                 'position_error': te[i]
             }
 
-        if axes:
-            for axis in axes:
-                gr = float(self.galil_command(command=f'MG _GR{axis}', expect_response=True))
-                data[axis]["gearing_ratio"] = gr
+        #if axes:
+        #    for axis in axes:
+        #        gr = float(self.galil_command(command=f'MG _GR{axis}', expect_response=True))
+        #        data[axis]["gearing_ratio"] = gr
 
         return data
 
