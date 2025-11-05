@@ -11,7 +11,6 @@ from twisted.internet import reactor
 
 from socs.agents.galildmc_axis_controller.drivers import GalilAxis
 
-
 if os.environ.get("GALIL_TEST_MODE"):
     from socs.agents.galildmc_axis_controller import drivers
     drivers.GalilAxis._drain_prompt = lambda self: b":"
@@ -171,7 +170,7 @@ class GalilAxisControllerAgent:
 
             self.take_data = True
 
-            pm = Pacemaker(1/3, quantize=False)
+            pm = Pacemaker(1 / 3, quantize=False)
             while self.take_data:
                 pm.sleep()
                 # Reliqinuish sampling lock occassionally
@@ -963,7 +962,7 @@ class GalilAxisControllerAgent:
             raise ValueError("No configfile specified")
         configfile = os.path.join(os.environ['OCS_CONFIG_DIR'], configfile)
 
-        with self.lock.acquire_timeout(timeout=5,job='input_configfile') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='input_configfile') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")

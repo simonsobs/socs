@@ -8,6 +8,7 @@ import yaml
 
 from socs.tcp import TCPInterface
 
+
 class GalilAxis(TCPInterface):
     def __init__(self, ip, port=23, timeout=10):
         """Interface class for connecting to GalilStageController for SO SAT Coupling Optics."""
@@ -92,7 +93,7 @@ class GalilAxis(TCPInterface):
 
                 if resp in ("?", "??"):
                     self._drain_prompt()
-                    self.send(b"TC1\r") # ask galil why '?'
+                    self.send(b"TC1\r")  # ask galil why '?'
                     tc_resp = self.recv().decode("ascii", errors="ignore").strip(":\r\n ")
 
                     if tc_resp.startswith("5"):
