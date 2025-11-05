@@ -20,10 +20,8 @@ class GalilAxis(TCPInterface):
 
     def _drain_prompt(self):
         """
-        Drain the TCP buffer until a Galil ':' prompt is seen or timeout occurs.
-        If a '?' is detected, query TC1 for an error code.
-        Handles 'Input buffer full' (TC1=5) by pausing and waiting for the controller
-        to clear before allowing new commands.
+        Check for and drain any remaining data from the TCP buffer.
+        Return True or False depending on whether a ':' Galil prompt appears.
 
         """
         start = time.time()
