@@ -11,10 +11,6 @@ from twisted.internet import reactor
 
 from socs.agents.galildmc_axis_controller.drivers import GalilAxis
 
-# TODO: check jobs in each task to match name of task
-# TODO Tasks: get_relative_position, get absolute position, get torque limit
-# TODO: check input_configfile and if it needs to be updated
-# TODO: safety checks when thinking about the positional error between two axes --> alarm? David?
 
 if os.environ.get("GALIL_TEST_MODE"):
     from socs.agents.galildmc_axis_controller import drivers
@@ -175,7 +171,7 @@ class GalilAxisControllerAgent:
 
             self.take_data = True
 
-            pm = Pacemaker(0.2)  # , quantize=True)
+            pm = Pacemaker(1/3, quantize=False)
             while self.take_data:
                 pm.sleep()
                 # Reliqinuish sampling lock occassionally
@@ -188,7 +184,6 @@ class GalilAxisControllerAgent:
 
                 try:
                     data = self.stage.get_data(self.axes)
-                    print('data', data)
                     if session.degraded:
                         self.log.info("Connection re-established.")
                         session.degraded = False
@@ -339,7 +334,7 @@ class GalilAxisControllerAgent:
         """
         axis = params['axis']
 
-        with self.lock.acquire_timeout(timeout=3, job='get_brake_status') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='get_brake_status') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because {self.lock.job} is already running")
                 return False, "Could not acquire lock"
@@ -358,7 +353,7 @@ class GalilAxisControllerAgent:
         Parameters:
             axis (str): Axis to query (e.g. 'A', 'B').
         """
-        with self.lock.acquire_timeout(timeout=3, job='get_motor_state') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='get_motor_state') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
@@ -492,7 +487,7 @@ class GalilAxisControllerAgent:
         """
         axis = params['axis']
         errtype = params['errtype']
-        with self.lock.acquire_timeout(timeout=3, job='set_off_on_error') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='set_off_on_error') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
@@ -968,7 +963,7 @@ class GalilAxisControllerAgent:
             raise ValueError("No configfile specified")
         configfile = os.path.join(os.environ['OCS_CONFIG_DIR'], configfile)
 
-        with self.lock.acquire_timeout(job='input_configfile') as acquired:
+        with self.lock.acquire_timeout(timeout=5,job='input_configfile') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
@@ -985,26 +980,26 @@ class GalilAxisControllerAgent:
             except Exception as e:
                 return False, f'Config parse error: {e}'
 
-            for a in axes:
+            for a in self.axes:
                 # set motor type
-                motortype = config['galil']['motorconfigparams'][a]['MT']
+                motortype = self.axis_map[a]['MT']
                 self.stage.set_motor_type(axis=a, motortype=motortype)
 
                 # set off on error
-                errtype = config['galil']['motorconfigparams'][a]['OE']
+                errtype = self.axis_map[a]['OE']
                 errtype = int(errtype)
                 self.stage.set_off_on_error(axis=a, errtype=errtype)
 
                 # set amp gain
-                gn = config['galil']['motorconfigparams'][a]['AG']
+                gn = self.axis_map[a]['AG']
                 self.stage.set_amp_gain(axis=a, val=gn)
 
                 # set torque limit
-                tl = config['galil']['motorconfigparams'][a]['TL']
-                self.stage.set_torque_limitn(axis=a, val=tl)
+                tl = self.axis_map[a]['TL']
+                self.stage.set_torque_limit(axis=a, val=tl)
 
                 # set current loop gain
-                clgn = config['galil']['motorconfigparams'][a]['AU']
+                clgn = self.axis_map[a]['AU']
                 self.stage.set_amp_currentloop_gain(axis=a, val=clgn)
 
                 # enable sin commutation
@@ -1018,6 +1013,8 @@ class GalilAxisControllerAgent:
                     # initialize
                     val == gal['initaxisparams']['BZ']
                     self.stage.initialize_axis(axis=a, val=val)
+
+        return True, "Input configfile task complete."
 
 
 def make_parser(parser=None):
