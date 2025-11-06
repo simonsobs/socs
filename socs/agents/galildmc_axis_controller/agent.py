@@ -745,7 +745,7 @@ class GalilAxisControllerAgent:
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('speed', type=float)
     def jog_axis(self, session, params):
-        """jog_axis(axis, val)
+        """jog_axis(axis, speed)
 
         **Task** - Sets the jog mode and the jog speed fo the axes,
         moving the axis continuously at the commanded speed.
@@ -769,6 +769,36 @@ class GalilAxisControllerAgent:
                 return False, "Could not acquire lock"
 
             self.stage.jog_axis(axis, speed)
+
+        return True, f'{axis} speed is now set to {speed}'
+
+    @ocs_agent.param('axis', type=str)
+    @ocs_agent.param('speed', type=float)
+    def set_speed(self, session, params):
+        """set_speed(axis, speed)
+
+        **Task** - Sets the speed for a subsequent  motion/move-to command
+        (such as relative or absolute position motion).
+
+        Parameters:
+            axis (str): Specified axis. Ex. 'A'
+            speed (float): Specified speed value in raw encoder units
+
+        Notes:
+            The speed value here is not defined in terms of millimeters or
+            degrees. User will have to define in encoder counts
+            (i.e., `4000` for 4000 counts/sec).
+
+        """
+        axis = params['axis']
+        speed = params['speed']
+        with self.lock.acquire_timeout(timeout=5, job='jog_axis') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            self.stage.set_speed(axis, speed)
 
         return True, f'{axis} speed is now set to {speed}'
 
@@ -1064,6 +1094,7 @@ def main(args=None):
     agent.register_task('initialize_axis', galilaxis_agent.initialize_axis)
     agent.register_task('define_position', galilaxis_agent.define_position)
     agent.register_task('jog_axis', galilaxis_agent.jog_axis)
+    agent.register_task('set_speed', galilaxis_agent.set_speed)
     agent.register_task('enable_sin_commutation', galilaxis_agent.enable_sin_commutation)
     agent.register_task('disable_limit_switch', galilaxis_agent.disable_limit_switch)
     agent.register_task('set_limitswitch_polarity', galilaxis_agent.set_limitswitch_polarity)

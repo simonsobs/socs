@@ -439,6 +439,17 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=cmd)
         return resp
 
+    def set_speed(self, axis, speed):
+        """
+        Set speed for axis for use in commands like PR/PA (relative and absolute
+        position). Does not begin motion, just defines speed for when
+        ready to begin motion. Units of speed is in raw encoder units (counts/s).
+
+        """
+        cmd = f"SP{axis}={speed};"
+        resp = self.galil_command(command=cmd)
+        return resp
+
     def set_motor_state(self, axis, state):
         """
         Enable or disable a motor, then verify its state (0='on', 1='off').
