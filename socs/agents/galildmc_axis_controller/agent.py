@@ -196,7 +196,7 @@ class GalilAxisControllerAgent:
                                 "timestamp": time.time()}
 
                 pub_data = {'timestamp': time.time(),
-                            'block_name': 'stage_status',
+                            'block_name': 'axes',
                             'data': {}}
 
                 pub_data['data'] = data
