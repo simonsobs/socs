@@ -79,7 +79,6 @@ class GalilAxis(TCPInterface):
         # check if Galil is ready to receive commands
         self._is_ready()
 
-        # if ready, send msg
         self.send(msg)
 
         if not expect_response:
@@ -89,7 +88,7 @@ class GalilAxis(TCPInterface):
             for attempt in range(retries):
                 resp = self.recv().decode("ascii", errors="ignore").strip(":\r\n")
 
-                if resp in ("?", "??"):
+                if resp in ("?", "??", ""):
                     self._drain_prompt()
                     self.send(b"TC1\r")  # ask galil why '?'
                     tc_resp = self.recv().decode("ascii", errors="ignore").strip(":\r\n ")
@@ -199,15 +198,14 @@ class GalilAxis(TCPInterface):
         else:
             print(f'Axis {axis} did not move. Try again.')
 
-    def set_relative_position(self, axis, distance, counts_per_unit=None, encodeunits=False):
+    def set_relative_position(self, axis, distance, counts_per_unit=None):
         """
-        Move axis by a relative distance (in units or encoder counts.
+        Move axis by a relative distance (in calibration units such as
+        mm or deg or raw encoder counts). If `counts_per_unit` is None,
+        assume raw counts.
 
         """
-        if not encodeunits and counts_per_unit is None:
-            raise ValueError("counts_per_unit required when encodeunits=False")
-
-        counts = distance if encodeunits else round(distance * counts_per_unit, 3)
+        counts = distance if counts_per_unit is None else round(distance * counts_per_unit, 3)
         return self.galil_command("PR", axis=axis, value=counts)
 
     def set_absolute_position(self, axis, position, counts_per_unit=None, encodeunits=False):

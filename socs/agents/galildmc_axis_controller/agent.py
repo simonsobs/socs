@@ -222,22 +222,18 @@ class GalilAxisControllerAgent:
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('distance', type=float)
-    @ocs_agent.param('movetype', type=str, choices=['linear', 'angular', None])
-    @ocs_agent.param('encodeunits', type=bool, default=False)
+    @ocs_agent.param('movetype', type=str, choices=['linear', 'angular', 'encoder'])
     def set_relative_position(self, session, params):
-        """set_relative_position(axis, lindist)
+        """set_relative_position(axis, distance, movetype)
 
         **Task** - Set the relative position location for a specified axis.
 
         Parameters:
             axis (str): Axis to command position. Ex: 'A'
-            distance (float): Relative distance value, in millimeter or degrees
-                depending on `movetype`.
+            distance (float): Relative distance value, in millimeter, degrees,
+                or raw counts, depending on `movetype`.
             movetype (str): 'linear' (mm) or 'angular' (deg), or `None` for raw
                 encoder counts.
-            encodeunits (bool): If True, interpret `distance` directly as raw counts
-            instead of millimeters or degrees. Default is False.
-
         Notes:
             The conversion from millimeters to encoder counts is defined in the
             configuration file under `galil.motorsettings.countspermm` or
@@ -247,29 +243,24 @@ class GalilAxisControllerAgent:
         axis = params['axis']
         distance = params['distance']
         movetype = params['movetype']
-        encodeunits = params['encodeunits']
-        with self.lock.acquire_timeout(0, job='set_relative_position') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='set_relative_position') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
             # Determine conversion factors
-            if encodeunits and movetype is None:
+            if movetype == 'encoder':
                 # use raw encoder units
                 counts_per_unit = None
-            elif not encodeunits and movetype is not None:
+            elif movetype == 'linear':
                 # use specific conversion factors
-                counts_per_units = (
-                    self.counts_per_mm if movetype == 'linear' else self.counts_per_deg
-                )
+                counts_per_unit = self.counts_per_mm
+            elif movetype == 'angular':
+                counts_per_unit = self.counts_per_deg
 
             self.stage.set_relative_position(axis, distance,
-                                             counts_per_unit=counts_per_unit,
-                                             encodeunits=encodeunits)
-
-            self.log.info(f"Set relative {movetype} position for {axis}: {dist} "
-                          f"{'encoder units' if encodeunits else 'mm'}")
+                                             counts_per_unit=counts_per_unit)
 
         return True, f"Axis {axis} set to relative position: {distance}."
 
