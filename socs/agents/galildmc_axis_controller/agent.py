@@ -266,10 +266,9 @@ class GalilAxisControllerAgent:
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('position', type=float)
-    @ocs_agent.param('movetype', type=str, choices=['linear', 'angular', None])
-    @ocs_agent.param('encodeunits', type=bool, default=False)
+    @ocs_agent.param('movetype', type=str, choices=['linear', 'angular', 'encoder'])
     def set_absolute_position(self, session, params):
-        """set_absolute_position(axis, position, movetype='linear', encodeunits=False)
+        """set_absolute_position(axis, position, movetype)
 
         **Task** - Set the absolute position location for a specified axis.
 
@@ -277,41 +276,37 @@ class GalilAxisControllerAgent:
             axis (str): Axis to command position. Example: 'A'
             position (float): Absolute position distance value in mm, deg,
                 or raw encoder counts.
-            movetype (str): 'linear' (mm) or 'angular' (deg), or `None` for raw
+            movetype (str): 'linear' (mm) or 'angular' (deg), or `encoder` for raw
                 encoder counts.
-            encodeunits (bool): If True, interpret `distance` directly as raw counts
-            instead of millimeters or degrees. Default is False.
 
+        Notes:
+            The conversion from millimeters to encoder counts is defined in the
+            configuration file under `galil.motorsettings.countspermm` or
+            `galil.motorsettings.countsperdeg`
         """
         axis = params['axis']
         position = params['position']
         movetype = params['movetype']
-        encodeunits = params['encodeunits']
-
-        with self.lock.acquire_timeout(0, job='set_absolute_position') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='set_absolute_position') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because {self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
             # Determine conversion factors
-            if encodeunits and movetype is None:
+            if movetype == 'encoder':
                 # use raw encoder units
                 counts_per_unit = None
-            elif not encodueunits and movetype is not None:
+            elif movetype == 'linear':
                 # use specific conversion factors
-                counts_per_units = (
-                    self.counts_per_mm if movetype == 'linear' else self.counts_per_deg
-                )
+                counts_per_unit = self.counts_per_mm
+            elif movetype == 'angular':
+                counts_per_unit = self.counts_per_deg
 
             # Set the PA value
             self.stage.set_absolute_position(axis, position,
-                                             counts_per_unit=counts_per_unit,
-                                             encodeunits=encodeunits)
+                                             counts_per_unit=counts_per_unit)
 
-            self.log.info(f"Set absolute {movetype} position for axis {axis}: "
-                          f"{position} {'encoder units' if encodeunits else movetype}")
-
-        return True, f"Axis {axis} set to absolute position: {distance}"
+        return True, f"Axis {axis} set to absolute position: {position}"
 
     @ocs_agent.param('axis', type=str)
     def get_brake_status(self, session, params):

@@ -208,15 +208,12 @@ class GalilAxis(TCPInterface):
         counts = distance if counts_per_unit is None else round(distance * counts_per_unit, 3)
         return self.galil_command("PR", axis=axis, value=counts)
 
-    def set_absolute_position(self, axis, position, counts_per_unit=None, encodeunits=False):
+    def set_absolute_position(self, axis, position, counts_per_unit=None):
         """
         Set absolute position for an axis in units or encoder counts.
 
         """
-        if not encodeunits and counts_per_unit is None:
-            raise ValueError("counts_per_unit required when encodeunits=False")
-
-        counts = position if encodeunits else round(position * counts_per_unit, 3)
+        counts = position if counts_per_unit is None else round(position * counts_per_unit, 3)
         return self.galil_command("PA", axis=axis, value=counts)
 
     def release_brake(self, output_num):
