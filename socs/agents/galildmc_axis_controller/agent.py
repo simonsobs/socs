@@ -688,7 +688,9 @@ class GalilAxisControllerAgent:
     def set_magnetic_cycle(self, session, params):
         """set_magnetic_cycle(axis, val)
 
-        **Task** - Set motor torque limit per axis.
+        **Task** - Set magnetic cycle value for motors with sinusoidal
+            amplifiers for specific axis. Defines the length of the
+            motor's magnetic cycle in encoder units.
 
         Parameters:
             axis (str): Specified axis. Ex. 'A'
