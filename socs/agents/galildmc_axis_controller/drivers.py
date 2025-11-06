@@ -346,7 +346,7 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=f'AU{axis}={val};')
         return resp
 
-    # init
+    # initialization required if galil motor has sinusoidal amplifiers
     def enable_sin_commutation(self, axis):
         """
         For axes with a sinusoidal amplifier, the BA command is necessary to configure
@@ -356,7 +356,7 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=f'BA{axis};')
         return resp
 
-    # init
+    # initialization required if galil motor has sinusoidal amplifiers
     def set_magnetic_cycle(self, axis, val='3276.8'):
         """
         Defines the length of the motors magnetic cycle in encoder counts,
@@ -366,7 +366,7 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=f'BM{axis}={val};')
         return resp
 
-    # init
+    # initialization required if galil motor has sinusoidal amplifiers
     def initialize_axis(self, axis, val):
         """
         Initializes axes configured for sinusoidal commutation. BZ command
@@ -378,11 +378,10 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=f'BZ{axis}={val};')
         return resp
 
-    # home
     def define_position(self, axes, val=0):
         """
         Redefines current axis position to user specified value.
-        Useful for homing procedure.
+        Useful for homing procedure. Default is 0.
 
         """
         resp = self.galil_command(command=f'DP{axis}={val};')
