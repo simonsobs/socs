@@ -156,8 +156,8 @@ class GalilAxisControllerAgent:
 
                 >> response.session['data']
                 {'fields':
-                    {'E': {'position': 1182887.0, 'velocity': 0.0, 'torque': 0.0, 'position_error': 34.0, 'gearing_ratio': 0.0},
-                     'F': {'position': 5628.0, 'velocity': 0.0, 'torque': 0.0424, 'position_error': 23.0, 'gearing_ratio': 1.0}},
+                    {'E': {'position': 1182887.0, 'velocity': 0.0, 'torque': 0.0, 'position_error': 34.0},
+                     'F': {'position': 5628.0, 'velocity': 0.0, 'torque': 0.0424, 'position_error': 23.0}},
                      'timestamp': 1761330944.879641}
 
         """
