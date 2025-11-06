@@ -620,6 +620,26 @@ class GalilAxisControllerAgent:
         return True, f'Torque limit for {axis} set to {val} volts'
 
     @ocs_agent.param('axis', type=str)
+    def get_torque_limit(self, session, params):
+        """get_torque_limit(axis)
+
+        **Task** - Query motor torque limit for specified axis.
+
+        Parameters:
+            axis (str): Axis to query (e.g. 'A').
+        """
+        axis = params['axis']
+
+        with self.lock.acquire_timeout(timeout=5, job='get_motor_state') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because {self.lock.job} is already running.")
+                return False, "Could not acquire lock."
+
+            val = self.stage.get_torque_limit(axis)
+
+        return True, f"Torque limit for {axis} is: {val}."
+
+    @ocs_agent.param('axis', type=str)
     @ocs_agent.param('state', type=str, choices=['enable', 'disable'])
     def set_motor_state(self, session, params):
         """set_motor_state(axis, state)
