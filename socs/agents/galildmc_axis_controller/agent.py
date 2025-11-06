@@ -556,7 +556,7 @@ class GalilAxisControllerAgent:
         **Task** - Query the amplifier current loop gain value for a given axis.
 
         Parameters:
-            axis (str): Axis to query (e.g. 'A', 'B', 'E').
+            axis (str): Axis to query (e.g. 'A').
         """
         axis = params['axis']
 
@@ -568,6 +568,30 @@ class GalilAxisControllerAgent:
             resp = self.stage.get_amp_currentloop_gain(axis)
 
         return True, f"Amplifer Current Loop Gain for {axis}: {resp}"
+
+    @ocs_agent.param('axis', type=str)
+    @ocs_agent.param('val', type=int)
+    def set_amp_currentloop_gain(self, session, params):
+        """set_amp_currentloop_gain(axis, val)
+
+        **Task** - Set motor torque limit per axis.
+
+        Parameters:
+            axis (str): Specified axis. Ex. 'A'
+            val (int): Current-loop gain value to apply.
+
+        """
+        axis = params['axis']
+        val = params['val']
+        with self.lock.acquire_timeout(timeout=5, job='set_amp_currentloop_gain') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            self.stage.set_amp_currentloop_gain(axis, val)
+
+        return True, f'Amp current loop gain set to {val} for axis {axis}'
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=float)
@@ -594,30 +618,6 @@ class GalilAxisControllerAgent:
             self.stage.set_torque_limit(axis, val)
 
         return True, f'Torque limit for {axis} set to {val} volts'
-
-    @ocs_agent.param('axis', type=str)
-    @ocs_agent.param('val', type=int)
-    def set_amp_currentloop_gain(self, session, params):
-        """set_amp_currentloop_gain(axis, val)
-
-        **Task** - Set motor torque limit per axis.
-
-        Parameters:
-            axis (str): Specified axis. Ex. 'A'
-            val (int): Current-loop gain value to apply.
-
-        """
-        axis = params['axis']
-        val = params['val']
-        with self.lock.acquire_timeout(timeout=5, job='set_amp_currentloop_gain') as acquired:
-            if not acquired:
-                self.log.warn(f"Could not start Task because "
-                              f"{self.lock.job} is already running")
-                return False, "Could not acquire lock"
-
-            self.stage.set_amp_currentloop_gain(axis, val)
-
-        return True, f'Amp current loop gain set to {val} for axis {axis}'
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('state', type=str, choices=['enable', 'disable'])
