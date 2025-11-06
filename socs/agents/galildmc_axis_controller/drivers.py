@@ -397,7 +397,8 @@ class GalilAxis(TCPInterface):
 
     def set_limitswitch_polarity(self, pol=1):
         """
-        CN -1 means active low, CN +1 is active high. And we want active high.
+        CN -1 means active low, CN +1 is active high. Default is  1
+        (active high).
 
         """
         resp = self.galil_command(command=f'CN {pol};')

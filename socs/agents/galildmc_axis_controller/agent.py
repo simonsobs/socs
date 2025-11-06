@@ -870,7 +870,7 @@ class GalilAxisControllerAgent:
 
     @ocs_agent.param('polarity', type=int)
     def set_limitswitch_polarity(self, session, params):
-        """set_limitswitch_polarity()
+        """set_limitswitch_polarity(polarity)
 
         **Task** - Configure the limit switch polarity for all axes.
 
@@ -989,7 +989,7 @@ class GalilAxisControllerAgent:
 
         Parameters:
             configfile (str, optional):
-                name of .yaml config file. Defaults to the fite set in the site config
+                name of .yaml config file. Defaults to the file set in the site config.
 
 
         """
