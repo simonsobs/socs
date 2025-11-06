@@ -367,6 +367,20 @@ class GalilAxis(TCPInterface):
         return resp
 
     # initialization required if galil motor has sinusoidal amplifiers
+    def set_dwell_times(self, t_first, t_second):
+        """
+        Define the dwell times used for sinusoidal commutation initialization.
+
+        This command sets the timing parameters for the Galil BZ command,
+        specifying how long the motor will hold at the first and second
+        magnetic positions during commutation (in milliseconds). These
+        parameters must be defined before executing the BZ command.
+
+        """
+        cmd = f'BZ <{t_first}>{t_second}'
+        resp = self.galil_command(command=cmd)
+        return resp
+
     def initialize_axis(self, axis, val):
         """
         Initializes axes configured for sinusoidal commutation. BZ command

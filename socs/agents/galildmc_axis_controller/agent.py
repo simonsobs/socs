@@ -69,6 +69,8 @@ class GalilAxisControllerAgent:
         self.axes = None
         self.counts_per_mm = None
         self.counts_per_deg = None
+        self.first_dwell = None
+        self.sec_dwell = None
 
         # Register data feeds
         agg_params = {
@@ -115,6 +117,8 @@ class GalilAxisControllerAgent:
             self.counts_per_mm = gal['motorsettings']['countspermm']
             self.counts_per_deg = gal['motorsettings']['countsperdeg']
             self.brakes = gal['brakes']['output_map']
+            self.first_dwell = gal['dwell_times']['first_ms']
+            self.sec_dwell = gal['dwell_times']['second_ms']
 
             # Establish connection
             self.stage = GalilAxis(ip=self.ip, port=self.port)
@@ -709,21 +713,50 @@ class GalilAxisControllerAgent:
 
         return True, f'Magnetic cycle for {axis} set to {val}'
 
+    @ocs_agent.param('t_first', type=int)
+    @ocs_agent.param('t_second', type=int)
+    def set_dwell_times(self, session, params):
+        """set_dwell_times(t_first, t_second)
+
+        **Task** - Define dwell times for the initialization task to define
+            the time for driving the motor to 2 different locations.
+
+        Parameters:
+            t_first (int): timing in milliseconds for driviing the motor to
+                the first location. Ex: '1500'
+            t_second (int): timing in milliseconds for driving the motor to
+                the second location. Ex: '1000'
+
+        """
+        first = params['t_first']
+        second = params['t_second']
+        with self.lock.acquire_timeout(timeout=5, job='set_dwell_times') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            resp = self.stage.set_dwell_times(t_first=first, t_second=second)
+
+        return True, f'Dwell times for initializing axes set to {first} and {second}ms, respectively.'
+
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=float)
     def initialize_axis(self, session, params):
         """initialize_axis(axis, val)
 
-        **Task** - Initialize axes for sinusoidal amplifier settings..
+        **Task** - Initialize axes configured with sinusoidal amplifiers.
+            During this procedure, each motor is driven to two magnetic
+            positions to establish the commutation angle required for motion.
 
         Parameters:
             axis (str): Specified axis. Ex. 'A'
             val (float): Torque command voltage to be applied during initialization
-            for axes that are configured for sinusoidal commutation.
+            for axes that are configured for sinusoidal commutation. Ex: 3.0
 
         Notes:
-            To run this task, you must run the `enable_sin_commutation` and
-            the `set_magnetic_cycle` tasks first.
+            To run this task, you must run the `enable_sin_commutation`,
+            `set_magnetic_cycle`, and `set_dwell_times` tasks first.
 
         """
         axis = params['axis']
@@ -961,9 +994,9 @@ class GalilAxisControllerAgent:
 
     @ocs_agent.param('axis', type=str)
     def get_gearing_ratio(self, session, params):
-        """get_gearing_ratio(order)
+        """get_gearing_ratio(axis)
 
-        **Task** - Query the current electronig gearing ratio for a specified axis
+        **Task** - Query the current electronic gearing ratio for a specified axis
 
         Parameters:
             axis (str): Axis to query (e.g., 'A')
@@ -1047,6 +1080,8 @@ class GalilAxisControllerAgent:
                     # set magnetic cycle
                     mag = gal['initaxisparams']['BM']
                     self.stage.set_magnetic_cycle(axis=a, val=mag)
+                    # set dwell times before initializing 
+                    self.stage.set_dwell_times(t_first=self.first_dwell, t_second=self.sec_dwell)
                     # initialize
                     val == gal['initaxisparams']['BZ']
                     self.stage.initialize_axis(axis=a, val=val)
@@ -1114,6 +1149,7 @@ def main(args=None):
     agent.register_task('set_motor_state', galilaxis_agent.set_motor_state)
     agent.register_task('get_motor_state', galilaxis_agent.get_motor_state)
     agent.register_task('set_magnetic_cycle', galilaxis_agent.set_magnetic_cycle)
+    agent.register_task('set_dwell_times', galilaxis_agent.set_dwell_times)
     agent.register_task('initialize_axis', galilaxis_agent.initialize_axis)
     agent.register_task('define_position', galilaxis_agent.define_position)
     agent.register_task('jog_axis', galilaxis_agent.jog_axis)
