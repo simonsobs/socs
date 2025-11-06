@@ -406,7 +406,7 @@ class GalilAxis(TCPInterface):
         Disable limit switch detection on a given axis (LDx=3).
 
         """
-        resp = self.galil_command(command=f'LD{axis}=3;', expect_response=True)
+        resp = self.galil_command(command=f'LD{axis}=3;')
         return resp
 
     def set_limitswitch_polarity(self, pol=1):
