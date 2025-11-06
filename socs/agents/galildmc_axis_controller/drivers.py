@@ -190,13 +190,13 @@ class GalilAxis(TCPInterface):
 
         """
         self.galil_command(command="BG", axis=axis)
-        time.sleep(1)
 
         state = self.is_running(axis)
+        state = str(int(float(state)))
         if state == '1':
             print(f'Axis {axis} is in motion.')
-        else:
-            print(f'Axis {axis} did not move. Try again.')
+        elif state == '0':
+            print(f'Axis {axis} is not moving. Retry command if needed.')
 
     def set_relative_position(self, axis, distance, counts_per_unit=None):
         """
