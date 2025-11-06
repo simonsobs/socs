@@ -1106,6 +1106,7 @@ def main(args=None):
     agent.register_task('set_amp_gain', galilaxis_agent.set_amp_gain)
     agent.register_task('get_amp_gain', galilaxis_agent.get_amp_gain)
     agent.register_task('set_torque_limit', galilaxis_agent.set_torque_limit)
+    agent.register_task('get_torque_limit', galilaxis_agent.get_torque_limit)
     agent.register_task('set_amp_currentloop_gain', galilaxis_agent.set_amp_currentloop_gain)
     agent.register_task('get_amp_currentloop_gain', galilaxis_agent.get_amp_currentloop_gain)
     agent.register_task('set_motor_state', galilaxis_agent.set_motor_state)
