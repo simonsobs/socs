@@ -378,7 +378,7 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=f'BZ{axis}={val};')
         return resp
 
-    def define_position(self, axes, val=0):
+    def define_position(self, axis, val=0):
         """
         Redefines current axis position to user specified value.
         Useful for homing procedure. Default is 0.
