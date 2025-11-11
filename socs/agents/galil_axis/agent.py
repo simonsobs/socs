@@ -9,7 +9,7 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 from twisted.internet import reactor
 
-from socs.agents.galildmc_axis_controller.drivers import GalilAxis
+from socs.agents.galil_axis.drivers import GalilAxis
 
 if os.environ.get("GALIL_TEST_MODE"):
     from socs.agents.galildmc_axis_controller import drivers
