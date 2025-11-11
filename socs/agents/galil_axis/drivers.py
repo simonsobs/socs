@@ -448,7 +448,7 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=f"GR {order};")
         return resp
 
-    def jog_axis(self, axis, speed):
+    def set_jog_speed(self, axis, speed):
         """
         Set jog speed for axis. Does not begin motion, just sets up speed
         for when ready to begin motion.

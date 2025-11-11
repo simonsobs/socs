@@ -805,15 +805,17 @@ class GalilAxisAgent:
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('speed', type=float)
-    def jog_axis(self, session, params):
-        """jog_axis(axis, speed)
+    def set_jog_speed(self, session, params):
+        """set_jog_speed(axis, speed)
 
-        **Task** - Sets the jog mode and the jog speed fo the axes,
-        moving the axis continuously at the commanded speed.
+        **Task** - Defines the jog speed for the specified
+            axis. Note that this task will set the speed to move
+            the axis continuously when ready to begin motion,
+            but does not begin motion.
 
         Parameters:
             axis (str): Specified axis. Ex. 'A'
-            speed (float): Specified speed value in raw encoder units
+            speed (float): The value of the speed in raw encoder units
 
         Notes:
             The speed value here is not defined in terms of millimeters or
@@ -829,7 +831,7 @@ class GalilAxisAgent:
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            self.stage.jog_axis(axis, speed)
+            self.stage.set_jog_speed(axis, speed)
 
         return True, f'{axis} speed is now set to {speed}'
 
