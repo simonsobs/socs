@@ -386,16 +386,10 @@ class GalilAxisAgent:
 
             brake_outputnum = self.brakes[axis]
 
-            try:
-                if state == 'engage':
-                    self.stage.engage_brake(brake_outputnum)
-                elif state == 'release':
-                    self.stage.release_brake(brake_outputnum)
-                else:
-                    return False, f"Invalid brake state '{state}'. Must be 'engage' or 'release'."
-            except Exception as e:
-                self.log.error(f"Failed to {state} brake for {axis}-axis: {e}")
-                return False, f"Error during brake {state}: {e}"
+            if state == 'engage':
+                self.stage.engage_brake(brake_outputnum)
+            elif state == 'release':
+                self.stage.release_brake(brake_outputnum)
 
         return True, f"Set brake status to: {state}."
 
