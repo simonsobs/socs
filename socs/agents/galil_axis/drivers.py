@@ -480,17 +480,10 @@ class GalilAxis(TCPInterface):
 
         # --- Execute command ---
         if state == 'enable':
-            self.galil_command("SH", axis=axis)
+            resp = self.galil_command("SH", axis=axis)
         elif state == 'disable':
-            self.galil_command("MO", axis=axis)
-
-        # --- Allow controller to settle ---
-        time.sleep(1.0)
-
-        # --- Query new state ---
-        status, human_state = self.get_motor_state(axis=axis)
-
-        return status, human_state
+            resp = self.galil_command("MO", axis=axis)
+        return resp
 
     def get_motor_state(self, axis):
         """

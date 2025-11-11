@@ -668,7 +668,7 @@ class GalilAxisAgent:
                 self.log.warn(f"Could not start Task because {self.lock.job} is already running.")
                 return False, "Could not acquire lock."
 
-            status, human_state = self.stage.set_motor_state(axis, state)
+            self.stage.set_motor_state(axis, state)
 
         return True, f"Motor {axis} {state}d; verified state: {human_state} (raw={status})"
 
