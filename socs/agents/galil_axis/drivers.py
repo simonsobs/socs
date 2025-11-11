@@ -194,9 +194,11 @@ class GalilAxis(TCPInterface):
         state = self.is_running(axis)
         state = str(int(float(state)))
         if state == '1':
-            print(f'Axis {axis} is in motion.')
+            msg = f'Axis {axis} is in motion.')
+            return True, msg
         elif state == '0':
-            print(f'Axis {axis} is not moving. Retry command if needed.')
+            msg = f'Axis {axis} is not moving. Retry command if needed.'
+            return False, msg
 
     def set_relative_position(self, axis, distance, counts_per_unit=None):
         """

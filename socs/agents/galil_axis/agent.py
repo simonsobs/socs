@@ -410,8 +410,8 @@ class GalilAxisAgent:
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            self.stage.begin_motion(axis)
-            self.log.info(f'Now moving {axis}')
+            status, msg = self.stage.begin_motion(axis)
+            self.log.info(f'Status: {status}, {msg})
 
         return True, f'Commanded {axis} to move.'
 
