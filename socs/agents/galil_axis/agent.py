@@ -52,7 +52,7 @@ def read_config(configfile):
     return cfg
 
 
-class GalilAxisControllerAgent:
+class GalilAxisAgent:
     """ Agent for controlling Galil axis motors used in SAT
     coupling optics instrument for passband measurements on-site.
 
@@ -1127,7 +1127,7 @@ def make_parser(parser=None):
 
 def main(args=None):
     parser = make_parser()
-    args = site_config.parse_args(agent_class='GalilAxisControllerAgent',
+    args = site_config.parse_args(agent_class='GalilAxisAgent',
                                   parser=parser,
                                   args=args)
 
@@ -1144,7 +1144,7 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
 
     # create agent instance and run log creation
-    galilaxis_agent = GalilAxisControllerAgent(agent, args.ip, args.configfile)
+    galilaxis_agent = GalilAxisAgent(agent, args.ip, args.configfile)
     agent.register_task('init', galilaxis_agent.init, startup=init_params)
     agent.register_task('set_relative_position', galilaxis_agent.set_relative_position)
     agent.register_task('set_absolute_position', galilaxis_agent.set_absolute_position)
