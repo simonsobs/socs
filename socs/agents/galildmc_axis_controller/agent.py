@@ -1063,6 +1063,8 @@ class GalilAxisControllerAgent:
                 self.axis_map = gal.get('motorconfigparams', {})
                 self.axes = list(self.axis_map.keys())
                 self.brakes = gal['brakes']['output_map']
+                self.first_dwell = gal['dwell_times']['first_ms']
+                self.sec_dwell = gal['dwell_times']['second_ms']
             except Exception as e:
                 return False, f'Config parse error: {e}'
 
