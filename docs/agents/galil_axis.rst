@@ -1,19 +1,19 @@
 .. highlight:: rst
 
-.. _galilaxis_controller:
+.. _galilaxis:
 
-=====================
-Galil Axis Controller
-=====================
+================
+Galil Axis Agent
+================
 
-The Galil DMC Axis Controller Agent provides motion control and telemetry readout for
+The Galil Axis Agent provides motion control and telemetry readout for
 the Galil DMC motor controller. When used in the Simons Observatory SAT Coupling
 Optics system, the agent controls four axes—two linear and two angular—that move
 the hardware as needed to perform detector passband measurements.
 
 
 .. argparse::
-    :filename: ../socs/agents/galildmc_axis_controller/agent.py
+    :filename: ../socs/agents/galil_axis/agent.py
     :func: make_parser
     :prog: python3 agent.py
 
@@ -26,15 +26,15 @@ Agent in a docker container.
 OCS Site Config
 ````````````````
 
-To configure your Lakeshore 372 for use with OCS you need to add a
-Lakeshore372Agent block to your ocs configuration file. Here is an example
+To configure your Galil axis motor controller for use with OCS you need to add a
+GalilAxisAgent block to your ocs configuration file. Here is an example
 configuration block::
 
-  {'agent-class': 'GalilAxisControllerAgent',
+  {'agent-class': 'GalilAxisAgent',
    'instance-id': 'satcouplingoptics',
                  ['--ip', '10.120.1.6'],
                  ['--configfile', 'axes_config.yaml']]},
-                 ['--mode', 'init'],
+                 ['--mode', 'acq'],
 
 
 
@@ -87,7 +87,7 @@ axes (e.g., E and F) during operation::
 Docker Compose
 ``````````````
 
-The Galil Axis Controller Agent should be configured to run in a Docker container. An
+The Galil Axis Agent should be configured to run in a Docker container. An
 example configuration is::
 
   ocs-galil-agent:
@@ -105,5 +105,5 @@ example configuration is::
 Agent API
 ---------
 
-.. autoclass:: socs.agents.galildmc_axis_controller.agent.GalilAxisControllerAgent
+.. autoclass:: socs.agents.galil_axis.agent.GalilAxisAgent
     :members:
