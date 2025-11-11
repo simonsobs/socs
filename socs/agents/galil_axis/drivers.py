@@ -242,20 +242,17 @@ class GalilAxis(TCPInterface):
         """
         output_num = output_map[axis]
         query_str = f"@OUT[{output_num}]"
-        val = self.galil_command(command="MG", value=query_str)
+        val = self.galil_command(command="MG", value=query_str,
+                                 expect_response=True)
 
-        try:
-            state = int(round(float(val)))
-        except (TypeError, ValueError):
-            print(f"Could not parse brake value '{val}' for axis {axis}.")
-            return {axis: {"state": None, "status": "Unknown"}}
+        state = int(round(float(val)))
 
         if state == 1:
             status = "Brake Released"
         if state == 0:
             status = "Brake Engaged"
 
-        return {axis: {"state": state, "status": status}}
+        return state, status
 
     def get_motor_type(self, axis):
         """

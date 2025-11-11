@@ -340,10 +340,10 @@ class GalilAxisAgent:
                 self.log.warn(f"Could not start Task because {self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            response = self.stage.get_brake_status(axis=axis, output_map=self.brakes)
-            session.log.info(f'Brake status for {axis} is: {response}')
+            state, status = self.stage.get_brake_status(axis=axis, output_map=self.brakes)
+            session.log.info(f'Brake status for {axis} is: {state}, {status}')
 
-        return True, f'Brake status for {axis} is: {response}'
+        return True, f'Brake status for {axis} queried.'
 
     @ocs_agent.param('axis', type=str)
     def get_motor_state(self, session, params):
