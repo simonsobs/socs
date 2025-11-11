@@ -278,7 +278,7 @@ class GalilAxisAgent:
             self.stage.set_relative_position(axis, distance,
                                              counts_per_unit=counts_per_unit)
 
-        return True, f"Axis {axis} set to relative position: {distance}."
+        return True, f"Commanded {axis} to set to relative position: {distance}."
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('position', type=float)
@@ -322,7 +322,7 @@ class GalilAxisAgent:
             self.stage.set_absolute_position(axis, position,
                                              counts_per_unit=counts_per_unit)
 
-        return True, f"Axis {axis} set to absolute position: {position}"
+        return True, f"Commanded {axis} to set to absolute position: {position}"
 
     @ocs_agent.param('axis', type=str)
     def get_brake_status(self, session, params):
@@ -363,7 +363,7 @@ class GalilAxisAgent:
             response = self.stage.get_motor_state(axis=axis)
             session.log.info(f'Motor state is: {response}')
 
-        return True, f'Motor state is: {response}'
+        return True, f'Queried motor state for axis {axis}'
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('state', type=str, choices=['engage', 'release'])
@@ -391,7 +391,7 @@ class GalilAxisAgent:
             elif state == 'release':
                 self.stage.release_brake(brake_outputnum)
 
-        return True, f"Set brake status to: {state}."
+        return True, f"Commanded the brake for axis {axis} to be set to {state}."
 
     @ocs_agent.param('axis', type=str)
     def begin_axis_motion(self, session, params):
@@ -436,7 +436,7 @@ class GalilAxisAgent:
 
             self.stage.set_motor_type(axis, motortype)
 
-        return True, f'Motor type for {axis} set to {motortype}'
+        return True, f'Commanded motor type for {axis} to be set to {motortype}'
 
     @ocs_agent.param('axis', type=str)
     def get_motor_type(self, session, params):
@@ -461,7 +461,7 @@ class GalilAxisAgent:
                 self.log.error(f"Failed to query motor type for {axis}: {e}")
                 return False, f"Error querying motor type for {axis}: {e}"
 
-        return True, f"Motor type for {axis}: {resp}"
+        return True, f"Queried motor type for {axis}."
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('errtype', type=int)
@@ -490,7 +490,7 @@ class GalilAxisAgent:
 
             self.stage.set_off_on_error(axis, errtype)
 
-        return True, f'Off-on-error for {axis} is set to {errtype}'
+        return True, f'Commanded the off-on-error for {axis} to be set to {errtype}.'
 
     @ocs_agent.param('axis', type=str)
     def get_off_on_error(self, session, params):
@@ -511,7 +511,7 @@ class GalilAxisAgent:
             raw_val, human_state = self.stage.get_off_on_error(axis)
             self.log.info(f"OE for {axis}: {human_state} (raw={raw_val})")
 
-        return True, f"OE for {axis}: {human_state} (raw={raw_val})"
+        return True, f"Queried off-on-error status for  {axis}."
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=int)
@@ -536,7 +536,7 @@ class GalilAxisAgent:
 
             self.stage.set_amp_gain(axis, val)
 
-        return True, f'Amp gain for {axis} set to {val}'
+        return True, f'Commanded amp gain for {axis} to be set to {val}.'
 
     @ocs_agent.param('axis', type=str)
     def get_amp_gain(self, session, params):
@@ -557,7 +557,7 @@ class GalilAxisAgent:
             resp = self.stage.get_amp_gain(axis)
             self.log.info(f"Amplifier gain for {axis}: {resp}")
 
-        return True, f"Amplifer Gain for {axis}: {resp}"
+        return True, f"Queried amplifer gain for {axis}."
 
     @ocs_agent.param('axis', type=str)
     def get_amp_currentloop_gain(self, session, params):
@@ -577,7 +577,7 @@ class GalilAxisAgent:
 
             resp = self.stage.get_amp_currentloop_gain(axis)
 
-        return True, f"Amplifer Current Loop Gain for {axis}: {resp}"
+        return True, f"Queried amplifer current loop gain for {axis}."
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=int)
@@ -601,7 +601,7 @@ class GalilAxisAgent:
 
             self.stage.set_amp_currentloop_gain(axis, val)
 
-        return True, f'Amp current loop gain set to {val} for axis {axis}'
+        return True, f'Commanded amp current loop gain to be set to {val} for axis {axis}.'
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=float)
@@ -627,7 +627,7 @@ class GalilAxisAgent:
 
             self.stage.set_torque_limit(axis, val)
 
-        return True, f'Torque limit for {axis} set to {val} volts'
+        return True, f'Commanded torque limit for {axis} to be set to {val} volts'
 
     @ocs_agent.param('axis', type=str)
     def get_torque_limit(self, session, params):
@@ -647,7 +647,7 @@ class GalilAxisAgent:
 
             val = self.stage.get_torque_limit(axis)
 
-        return True, f"Torque limit for {axis} is: {val}."
+        return True, f"Queried torque limit for {axis}."
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('state', type=str, choices=['enable', 'disable'])
@@ -670,7 +670,7 @@ class GalilAxisAgent:
 
             self.stage.set_motor_state(axis, state)
 
-        return True, f"Motor {axis} {state}d; verified state: {human_state} (raw={status})"
+        return True, f"Commanded motor {axis} to be {state}d."
 
     @ocs_agent.param('axis', type=str)
     def get_motor_state(self, session, params):
@@ -691,7 +691,7 @@ class GalilAxisAgent:
             state, human_state = self.stage.get_motor_state(axis)
             self.log.info(f"Motor {axis} state: {human_state} (raw={state})")
 
-        return True, f"Motor {axis} state: {human_state} (raw={state})"
+        return True, f"Queried motor {axis} state."
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=float)
@@ -717,7 +717,7 @@ class GalilAxisAgent:
 
             self.stage.set_magnetic_cycle(axis, val)
 
-        return True, f'Magnetic cycle for {axis} set to {val}'
+        return True, f'Commanded magnetic cycle for {axis} to be set to {val}.'
 
     @ocs_agent.param('t_first', type=int)
     @ocs_agent.param('t_second', type=int)
@@ -744,7 +744,7 @@ class GalilAxisAgent:
 
             resp = self.stage.set_dwell_times(t_first=first, t_second=second)
 
-        return True, f'Dwell times for initializing axes set to {first} and {second}ms, respectively.'
+        return True, f'Commanded dwell times for axes to be set to {first} and {second}ms, respectively.'
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=float)
@@ -775,7 +775,7 @@ class GalilAxisAgent:
 
             self.stage.initialize_axis(axis, val)
 
-        return True, f'Initialized {axis} to {val} setting'
+        return True, f'Commanded {axis} to be initialized to {val} setting'
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=float)
@@ -801,7 +801,7 @@ class GalilAxisAgent:
 
             self.stage.define_position(axis, val)
 
-        return True, f'{axis} position now set to {val}'
+        return True, f'Commanded axis {axis} position to be set to {val}.'
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('speed', type=float)
@@ -833,7 +833,7 @@ class GalilAxisAgent:
 
             self.stage.set_jog_speed(axis, speed)
 
-        return True, f'{axis} speed is now set to {speed}'
+        return True, f'Commanded {axis} jog speed to be set to {speed}.'
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('speed', type=float)
@@ -863,7 +863,7 @@ class GalilAxisAgent:
 
             self.stage.set_speed(axis, speed)
 
-        return True, f'{axis} speed is now set to {speed}'
+        return True, f'Commanded axis {axis} speed to be set to {speed}.'
 
     @ocs_agent.param('axis', type=str)
     def enable_sin_commutation(self, session, params):
@@ -885,7 +885,7 @@ class GalilAxisAgent:
             self.stage.enable_sin_commutation(axis)
             self.log.info(f'Sin commutation setting for {axis} is enabled.')
 
-        return True
+        return True, f"Commanded sin commutation for axis {axis} to be enabled."
 
     @ocs_agent.param('axis', type=str)
     def disable_limit_switch(self, session, params):
@@ -907,7 +907,7 @@ class GalilAxisAgent:
             self.stage.disable_limit_switch(axis)
             self.log.info(f'Limit switch for {axis} is disabled.')
 
-        return True, f'Limit switch for {axis} is disabled.'
+        return True, f'Commanded limit switch for {axis} to be disabled.'
 
     @ocs_agent.param('polarity', type=int)
     def set_limitswitch_polarity(self, session, params):
@@ -931,7 +931,7 @@ class GalilAxisAgent:
             self.stage.set_limitswitch_polarity(pol)
             self.log.info(f'Limit switch polarity for {axis} is set to {pol}.')
 
-        return True
+        return True, f"Commanded limit switch polarity for axis {axis} to be set to {pol}."
 
     @ocs_agent.param('axis', type=str)
     def stop_axis_motion(self, session, params):
@@ -952,7 +952,7 @@ class GalilAxisAgent:
 
             self.stage.stop_motion(axis)
 
-        return True, f'Stopped motion for {axis}.'
+        return True, f'Commanded {axis} a to stop motion.'
 
     @ocs_agent.param('order', type=str)
     def set_gearing(self, session, params):
@@ -975,7 +975,7 @@ class GalilAxisAgent:
 
             self.stage.set_gearing(order)
 
-        return True, f'Gearing set to {order}'
+        return True, f'Commanded gearing for leader/folower axes to be set to {order}.'
 
     @ocs_agent.param('order', type=str)
     def set_gearing_ratio(self, session, params):
@@ -1001,7 +1001,7 @@ class GalilAxisAgent:
 
             self.stage.set_gearing_ratio(order)
 
-        return True, f'Gearing ratio set to {order}'
+        return True, f'Commanded gearing ratio for follower axes to be set to {order}.'
 
     @ocs_agent.param('axis', type=str)
     def get_gearing_ratio(self, session, params):
@@ -1022,7 +1022,7 @@ class GalilAxisAgent:
 
             resp = self.stage.get_gearing_ratio(axis=axis)
 
-        return True, f'Gearing ratio for axis {axis} is {resp}'
+        return True, f'Queried gearing ratio for axis {axis}.'
 
     @ocs_agent.param('configfile', type=str, default=None)
     def input_configfile(self, session, params=None):
@@ -1094,7 +1094,7 @@ class GalilAxisAgent:
                     val == gal['initaxisparams']['BZ']
                     self.stage.initialize_axis(axis=a, val=val)
 
-        return True, "Input configfile task complete."
+        return True, "Commanded input_configfile task to set motor controller settings."
 
 
 def make_parser(parser=None):
