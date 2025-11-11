@@ -825,7 +825,7 @@ class GalilAxisAgent:
         """
         axis = params['axis']
         speed = params['speed']
-        with self.lock.acquire_timeout(timeout=5, job='jog_axis') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='set_jog_speed') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
@@ -855,7 +855,7 @@ class GalilAxisAgent:
         """
         axis = params['axis']
         speed = params['speed']
-        with self.lock.acquire_timeout(timeout=5, job='jog_axis') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='set_speed') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
@@ -1160,7 +1160,7 @@ def main(args=None):
     agent.register_task('set_dwell_times', galilaxis_agent.set_dwell_times)
     agent.register_task('initialize_axis', galilaxis_agent.initialize_axis)
     agent.register_task('define_position', galilaxis_agent.define_position)
-    agent.register_task('jog_axis', galilaxis_agent.jog_axis)
+    agent.register_task('set_jog_speed', galilaxis_agent.set_jog_speed)
     agent.register_task('set_speed', galilaxis_agent.set_speed)
     agent.register_task('enable_sin_commutation', galilaxis_agent.enable_sin_commutation)
     agent.register_task('disable_limit_switch', galilaxis_agent.disable_limit_switch)
