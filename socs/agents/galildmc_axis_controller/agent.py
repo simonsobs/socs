@@ -1057,10 +1057,10 @@ class GalilAxisControllerAgent:
 
             cfg = read_config(configfile)
             try:
-                gal = cfg.get('galil', {})
+                gal = cfg['galil']
                 self.cfg = cfg
-                self.motorsettings = gal.get('motorsettings', {})
-                self.axis_map = gal.get('motorconfigparams', {})
+                self.motorsettings = gal.['motorsettings']
+                self.axis_map = gal['motorconfigparams']
                 self.axes = list(self.axis_map.keys())
                 self.brakes = gal['brakes']['output_map']
                 self.first_dwell = gal['dwell_times']['first_ms']
