@@ -956,7 +956,8 @@ class GalilAxisAgent:
     def set_gearing(self, session, params):
         """set_gearing(order)
 
-        **Task** - Configure electronic gearing relationships between axes..
+        **Task** - Configure electronic gearing relationships between follower
+            and leader axes.
 
         Parameters:
             order (str): Comma-separated axis assignment string defining the leader/
@@ -979,6 +980,8 @@ class GalilAxisAgent:
         """set_gearing_ratio(order)
 
         **Task** - Set electronic gearing ratio between leader and follower axes.
+            A ratio of 1 means the follower axis moves at the same speed as its
+            leader axis.
 
         Parameters:
             order (str): Comma-separated string of gearing ratios for each axis,
@@ -1060,25 +1063,20 @@ class GalilAxisAgent:
 
             for a in self.axes:
                 # set motor type
-                motortype = self.axis_map[a]['MT']
-                self.stage.set_motor_type(axis=a, motortype=motortype)
+                self.stage.set_motor_type(axis=a, motortype=self.axis_map[a]['MT'])
 
                 # set off on error
-                errtype = self.axis_map[a]['OE']
                 errtype = int(errtype)
-                self.stage.set_off_on_error(axis=a, errtype=errtype)
+                self.stage.set_off_on_error(axis=a, errtype=self.axis_map[a]['OE'])
 
                 # set amp gain
-                gn = self.axis_map[a]['AG']
-                self.stage.set_amp_gain(axis=a, val=gn)
+                self.stage.set_amp_gain(axis=a, val=self.axis_map[a]['AG'])
 
                 # set torque limit
-                tl = self.axis_map[a]['TL']
-                self.stage.set_torque_limit(axis=a, val=tl)
+                self.stage.set_torque_limit(axis=a, val=self.axis_map[a]['TL'])
 
                 # set current loop gain
-                clgn = self.axis_map[a]['AU']
-                self.stage.set_amp_currentloop_gain(axis=a, val=clgn)
+                self.stage.set_amp_currentloop_gain(axis=a, val=self.axis_map[a]['AU'])
 
                 # enable sin commutation
                 initstate = gal['initaxisparams']['BA']
