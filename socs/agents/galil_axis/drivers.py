@@ -428,7 +428,11 @@ class GalilAxis(TCPInterface):
 
     def set_gearing(self, order):
         """
-        Set gearing: order is order of opertions in string: ',A,,C'.
+        Set gearing for defining follower and leader axes.
+        The `order` string defines the sequence of operations.
+        For example: `order = ',A,C'` means axis **B** follows
+        **A**, and axis **D** follows **C** —the commas correspond
+        to axes A, B, C, D in order.
 
         """
         resp = self.galil_command(command=f"GA {order};")
@@ -436,7 +440,9 @@ class GalilAxis(TCPInterface):
 
     def set_gearing_ratio(self, order):
         """
-        Set gearing ratios, e.g. GR -1,1 for axes B and D.
+        Set the gearing ratio for follower axes relative to their leader axes.
+        A ratio of 1 means the follower moves at the same speed as its leader.
+        For example, `GR 1,1` sets the gearing ratios for axes B and D
 
         """
         resp = self.galil_command(command=f"GR {order};")
