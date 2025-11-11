@@ -29,9 +29,25 @@ def read_config(configfile):
     if not isinstance(gal, dict):
         raise ValueError("Config missing top-level 'galil' section.")
 
+    brakes = gal.get('brakes')
+    if not isinstance(brakes, dict) or not brakes:
+        raise ValueError("galil.brakes must be a non-empty dict of output map per axis.")
+
+    motorsettings = gal.get('motorsettings')
+    if not isinstance(motorsettings, dict) or not motorsettings:
+        raise ValueError("galil.motorsettings must be a non-empty dict of mm/deg conversion values.")
+
     mparams = gal.get('motorconfigparams')
     if not isinstance(mparams, dict) or not mparams:
         raise ValueError("galil.motorconfigparams must be a non-empty dict of axes.")
+
+    initparams = gal.get('initaxisparams')
+    if not isinstance(initparams, dict) or not initparams:
+        raise ValueError("galil.initaxisparams must be a non-empty dict of axes settings.")
+
+    dwellparams = gal.get('dwell_times')
+    if not isinstance(dwellparams, dict) or not dwellparams:
+        raise ValueError("galil.dwell_times must be a non-empty dict of times for initializing axes.")
 
     return cfg
 
