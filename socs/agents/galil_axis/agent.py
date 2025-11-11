@@ -11,10 +11,6 @@ from twisted.internet import reactor
 
 from socs.agents.galil_axis.drivers import GalilAxis
 
-if os.environ.get("GALIL_TEST_MODE"):
-    from socs.agents.galildmc_axis_controller import drivers
-    drivers.GalilAxis._drain_prompt = lambda self: b":"
-
 
 def read_config(configfile):
     """ read and parse YAML config for axes.
