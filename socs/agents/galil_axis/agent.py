@@ -2,12 +2,9 @@ import argparse
 import os
 import time
 
-import numpy as np
-import txaio
 import yaml
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
-from twisted.internet import reactor
 
 from socs.agents.galil_axis.drivers import GalilAxis
 
