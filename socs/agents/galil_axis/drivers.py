@@ -243,7 +243,7 @@ class GalilAxis(TCPInterface):
         output_num = output_map[axis]
         query_str = f"@OUT[{output_num}]"
         val = self.galil_command(command="MG", value=query_str,
-                                 expect_response = True)
+                                 expect_response=True)
 
         state = int(round(float(val)))
 
