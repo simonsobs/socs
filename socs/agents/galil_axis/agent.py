@@ -346,7 +346,7 @@ class GalilAxisAgent:
 
     @ocs_agent.param('axis', type=str)
     def get_motor_state(self, session, params):
-        """get_motor_state()
+        """get_motor_state(axis)
 
         **Task** - Check if an axis motor is enabled.
 
