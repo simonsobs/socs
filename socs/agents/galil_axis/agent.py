@@ -1001,7 +1001,7 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock"
 
             resp = self.stage.get_gearing_ratio(axis=axis)
-            self.log.info(f"Gearing ratio for axis {axis} is: {resp}." 
+            self.log.info(f"Gearing ratio for axis {axis} is: {resp}.") 
 
         return True, f'Queried gearing ratio for axis {axis}.'
 
