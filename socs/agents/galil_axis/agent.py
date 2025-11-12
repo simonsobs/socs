@@ -723,7 +723,7 @@ class GalilAxisAgent:
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            resp = self.stage.set_dwell_times(t_first=first, t_second=second)
+            self.stage.set_dwell_times(t_first=first, t_second=second)
 
         return True, f'Commanded dwell times for axes to be set to {first} and {second}ms, respectively.'
 
