@@ -345,28 +345,6 @@ class GalilAxisAgent:
         return True, f'Brake status for {axis} queried.'
 
     @ocs_agent.param('axis', type=str)
-    def get_motor_state(self, session, params):
-        """get_motor_state(axis)
-
-        **Task** - Check if an axis motor is enabled.
-
-        Parameters:
-            axis (str): Axis to query (e.g. 'A', 'B').
-        """
-        axis = params['axis']
-
-        with self.lock.acquire_timeout(timeout=5, job='get_motor_state') as acquired:
-            if not acquired:
-                self.log.warn(f"Could not start Task because "
-                              f"{self.lock.job} is already running")
-                return False, "Could not acquire lock"
-
-            response = self.stage.get_motor_state(axis=axis)
-            session.log.info(f'Motor state is: {response}')
-
-        return True, f'Queried motor state for axis {axis}'
-
-    @ocs_agent.param('axis', type=str)
     @ocs_agent.param('state', type=str, choices=['engage', 'release'])
     def set_axis_brake(self, session, params):
         """set_axis_brake(axis, state)
