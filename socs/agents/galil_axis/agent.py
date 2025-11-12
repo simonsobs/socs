@@ -648,7 +648,7 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock."
 
             val = self.stage.get_torque_limit(axis)
-            self.log.info(f"Torque limit for axis {axis} is {val}." 
+            self.log.info(f"Torque limit for axis {axis} is {val}.")
 
         return True, f"Queried torque limit for {axis}."
 
