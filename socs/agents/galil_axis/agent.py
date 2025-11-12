@@ -94,16 +94,17 @@ class GalilAxisAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-    @ocs_agent.param('configfile', type=str, default=None)
-    @ocs_agent.param('auto_acquire', default=False, type=bool)
+    @ocs_agent.param('input_config', type=bool, default=None)
+    @ocs_agent.param('auto_acquire', type=bool, default=False)
     def init(self, session, params=None):
-        """init(configfile=None, auto_acquire=False)
+        """init(input_config=False, auto_acquire=False)
 
         **Task** - Initalize connection to Galil axis controller.
 
         Parameters:
-            configfile (str, optional): Path to the .yaml configfile containing
-                motor and axis settings. Defaults to None.
+            input_config (bool, optional): If True, init task will also
+                run `input_configfile` task as part of agent initialization.
+                Defaults to False.
             auto_acquire(bool):  If True, start acquisition immediately after
                 initialization. Defaults to False.
 
@@ -145,10 +146,11 @@ class GalilAxisAgent:
         self.initialized = True
 
         # load configfile if provided as init argument
-        if params.get('configfile'):
-            ok, msg = self.input_configfile(session, {'configfile': params['configfile']})
+        if params['input_config']:
+            ok, msg = self.input_configfile(session, {'configfile': self.configfile})
+            self.log.info(msg)
             if not ok:
-                return False, f'Config load failsed: {msg}'
+                return False, f'Config load failed: {msg}'
 
         # start data acquistion if requested
         if params['auto_acquire']:
@@ -411,7 +413,7 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock"
 
             status, msg = self.stage.begin_motion(axis)
-            self.log.info(f'Status: {status}, {msg})
+            self.log.info(f'Status: {status}, {msg}')
 
         return True, f'Commanded {axis} to move.'
 
@@ -576,6 +578,7 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock."
 
             resp = self.stage.get_amp_currentloop_gain(axis)
+            self.log.info(f"Amplifier current loop gain for {axis} is: {resp}.")
 
         return True, f"Queried amplifer current loop gain for {axis}."
 
@@ -1054,7 +1057,7 @@ class GalilAxisAgent:
             try:
                 gal = cfg['galil']
                 self.cfg = cfg
-                self.motorsettings = gal.['motorsettings']
+                self.motorsettings = gal['motorsettings']
                 self.axis_map = gal['motorconfigparams']
                 self.axes = list(self.axis_map.keys())
                 self.brakes = gal['brakes']['output_map']
@@ -1068,7 +1071,6 @@ class GalilAxisAgent:
                 self.stage.set_motor_type(axis=a, motortype=self.axis_map[a]['MT'])
 
                 # set off on error
-                errtype = int(errtype)
                 self.stage.set_off_on_error(axis=a, errtype=self.axis_map[a]['OE'])
 
                 # set amp gain
@@ -1110,6 +1112,7 @@ def make_parser(parser=None):
     pgroup.add_argument('--ip')
     pgroup.add_argument('--port', default=23)
     pgroup.add_argument('--configfile')
+    pgroup.add_argument('--input_config', type=bool)
     pgroup.add_argument('--mode', choices=['init', 'acq'])
 
     return parser
@@ -1124,9 +1127,11 @@ def main(args=None):
     # Automatically acquire data if requested (default)
     init_params = False
     if args.mode == 'init':
-        init_params = {'auto_acquire': False}
+        init_params = {'auto_acquire': False,
+                       'input_config': args.input_config}
     elif args.mode == 'acq':
-        init_params = {'auto_acquire': True}
+        init_params = {'auto_acquire': True,
+                       'input_config': args.input_config}
 
     # Call launcher function (initiates connection to appropriate
     # WAMP hub and realm).
