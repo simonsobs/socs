@@ -111,8 +111,8 @@ class GalilAxisAgent:
 
         with self.lock.acquire_timeout(0, job='init') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start init because "
-                              "{self.lock.job} is already running")
+                self.log.warn(f"Could not start init because {self.lock.job}"
+                              "is already running")
                 return False, "Could not acquire lock."
 
             # Get axes from config file to establish connection to galil stage controller
