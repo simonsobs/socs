@@ -910,9 +910,8 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock"
 
             self.stage.set_limitswitch_polarity(pol)
-            self.log.info(f'Limit switch polarity for {axis} is set to {pol}.')
 
-        return True, f"Commanded limit switch polarity for axis {axis} to be set to {pol}."
+        return True, f"Commanded limit switch polarity to be set to {pol}."
 
     @ocs_agent.param('axis', type=str)
     def stop_axis_motion(self, session, params):
