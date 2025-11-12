@@ -353,6 +353,8 @@ class GalilAxisAgent:
         Parameters:
             axis (str): Axis to query (e.g. 'A', 'B').
         """
+        axis = params['axis']
+
         with self.lock.acquire_timeout(timeout=5, job='get_motor_state') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
@@ -646,6 +648,7 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock."
 
             val = self.stage.get_torque_limit(axis)
+            self.log.info(f"Torque limit for axis {axis} is {val}." 
 
         return True, f"Queried torque limit for {axis}."
 
