@@ -1065,14 +1065,15 @@ class GalilAxisAgent:
                 if initstate == 'True':
                     # enable sin commutation
                     self.stage.enable_sin_commutation(axis=a)
+
                     # set magnetic cycle
-                    mag = gal['initaxisparams']['BM']
-                    self.stage.set_magnetic_cycle(axis=a, val=mag)
+                    self.stage.set_magnetic_cycle(axis=a, val=gal['initaxisparams']['BM'])
+
                     # set dwell times before initializing
                     self.stage.set_dwell_times(t_first=self.first_dwell, t_second=self.sec_dwell)
+
                     # initialize
-                    val == gal['initaxisparams']['BZ']
-                    self.stage.initialize_axis(axis=a, val=val)
+                    self.stage.initialize_axis(axis=a, val=gal['initaxisparams']['BZ'])
 
         return True, "Commanded input_configfile task to set motor controller settings."
 
