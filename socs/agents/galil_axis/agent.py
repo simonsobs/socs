@@ -1149,8 +1149,6 @@ def main(args=None):
     agent.register_task('stop_axis_motion', galilaxis_agent.stop_axis_motion)
     agent.register_task('set_motor_type', galilaxis_agent.set_motor_type)
     agent.register_task('get_motor_type', galilaxis_agent.get_motor_type)
-    agent.register_task('get_motor_state', galilaxis_agent.get_motor_state)
-    agent.register_task('set_motor_state', galilaxis_agent.set_motor_state)
     agent.register_task('set_off_on_error', galilaxis_agent.set_off_on_error)
     agent.register_task('get_off_on_error', galilaxis_agent.get_off_on_error)
     agent.register_task('set_amp_gain', galilaxis_agent.set_amp_gain)
