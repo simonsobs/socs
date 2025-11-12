@@ -32,9 +32,10 @@ configuration block::
 
   {'agent-class': 'GalilAxisAgent',
    'instance-id': 'satcouplingoptics',
-                 ['--ip', '10.120.1.6'],
-                 ['--configfile', 'axes_config.yaml']]},
-                 ['--mode', 'acq'],
+                 ['--ip', '10.120.1.6',
+                  '--configfile', 'axes_config.yaml',
+                  '--input_config', True,
+                  '--mode', 'acq']}
 
 
 
@@ -50,15 +51,12 @@ axes (e.g., E and F) during operation::
 
    galil:
       motorsettings:
-        maxspeed: 100000
         countspermm: 4000
         countsperdeg: 2000
-
       brakes:
         output_map:
           E: '5'
           F: '6'
-
       motorconfigparams:
         E:
           MT: '1'
@@ -72,14 +70,12 @@ axes (e.g., E and F) during operation::
           AG: '0'
           TL: '2'
           AU: '0'
-
       initaxisparams:
-        BA: 'False'
+        BA: 'True'
         BM: '3276.8'
         BZ: '3'
-
-      hold_limits:
-        low: '<1000>'
+      dwell_times:
+        low: '1000'
         high: '1500'
 
 
