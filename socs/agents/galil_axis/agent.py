@@ -483,7 +483,7 @@ class GalilAxisAgent:
 
             raw_val, human_state = self.stage.get_off_on_error(axis)
 
-        return True, f"OE for {axis}: {human_state} (raw={raw_val}"
+        return True, f"OE for {axis}: {human_state} (raw={raw_val})"
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=int)
