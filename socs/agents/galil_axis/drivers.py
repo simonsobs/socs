@@ -1,10 +1,7 @@
 import math
-import os
 import select
 import time
 
-import serial
-import yaml
 
 from socs.tcp import TCPInterface
 
@@ -24,7 +21,6 @@ class GalilAxis(TCPInterface):
         Return True or False depending on whether a ':' Galil prompt appears.
 
         """
-        start = time.time()
         drained = b""
 
         # check if anything in buffer
@@ -259,7 +255,7 @@ class GalilAxis(TCPInterface):
         Return motor type for given axis via MG _MT{axis}.
 
         """
-        resp = self.galil_command(f"MG _MT", axis=axis, expect_response=True)
+        resp = self.galil_command("MG _MT", axis=axis, expect_response=True)
         return resp
 
     def get_gearing_ratio(self, axis):
