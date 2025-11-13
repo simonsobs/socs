@@ -2,7 +2,6 @@ import math
 import select
 import time
 
-
 from socs.tcp import TCPInterface
 
 

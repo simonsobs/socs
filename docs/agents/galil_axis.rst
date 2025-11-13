@@ -118,8 +118,8 @@ Updating the config file
 `````````````````````````
 
 Though the agent can be configured to initialize the axes via the :code:`input_config`
-boolean parameter in the OCS site config file, any changes made to the 
-configuration file after agent startup will require reloading it. The following 
+boolean parameter in the OCS site config file, any changes made to the
+configuration file after agent startup will require reloading it. The following
 client command is used to update the motor controller settings accordingly::
 
 
@@ -153,7 +153,7 @@ To begin motion::
   client.begin_axis_motion(axis='A')
 
 After the axis stops at the limit switch, we define that position using::
-  
+
   client.define_position(axis='A', val=0.00)
 
 
@@ -167,9 +167,9 @@ angular pair. In this configuration, A is the leader for B, and C is the leader 
 The gearing **ratio** determines the velocity at which each follower axis moves relative to its
 leader. For example, a ratio of :code:`1` means that B will follow A at the exact same speed defined
 for A. A ratio of :code:`-1` means the follower moves at the same speed scale but in the opposite direction.
- 
-Once the leader–follower mapping and gearing ratios are set, commanding 
-motion on the leader (e.g., A) will cause both A and B to move. If this does 
+
+Once the leader–follower mapping and gearing ratios are set, commanding
+motion on the leader (e.g., A) will cause both A and B to move. If this does
 not occur, stop motion and query the gearing ratio for the relevant axes.
 
 When querying the ratio, the expected response for a leader axis is :code:`0`, since leaders do not
@@ -177,7 +177,7 @@ follow any other axis. The follower axis should return the ratio you set (e.g., 
 
 Occasionally, the Galil motor controller may lose the gearing ratio values while still
 correctly remembering the leader/follower assignments. If a gearing-ratio query for the
-follower axis returns :code:`0`, reapply the gearing ratio. 
+follower axis returns :code:`0`, reapply the gearing ratio.
 
 Example usage of defining leader/follower axes and the gearing ratio::
 
@@ -185,11 +185,11 @@ Example usage of defining leader/follower axes and the gearing ratio::
   client.set_gearing(order=',A,C')
   client.set_gearing_ratio(order=',-1,1')
 
-Here, the second field corresponds to B and the fourth field corresponds to D.  
+Here, the second field corresponds to B and the fourth field corresponds to D.
 
 Another example using axes E and F as defined by the example OCS Site Configuration File::
 
-  # using axes E and F 
+  # using axes E and F
   client.set_gearing(order=',,,,,E')
   client.set_gearing_ratio(order=',,,,,1')
 
@@ -197,13 +197,13 @@ In this case, F (the sixth position) follows E with a ratio of :code:`1`.
 
 
 .. note::
-   The :code:`order` argument encodes leader–follower relationships---each 
+   The :code:`order` argument encodes leader–follower relationships---each
    comma-delimited field corresponds to one axis in alphabetical order. An empty field
-   means the axis is independent (i.e., not following another axis), 
+   means the axis is independent (i.e., not following another axis),
    while a non-empty field specifies which axis it should follow.
 
 To query the gearing ratio::
-  
+
   >>> response = client.get_gearing_ratio(axis='F')
   >>> print(response)
   OCSReply: OK : Operation "get_gearing_ratio" is currently not running (SUCCEEDED).
@@ -233,9 +233,9 @@ Below are 2 examples of setting and querying a specific state for a Galil axis::
     1762987024.889 Status is now "done".
   other keys in .session: op_code, degraded, data
 
-Here, :code:`get_motor_state` reports that axis F is disabled. The raw value shown as 
-:code:`(raw=1)` reflects how the Galil command works internally: the controller 
-returns a value of 1 when the axis is *off*. 
+Here, :code:`get_motor_state` reports that axis F is disabled. The raw value shown as
+:code:`(raw=1)` reflects how the Galil command works internally: the controller
+returns a value of 1 when the axis is *off*.
 
 Another set/get example below::
 
