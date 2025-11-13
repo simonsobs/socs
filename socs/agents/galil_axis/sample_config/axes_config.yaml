@@ -1,0 +1,28 @@
+galil:
+  motorsettings:
+    countspermm: 4000
+    countsperdeg: 2000
+  brakes:
+    output_map:
+      E: '5'
+      F: '6'
+  motorconfigparams:
+    E:              # linear axis
+      MT: '1' # motor type
+      OE: '1' #
+      AG: '0'
+      TL: '2'
+      AU: '0'
+    F:              # linear axis
+      MT: '1'
+      OE: '1'
+      AG: '0'
+      TL: '2'
+      AU: '0'
+  initaxisparams:
+    BA: 'False'          # if True command will run as BAE / BAF / BAA / BAB
+    BM: '3276.8'
+    BZ: '3'
+  dwell_times:
+    first_ms: '1000'
+    second_ms: '1500'
