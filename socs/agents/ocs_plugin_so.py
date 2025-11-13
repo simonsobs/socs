@@ -20,6 +20,7 @@ for n, f in [
         ('FlowmeterAgent', 'ifm_sbn246_flowmeter/agent.py'),
         ('FPGAAgent', 'holo_fpga/agent.py'),
         ('FTSAerotechAgent', 'fts_aerotech/agent.py'),
+        ('GalilAxisAgent', 'galil_axis/agent.py'),
         ('HTTPCameraAgent', 'http_camera/agent.py'),
         ('HWPBBBAgent', 'hwp_encoder/agent.py'),
         ('HWPPCUAgent', 'hwp_pcu/agent.py'),
