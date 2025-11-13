@@ -1,6 +1,6 @@
 .. highlight:: rst
 
-.. _galilaxis:
+.. _galil_axis:
 
 ================
 Galil Axis Agent
