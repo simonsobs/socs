@@ -340,9 +340,8 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock"
 
             state, status = self.stage.get_brake_status(axis=axis, output_map=self.brakes)
-            session.log.info(f'Brake status for {axis} is: {state}, {status}')
 
-        return True, f'Brake status for {axis} queried.'
+        return True, f'Brake status for {axis} is {state}, {status}'
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('state', type=str, choices=['engage', 'release'])
@@ -433,14 +432,9 @@ class GalilAxisAgent:
                 self.log.warn(f"Could not start Task because {self.lock.job} is already running.")
                 return False, "Could not acquire lock."
 
-            try:
-                resp = self.stage.get_motor_type(axis)
-                self.log.info(f"Motor type for axis {axis}: {resp}")
-            except Exception as e:
-                self.log.error(f"Failed to query motor type for {axis}: {e}")
-                return False, f"Error querying motor type for {axis}: {e}"
+            resp = self.stage.get_motor_type(axis)
 
-        return True, f"Queried motor type for {axis}."
+        return True, f"Motor type for axis {axis}: {resp}"
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('errtype', type=int)
@@ -488,9 +482,8 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock."
 
             raw_val, human_state = self.stage.get_off_on_error(axis)
-            self.log.info(f"OE for {axis}: {human_state} (raw={raw_val})")
 
-        return True, f"Queried off-on-error status for  {axis}."
+        return True, f"OE for {axis}: {human_state} (raw={raw_val}"
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=int)
@@ -534,9 +527,8 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock."
 
             resp = self.stage.get_amp_gain(axis)
-            self.log.info(f"Amplifier gain for {axis}: {resp}")
 
-        return True, f"Queried amplifer gain for {axis}."
+        return True, f"Amplifier gain for {axis}: {resp}"
 
     @ocs_agent.param('axis', type=str)
     def get_amp_currentloop_gain(self, session, params):
@@ -555,9 +547,8 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock."
 
             resp = self.stage.get_amp_currentloop_gain(axis)
-            self.log.info(f"Amplifier current loop gain for {axis} is: {resp}.")
 
-        return True, f"Queried amplifer current loop gain for {axis}."
+        return True, f"Amplifier current loop gain for {axis} is: {resp}."
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=int)
@@ -625,10 +616,9 @@ class GalilAxisAgent:
                 self.log.warn(f"Could not start Task because {self.lock.job} is already running.")
                 return False, "Could not acquire lock."
 
-            val = self.stage.get_torque_limit(axis)
-            self.log.info(f"Torque limit for axis {axis} is {val}.")
+            resp = self.stage.get_torque_limit(axis)
 
-        return True, f"Queried torque limit for {axis}."
+        return True, f"Torque limit for axis {axis} is {resp}."
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('state', type=str, choices=['enable', 'disable'])
@@ -670,9 +660,8 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock."
 
             state, human_state = self.stage.get_motor_state(axis)
-            self.log.info(f"Motor {axis} state: {human_state} (raw={state})")
 
-        return True, f"Queried motor {axis} state."
+        return True, f"Motor {axis} state: {human_state} (raw={state})"
 
     @ocs_agent.param('axis', type=str)
     @ocs_agent.param('val', type=float)
@@ -864,7 +853,6 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock"
 
             self.stage.enable_sin_commutation(axis)
-            self.log.info(f'Sin commutation setting for {axis} is enabled.')
 
         return True, f"Commanded sin commutation for axis {axis} to be enabled."
 
@@ -886,7 +874,6 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock"
 
             self.stage.disable_limit_switch(axis)
-            self.log.info(f'Limit switch for {axis} is disabled.')
 
         return True, f'Commanded limit switch for {axis} to be disabled.'
 
@@ -1001,9 +988,8 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock"
 
             resp = self.stage.get_gearing_ratio(axis=axis)
-            self.log.info(f"Gearing ratio for axis {axis} is: {resp}.")
 
-        return True, f'Queried gearing ratio for axis {axis}.'
+        return True, f"Gearing ratio for axis {axis} is: {resp}."
 
     @ocs_agent.param('configfile', type=str, default=None)
     def input_configfile(self, session, params=None):
