@@ -91,7 +91,7 @@ class GalilAxisAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-    @ocs_agent.param('input_config', type=bool, default=None)
+    @ocs_agent.param('input_config', type=bool, default=False)
     @ocs_agent.param('auto_acquire', type=bool, default=False)
     def init(self, session, params=None):
         """init(input_config=False, auto_acquire=False)
