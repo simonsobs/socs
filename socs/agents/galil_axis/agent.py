@@ -247,7 +247,7 @@ class GalilAxisAgent:
             axis (str): Axis to command position. Ex: 'A'
             distance (float): Relative distance value, in millimeter, degrees,
                 or raw counts, depending on `movetype`.
-            movetype (str): 'linear' (mm) or 'angular' (deg), or `None` for raw
+            movetype (str): 'linear' (mm) or 'angular' (deg), or 'encoder' for raw
                 encoder counts.
         Notes:
             The conversion from millimeters to encoder counts is defined in the
@@ -291,7 +291,7 @@ class GalilAxisAgent:
             axis (str): Axis to command position. Example: 'A'
             position (float): Absolute position distance value in mm, deg,
                 or raw encoder counts.
-            movetype (str): 'linear' (mm) or 'angular' (deg), or `encoder` for raw
+            movetype (str): 'linear' (mm) or 'angular' (deg), or 'encoder' for raw
                 encoder counts.
 
         Notes:
