@@ -977,14 +977,13 @@ def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None,
     plan = {}
 
     # Point time separation: at least 5 points per leg, preferably 10.
-    dt = 2 * abs(throw / v_az) / 10
-    dt = min(max(dt, 0.1), 1.0)
+    if scan_type in [2, 3]:
+        dt = .05
+    else:
+        dt = 2 * abs(throw / v_az) / 10
+        dt = min(max(dt, 0.1), 1.0)
     assert (2 * abs(throw / v_az) / dt >= 5)
     plan['step_time'] = dt
-
-    # In the case of type 2/3 scans, force step_time to be at most 0.1 seconds.
-    if scan_type in [2, 3]:
-        plan['step_time'] = min(0.1, plan['step_time'])
 
     # Turn around prep distance (deg)? 5 point periods, times the vel.
     turnprep_buffer = 5 * dt * v_az
