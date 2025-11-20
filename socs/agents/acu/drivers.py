@@ -293,15 +293,30 @@ def _get_target_az(current_az, current_t, increasing, az_endpoint1, az_endpoint2
     return target
 
 
+def get_const_vel_subscan(t0, az0, az1, speed, step_time,
+                          group=0, stop_at_end=False):
+    t_scan = abs(az1 - az0) / speed
+    n = max(1, int(round(t_scan / step_time))) + 1
+    az = np.linspace(az0, az1, n)
+    t = t0 + np.linspace(0, t_scan, n)
+    v = np.zeros(n) + np.sign(az1 - az0) * speed
+    f = np.zeros(n, int) + 1
+    f[-1] = 2
+    g = np.zeros(n, int)
+    if group:
+        g[:group] = 1
+    if stop_at_end:
+        v[-1] = 0.
+    return (t, az, v, f, g)
+
+
 def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     acc, el_endpoint1, el_endpoint2,
                                     el_speed=0,
-                                    num_batches=None,
                                     num_scans=None,
                                     start_time=None,
                                     wait_to_start=10.,
                                     step_time=1.,
-                                    batch_size=500,
                                     az_start='mid_inc',
                                     az_first_pos=None,
                                     az_drift=None,
@@ -321,9 +336,6 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             constant az scans, this must be equal to el_endpoint1.
         el_speed (float): speed of the elevation motion. For constant az
             scans, set to 0.0
-        num_batches (int or None): sets the number of batches for the
-            generator to create. Default value is None (interpreted as infinite
-            batches).
         num_scans (int or None): if not None, limits the points
           returned to the specified number of constant velocity legs.
         start_time (float or None): a ctime at which to start the scan.
@@ -334,9 +346,6 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
         step_time (float): time between points on the constant-velocity
             parts of the motion. Default value is 1.0 seconds. Minimum value is
             0.05 seconds.
-        batch_size (int): number of values to produce in each iteration.
-            Default is 500. Batch size is reset to the length of one leg of the
-            motion if num_batches is not None.
         az_start (str): part of the scan to start at.  To start at one
             of the extremes, use 'az_endpoint1', 'az_endpoint2', or
             'end' (same as 'az_endpoint1').  To start in the midpoint
@@ -355,41 +364,36 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             minimize the acceleration at the midpoint of the turnaround.
 
     Yields:
-        points (list): a list of TrackPoint objects.  Raises
-          StopIteration once exit condition, if defined, is met.
+        TrackPoint
 
     """
     if az_endpoint1 == az_endpoint2:
         raise ValueError('Generator requires two different az endpoints!')
 
-    # Force the el_speed to 0.  It matters because an el_speed in
-    # ProgramTrack data that exceeds the ACU limits will cause the
-    # point to be rejected, even if there's no motion in el planned
-    # (which, at the time of this writing, there is not).
-    el_speed = 0.
-
     # Note that starting scan direction gets modified, below,
     # depending on az_start.
-    increasing = az_endpoint2 > az_endpoint1
+    section = 2
+    if az_endpoint2 > az_endpoint1:
+        section = 0
 
     if az_start in ['az_endpoint1', 'az_endpoint2', 'end']:
         if az_start in ['az_endpoint1', 'end']:
             az = az_endpoint1
         else:
             az = az_endpoint2
-            increasing = not increasing
+            section = (section + 2) % 4
     elif az_start in ['mid_inc', 'mid_dec', 'mid']:
         az = (az_endpoint1 + az_endpoint2) / 2
         if az_start == 'mid':
             pass
         elif az_start == 'mid_inc':
-            increasing = True
+            section = 0
         else:
-            increasing = False
+            section = 2
     else:
         raise ValueError(f'az_start value "{az_start}" not supported. Choose from '
                          'az_endpoint1, az_endpoint2, mid_inc, mid_dec')
-    az_vel = az_speed if increasing else -az_speed
+    az_vel = az_speed if (section == 0) else -az_speed
 
     # Bias the starting point for the first leg?
     if az_first_pos is not None:
@@ -405,15 +409,6 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     if step_time < 0.05:
         raise ValueError('Time step size too small, must be at least '
                          '0.05 seconds')
-    daz = step_time * az_speed
-    el_vel = el_speed
-    az_flag = 0
-    el_flag = 0
-    if num_batches is None:
-        stop_iter = float('inf')
-    else:
-        stop_iter = num_batches
-        batch_size = int(np.ceil(abs(az_endpoint2 - az_endpoint1) / daz))
 
     def dec_num_scans():
         nonlocal num_scans
@@ -423,108 +418,37 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     def check_num_scans():
         return num_scans is None or num_scans > 0
 
-    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed, az_drift)
-    point_group_batch = 0
+    while check_num_scans():
 
-    i = 0
-    point_queue = []
-    while i < stop_iter and check_num_scans():
-        i += 1
-        point_block = []
-        for j in range(batch_size):
-            if len(point_queue):  # Pull from points in the queue first
-                point_block.append(point_queue.pop(0))
-                continue
+        if section in [0, 2]:
+            # Edge-to-edge
+            dec_num_scans()
+            increasing = (section == 0)
+            target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed, az_drift)
+            vects = get_const_vel_subscan(t, az, target_az, az_speed, step_time,
+                                          group=MIN_GROUP_NEW_LEG - 1,
+                                          stop_at_end=not check_num_scans())
+            for _t, _az, _vel, _flag, _gflag in zip(*vects):
+                yield TrackPoint(
+                    timestamp=_t+t0, az=_az, el=el, az_vel=_vel, el_vel=0,
+                    az_flag=_flag, el_flag=0,
+                    group_flag=_gflag)
+            t, az = [v[-1] for v in vects[:2]]
 
-            point_block.append(TrackPoint(
-                timestamp=t + t0,
-                az=az, el=el, az_vel=az_vel, el_vel=el_vel,
-                az_flag=az_flag, el_flag=el_flag,
-                group_flag=int(point_group_batch > 0)))
+        elif section in [1, 3]:
+            # Turn-around
+            if turnaround_method == "three_leg":
+                az_vel = az_speed if section == 0 else -az_speed
+                turnaround_track = three_leg_tr.gen_three_leg_turnaround(
+                    t0=t + t0, az0=az, el0=el, v0=az_vel,
+                    turntime=turntime,
+                    az_flag=2, el_flag=0,
+                    point_group_batch=0)
+                for tp in turnaround_track[:-1]:
+                    yield tp
+            t += turntime
 
-            if point_group_batch > 0:
-                point_group_batch -= 1
-
-            if increasing:
-                if az <= (target_az - 2 * daz):
-                    t += step_time
-                    az += daz
-                    az_vel = az_speed
-                    el_vel = el_speed
-                    az_flag = 1
-                    el_flag = 0
-                elif az == target_az:
-                    # Turn around.
-                    if turnaround_method == "three_leg":
-                        turnaround_track = three_leg_tr.gen_three_leg_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
-                                                                                 turntime=turntime,
-                                                                                 az_flag=az_flag, el_flag=el_flag,
-                                                                                 point_group_batch=point_group_batch)
-                        for track_point in turnaround_track:
-                            point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
-
-                    t += turntime
-                    az_vel = -1 * az_speed
-                    el_vel = el_speed
-                    az_flag = 1
-                    el_flag = 0
-                    increasing = False
-                    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed, az_drift)
-                    dec_num_scans()
-                    point_group_batch = MIN_GROUP_NEW_LEG - 1
-                else:
-                    time_remaining = (target_az - az) / az_speed
-                    az = target_az
-                    t += time_remaining
-                    az_vel = az_speed
-                    el_vel = el_speed
-                    az_flag = 2
-                    el_flag = 0
-            else:
-                if az >= (target_az + 2 * daz):
-                    t += step_time
-                    az -= daz
-                    az_vel = -1 * az_speed
-                    el_vel = el_speed
-                    az_flag = 1
-                    el_flag = 0
-                elif az == target_az:
-                    # Turn around.
-                    if turnaround_method == "three_leg":
-                        turnaround_track = three_leg_tr.gen_three_leg_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
-                                                                                 turntime=turntime,
-                                                                                 az_flag=az_flag, el_flag=el_flag,
-                                                                                 point_group_batch=point_group_batch)
-                        for track_point in turnaround_track:
-                            point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
-
-                    t += turntime
-                    az_vel = az_speed
-                    el_vel = el_speed
-                    az_flag = 1
-                    el_flag = 0
-                    increasing = True
-                    target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed, az_drift)
-                    dec_num_scans()
-                    point_group_batch = MIN_GROUP_NEW_LEG - 1
-                else:
-                    time_remaining = (az - target_az) / az_speed
-                    az = target_az
-                    t += time_remaining
-                    az_vel = -1 * az_speed
-                    el_vel = el_speed
-                    az_flag = 2
-                    el_flag = 0
-
-            if not check_num_scans():
-                # Kill the velocity on the last point and exit -- this
-                # was recommended at LAT FAT for smoothly stopping the
-                # motion at end of program.
-                point_block[-1].az_vel = 0
-                point_block[-1].el_vel = 0
-                break
-
-        yield point_block
+        section = (section + 1) % 4
 
 
 def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
