@@ -2468,7 +2468,6 @@ class ACUAgent:
             first_upload_time = None
             wait_stop_timeout = None
 
-
             prog_track_err = False
             stop_message = ""
             while True:
