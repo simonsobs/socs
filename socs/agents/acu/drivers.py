@@ -430,7 +430,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                           stop_at_end=not check_num_scans())
             for _t, _az, _vel, _flag, _gflag in zip(*vects):
                 yield TrackPoint(
-                    timestamp=_t+t0, az=_az, el=el, az_vel=_vel, el_vel=0,
+                    timestamp=_t + t0, az=_az, el=el, az_vel=_vel, el_vel=0,
                     az_flag=_flag, el_flag=0,
                     group_flag=_gflag)
             t, az = [v[-1] for v in vects[:2]]
