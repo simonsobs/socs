@@ -2210,12 +2210,12 @@ class ACUAgent:
             scan_params["az_start"] = "mid_dec"
         el_speed = params.get('el_speed', 0.0)
         az_edge_speed = az_speed
-        if params['scan_type'] in [2,3]:
+        if params['scan_type'] in [2, 3]:
             if az_vel_ref is None:
                 az_vel_ref = (az_endpoint1 + az_endpoint2) / 2.
             az_cent = az_vel_ref - 90
             az_edge = np.max(np.abs((az_endpoint1 - az_cent, az_endpoint2 - az_cent)))
-            az_edge_speed = az_speed/np.sin(az_edge)
+            az_edge_speed = az_speed / np.sin(az_edge)
 
         plan = sh.plan_scan(az_endpoint1, az_endpoint2,
                             el=el_endpoint1, v_az=az_edge_speed, a_az=az_accel,
