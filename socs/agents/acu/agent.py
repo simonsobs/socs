@@ -2208,7 +2208,7 @@ class ACUAgent:
             if params.get(k) is not None}
         el_speed = params.get('el_speed', 0.0)
         plan = sh.plan_scan(az_endpoint1, az_endpoint2,
-                            el=el_endpoint1, v_az=az_speed/(1 if type==1 else np.sin(np.deg2rad(30))), a_az=az_accel,
+                            el=el_endpoint1, v_az=az_speed / (1 if type == 1 else np.sin(np.deg2rad(30))), a_az=az_accel,
                             az_start=scan_params.get('az_start'),
                             scan_type=params['scan_type'])
 
