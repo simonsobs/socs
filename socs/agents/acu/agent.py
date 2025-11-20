@@ -2521,26 +2521,19 @@ class ACUAgent:
                     # check is used to decide we're done.
                     while mode == 'go' and (len(lines) <= new_line_target or lines[-1].group_flag != 0):
                         try:
-                            lines.extend(next(point_gen))
+                            lines.append(next(point_gen))
                         except StopIteration:
                             mode = 'stop'
                             stop_message = 'Stop due to end of the planned track.'
 
                         if len(lines) > FULL_STACK / 2:
-                            # This is used to raise an error and
-                            # abort; but it is more likely to occur in
-                            # the case where bad group_flag handling,
-                            # above, is messing things up.  So we just
-                            # break out and let some points get
-                            # processed.
-                            break
+                            # This could occur if group_flag was always set, for example.
+                            mode = 'abort'
+                            self.log.warn('Problem with point generator; too many points.')
+                            lines = []
 
                     # Grab the minimum batch
                     upload_lines, lines = lines[:new_line_target], lines[new_line_target:]
-
-                    # If the last line has a "group" flag, keep transferring lines.
-                    while len(lines) and len(upload_lines) and upload_lines[-1].group_flag != 0:
-                        upload_lines.append(lines.pop(0))
 
                     if len(upload_lines):
                         # Discard the group flag and upload all.
