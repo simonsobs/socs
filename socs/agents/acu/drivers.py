@@ -707,31 +707,16 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                 elif az == target_az:
                     point_group_batch = MIN_GROUP_NEW_LEG - 1
-                    if turnaround_method == "three_leg":
-                        _v = az_vel / np.sin(np.deg2rad(az - az_cent))
-                        turnaround_track = turnarounds.gen_turnaround(
-                            t0=t + t0, az0=az, el0=el, v0=_v,
-                            turntime=tt[1],
-                            az_flag=az_flag, el_flag=el_flag,
-                            step_time=step_time,
-                            second_leg_time=0.,
-                            point_group_batch=point_group_batch,
-                            turnaround_method='three_leg')
-                        for track_point in turnaround_track:
-                            point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
-
-                    if turnaround_method == "standard_gen":
-                        _v = az_vel / np.sin(np.deg2rad(az - az_cent))
-                        turnaround_track = turnarounds.gen_turnaround(
-                            t0=t + t0, az0=az, el0=el, v0=_v,
-                            turntime=tt[1],
-                            az_flag=az_flag, el_flag=el_flag,
-                            step_time=step_time,
-                            second_leg_time=0.,
-                            point_group_batch=point_group_batch,
-                            turnaround_method='standard')
-                        for track_point in turnaround_track:
-                            point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
+                    # Turn around.
+                    _v = az_vel / np.sin(np.deg2rad(az - az_cent))
+                    turnaround_track = turnarounds.gen_turnaround(turnaround_method=turnaround_method,
+                                                                  t0=t + t0, az0=az, el0=el, v0=_v,
+                                                                  turntime=tt[1],
+                                                                  az_flag=az_flag, el_flag=el_flag,
+                                                                  step_time=step_time,
+                                                                  second_leg_time=0.,
+                                                                  point_group_batch=point_group_batch)
+                    point_queue.extend(turnaround_track)
 
                     # Turn around.
                     t += tt[1]
@@ -757,31 +742,16 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                 elif az == target_az:
                     point_group_batch = MIN_GROUP_NEW_LEG - 1
-                    if turnaround_method == "three_leg":
-                        _v = az_vel / np.sin(np.deg2rad(az - az_cent))
-                        turnaround_track = turnarounds.gen_turnaround(
-                            t0=t + t0, az0=az, el0=el, v0=_v,
-                            turntime=tt[-1],
-                            step_time=step_time,
-                            second_leg_time=0.,
-                            az_flag=az_flag, el_flag=el_flag,
-                            point_group_batch=point_group_batch,
-                            turnaround_method='three_leg')
-                        for track_point in turnaround_track:
-                            point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
-
-                    if turnaround_method == "standard_gen":
-                        _v = az_vel / np.sin(np.deg2rad(az - az_cent))
-                        turnaround_track = turnarounds.gen_turnaround(
-                            t0=t + t0, az0=az, el0=el, v0=_v,
-                            turntime=tt[1],
-                            az_flag=az_flag, el_flag=el_flag,
-                            step_time=step_time,
-                            second_leg_time=0.,
-                            point_group_batch=point_group_batch,
-                            turnaround_method='standard')
-                        for track_point in turnaround_track:
-                            point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
+                    # Turn around.
+                    _v = az_vel / np.sin(np.deg2rad(az - az_cent))
+                    turnaround_track = turnarounds.gen_turnaround(turnaround_method=turnaround_method,
+                                                                  t0=t + t0, az0=az, el0=el, v0=_v,
+                                                                  turntime=tt[1],
+                                                                  az_flag=az_flag, el_flag=el_flag,
+                                                                  step_time=step_time,
+                                                                  second_leg_time=0.,
+                                                                  point_group_batch=point_group_batch)
+                    point_queue.extend(turnaround_track)
 
                     # Turn around.
                     t += tt[-1]

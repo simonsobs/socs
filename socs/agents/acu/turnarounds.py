@@ -117,6 +117,13 @@ def _gen_three_leg_turnaround(v0, turntime, second_leg_time=None, second_leg_vel
 
     Thus, for the same scan velocity and scan acceleration this turnaround will take the same time as the baseline.
 
+    The average and peak accelerations of the three_leg turnaround are as follows:
+
+        Average acceleration is = 2 * v0/turntime.
+        Peak acceleration is = 2.81*average_acceleration = 5.62 * v0/turn_time
+
+    The peak acceleration of the three_leg turnaround is ~ 2.81 / 1.5 ~= 1.87x larger than the standard_gen turnaround.
+
     Args:
         v0 (float): The initial velocity at the start of the turnaround.
         turntime (float): The total time for the turnaround defined by 2*velocity/acceleration.
