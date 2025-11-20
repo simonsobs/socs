@@ -552,7 +552,7 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                         start_time=None,
                         wait_to_start=10.,
                         step_time=1.,
-                        batch_size=500,
+                        batch_size=1000,
                         az_start='mid_inc',
                         az_first_pos=None,
                         az_drift=None,
@@ -709,7 +709,7 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
 
             point_block.append(TrackPoint(
                 timestamp=t + t0,
-                az=az, el=0, az_vel=az_vel / np.sin(np.deg2rad(az - az_cent)), el_vel=1,
+                az=az, el=el_cent, az_vel=az_vel / np.sin(np.deg2rad(az - az_cent)), el_vel=0,
                 az_flag=az_flag, el_flag=el_flag,
                 group_flag=int(point_group_batch > 0)))
 
@@ -721,7 +721,7 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     t += step_time
                     az += step_time * az_speed / np.sin(np.deg2rad(az - az_cent))
                     az_vel = az_speed
-                    az_flag = 0  # 1
+                    az_flag = 1  # 1
                     el_flag = 0
                 elif az == target_az:
                     point_group_batch = MIN_GROUP_NEW_LEG - 1
@@ -764,14 +764,14 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     az = target_az
                     t += time_remaining
                     az_vel = az_speed
-                    az_flag = 0  # 2
+                    az_flag = 1  # 2
                     el_flag = 0
             else:
                 if get_scan_time(az, target_az, az_speed, az_cent) > 2 * step_time:
                     t += step_time
                     az -= step_time * az_speed / np.sin(np.deg2rad(az - az_cent))
                     az_vel = -1 * az_speed
-                    az_flag = 0  # 1
+                    az_flag = 1  # 1
                     el_flag = 0
                 elif az == target_az:
                     point_group_batch = MIN_GROUP_NEW_LEG - 1
@@ -814,7 +814,7 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     az = target_az
                     t += time_remaining
                     az_vel = -1 * az_speed
-                    az_flag = 0  # 2
+                    az_flag = 1  # 2
                     el_flag = 0
 
             if not check_num_scans():
@@ -828,8 +828,9 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
         for p in point_block:
             if p.el_vel == 1000:
                 p.el_vel = 0.
-            else:
+            elif el_throw != 0:
                 p.el, p.el_vel = get_el(p.timestamp - t0)
+                p.el_flag = 1
 
         yield point_block
 
