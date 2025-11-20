@@ -438,7 +438,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
         elif section in [1, 3]:
             # Turn-around
             if turnaround_method == "three_leg":
-                az_vel = az_speed if section == 0 else -az_speed
+                az_vel = az_speed if section == 1 else -az_speed
                 turnaround_track = three_leg_tr.gen_three_leg_turnaround(
                     t0=t + t0, az0=az, el0=el, v0=az_vel,
                     turntime=turntime,
