@@ -7,7 +7,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-import socs.agents.acu.three_leg_turnaround as three_leg_tr
+import socs.agents.acu.turnarounds as turnarounds
 
 #: The number of seconds in a day.
 DAY = 86400
@@ -19,7 +19,7 @@ MIN_GROUP_NEW_LEG = 4
 #: Registry for turn-around profile types.
 TURNAROUNDS_ENUM = {
     'standard': 0,
-    # 1: reserved for "standard but explicitly commanded"
+    'standard_gen': 1,
     'three_leg': 2,
 }
 
@@ -455,13 +455,12 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                 elif az == target_az:
                     # Turn around.
-                    if turnaround_method == "three_leg":
-                        turnaround_track = three_leg_tr.gen_three_leg_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
-                                                                                 turntime=turntime,
-                                                                                 az_flag=az_flag, el_flag=el_flag,
-                                                                                 point_group_batch=point_group_batch)
-                        for track_point in turnaround_track:
-                            point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
+                    turnaround_track = turnarounds.gen_turnaround(turnaround_method=turnaround_method,
+                                                                  t0=t + t0, az0=az, el0=el, v0=az_vel,
+                                                                  turntime=turntime,
+                                                                  az_flag=az_flag, el_flag=el_flag,
+                                                                  point_group_batch=point_group_batch)
+                    point_queue.extend(turnaround_track)
 
                     t += turntime
                     az_vel = -1 * az_speed
@@ -490,13 +489,12 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                 elif az == target_az:
                     # Turn around.
-                    if turnaround_method == "three_leg":
-                        turnaround_track = three_leg_tr.gen_three_leg_turnaround(t0=t + t0, az0=az, el0=el, v0=az_vel,
-                                                                                 turntime=turntime,
-                                                                                 az_flag=az_flag, el_flag=el_flag,
-                                                                                 point_group_batch=point_group_batch)
-                        for track_point in turnaround_track:
-                            point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
+                    turnaround_track = turnarounds.gen_turnaround(turnaround_method=turnaround_method,
+                                                                  t0=t + t0, az0=az, el0=el, v0=az_vel,
+                                                                  turntime=turntime,
+                                                                  az_flag=az_flag, el_flag=el_flag,
+                                                                  point_group_batch=point_group_batch)
+                    point_queue.extend(turnaround_track)
 
                     t += turntime
                     az_vel = az_speed
@@ -693,7 +691,7 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
 
             point_block.append(TrackPoint(
                 timestamp=t + t0,
-                az=az, el=0, az_vel=az_vel / np.sin(np.deg2rad(az - az_cent)), el_vel=1,
+                az=az, el=el_cent, az_vel=az_vel / np.sin(np.deg2rad(az - az_cent)), el_vel=0,
                 az_flag=az_flag, el_flag=el_flag,
                 group_flag=int(point_group_batch > 0)))
 
@@ -705,21 +703,20 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     t += step_time
                     az += step_time * az_speed / np.sin(np.deg2rad(az - az_cent))
                     az_vel = az_speed
-                    az_flag = 0  # 1
+                    az_flag = 1  # 1
                     el_flag = 0
                 elif az == target_az:
                     point_group_batch = MIN_GROUP_NEW_LEG - 1
-                    if turnaround_method == "three_leg":
-                        _v = az_vel / np.sin(np.deg2rad(az - az_cent))
-                        turnaround_track = three_leg_tr.gen_three_leg_turnaround(
-                            t0=t + t0, az0=az, el0=el, v0=_v,
-                            turntime=tt[1],
-                            az_flag=az_flag, el_flag=el_flag,
-                            step_time=step_time,
-                            second_leg_time=0.,
-                            point_group_batch=point_group_batch)
-                        for track_point in turnaround_track:
-                            point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
+                    # Turn around.
+                    _v = az_vel / np.sin(np.deg2rad(az - az_cent))
+                    turnaround_track = turnarounds.gen_turnaround(turnaround_method=turnaround_method,
+                                                                  t0=t + t0, az0=az, el0=el, v0=_v,
+                                                                  turntime=tt[1],
+                                                                  az_flag=az_flag, el_flag=el_flag,
+                                                                  step_time=step_time,
+                                                                  second_leg_time=0.,
+                                                                  point_group_batch=point_group_batch)
+                    point_queue.extend(turnaround_track)
 
                     # Turn around.
                     t += tt[1]
@@ -734,28 +731,27 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     az = target_az
                     t += time_remaining
                     az_vel = az_speed
-                    az_flag = 0  # 2
+                    az_flag = 1  # 2
                     el_flag = 0
             else:
                 if get_scan_time(az, target_az, az_speed, az_cent) > 2 * step_time:
                     t += step_time
                     az -= step_time * az_speed / np.sin(np.deg2rad(az - az_cent))
                     az_vel = -1 * az_speed
-                    az_flag = 0  # 1
+                    az_flag = 1  # 1
                     el_flag = 0
                 elif az == target_az:
                     point_group_batch = MIN_GROUP_NEW_LEG - 1
-                    if turnaround_method == "three_leg":
-                        _v = az_vel / np.sin(np.deg2rad(az - az_cent))
-                        turnaround_track = three_leg_tr.gen_three_leg_turnaround(
-                            t0=t + t0, az0=az, el0=el, v0=_v,
-                            turntime=tt[-1],
-                            step_time=step_time,
-                            second_leg_time=0.,
-                            az_flag=az_flag, el_flag=el_flag,
-                            point_group_batch=point_group_batch)
-                        for track_point in turnaround_track:
-                            point_queue.append(track_point)  # Add the TrackPoints from the turnaround into the queue.
+                    # Turn around.
+                    _v = az_vel / np.sin(np.deg2rad(az - az_cent))
+                    turnaround_track = turnarounds.gen_turnaround(turnaround_method=turnaround_method,
+                                                                  t0=t + t0, az0=az, el0=el, v0=_v,
+                                                                  turntime=tt[1],
+                                                                  az_flag=az_flag, el_flag=el_flag,
+                                                                  step_time=step_time,
+                                                                  second_leg_time=0.,
+                                                                  point_group_batch=point_group_batch)
+                    point_queue.extend(turnaround_track)
 
                     # Turn around.
                     t += tt[-1]
@@ -770,7 +766,7 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                     az = target_az
                     t += time_remaining
                     az_vel = -1 * az_speed
-                    az_flag = 0  # 2
+                    az_flag = 1  # 2
                     el_flag = 0
 
             if not check_num_scans():
@@ -784,8 +780,9 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
         for p in point_block:
             if p.el_vel == 1000:
                 p.el_vel = 0.
-            else:
+            elif el_throw != 0:
                 p.el, p.el_vel = get_el(p.timestamp - t0)
+                p.el_flag = 1
 
         yield point_block
 
@@ -932,14 +929,13 @@ def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None,
     plan = {}
 
     # Point time separation: at least 5 points per leg, preferably 10.
-    dt = 2 * abs(throw / v_az) / 10
-    dt = min(max(dt, 0.1), 1.0)
+    if scan_type in [2, 3]:
+        dt = .05
+    else:
+        dt = 2 * abs(throw / v_az) / 10
+        dt = min(max(dt, 0.1), 1.0)
     assert (2 * abs(throw / v_az) / dt >= 5)
     plan['step_time'] = dt
-
-    # In the case of type 2/3 scans, force step_time to be at most 0.1 seconds.
-    if scan_type in [2, 3]:
-        plan['step_time'] = min(0.1, plan['step_time'])
 
     # Turn around prep distance (deg)? 5 point periods, times the vel.
     turnprep_buffer = 5 * dt * v_az

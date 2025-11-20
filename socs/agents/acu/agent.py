@@ -1797,7 +1797,8 @@ class ACUAgent:
     @ocs_agent.param('az_accel', type=float, default=None)
     @ocs_agent.param('el_freq', type=float, default=None)
     @ocs_agent.param('turnaround_method', type=str, default=None,
-                     choices=[None, 'standard', 'three_leg'])
+                     choices=[None, 'standard', 'standard_gen',
+                              'three_leg'])
     @ocs_agent.param('reset', default=False, type=bool)
     @inlineCallbacks
     def set_scan_params(self, session, params):
@@ -2041,7 +2042,8 @@ class ACUAgent:
     @ocs_agent.param('scan_type', default=1, choices=[1, 2, 3])
     @ocs_agent.param('az_vel_ref', type=float, default=None)
     @ocs_agent.param('turnaround_method', default=None,
-                     choices=[None, 'standard', 'three_leg'])
+                     choices=[None, 'standard', 'standard_gen',
+                              'three_leg'])
     @ocs_agent.param('scan_upload_length', type=float, default=None)
     @ocs_agent.param('type', default=None, choices=[1, 2, 3])
     @inlineCallbacks
@@ -2157,13 +2159,13 @@ class ACUAgent:
         if el_freq is None:
             el_freq = self.scan_params['el_freq']
         if turnaround_method is None:
-            if params['scan_type'] in [2, 3]:
-                turnaround_method = 'three_leg'
-                self.log.info('Setting turnaround_method="three_leg" for type2/3 scan.')
-            else:
-                turnaround_method = self.scan_params['turnaround_method']
+            turnaround_method = self.scan_params['turnaround_method']
+            if params['scan_type'] in [2, 3] and turnaround_method == 'standard':
+                turnaround_method = 'standard_gen'
+                self.log.info('Setting turnaround_method="standard_gen" for type2/3 scan.')
 
         # Check if the turnaround method is usable for the called scan type.
+        # This should never happen with the above turnaround_method setting.
         if turnaround_method == "standard" and params['scan_type'] != 1:
             raise ValueError("Cannot use standard turnaround method with type 2 or 3 scans!")
 
@@ -2204,9 +2206,19 @@ class ACUAgent:
             'wait_to_start', 'step_time', 'batch_size',
             'az_start', 'az_drift']
             if params.get(k) is not None}
+        if params['scan_type'] in [2, 3]:
+            scan_params["az_start"] = "mid_dec"
         el_speed = params.get('el_speed', 0.0)
+        az_edge_speed = az_speed
+        if params['scan_type'] in [2, 3]:
+            if az_vel_ref is None:
+                az_vel_ref = (az_endpoint1 + az_endpoint2) / 2.
+            az_cent = az_vel_ref - 90
+            az_edge = np.max(np.abs((az_endpoint1 - az_cent, az_endpoint2 - az_cent)))
+            az_edge_speed = az_speed / np.sin(az_edge)
+
         plan = sh.plan_scan(az_endpoint1, az_endpoint2,
-                            el=el_endpoint1, v_az=az_speed, a_az=az_accel,
+                            el=el_endpoint1, v_az=az_edge_speed, a_az=az_accel,
                             az_start=scan_params.get('az_start'),
                             scan_type=params['scan_type'])
 
@@ -2271,7 +2283,7 @@ class ACUAgent:
         # Prepare the point generator.
         free_form = False
         if params['scan_type'] == 1:
-            if turnaround_method == 'three_leg':
+            if turnaround_method != 'standard':
                 free_form = True
 
             g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
@@ -2333,7 +2345,7 @@ class ACUAgent:
 
         ret_val = (yield self._run_track(
             session=session, point_gen=g, step_time=step_time,
-            azonly=azonly, point_batch_count=point_batch_count, free_form=free_form))
+            azonly=azonly, point_batch_count=point_batch_count, free_form=free_form, unabort_failure=(params['scan_type'] in [2, 3])))
 
         self.agent.publish_to_feed('scan_params',
                                    {'timestamp': time.time(),
@@ -2344,7 +2356,7 @@ class ACUAgent:
 
     @inlineCallbacks
     def _run_track(self, session, point_gen, step_time, azonly=False,
-                   point_batch_count=None, free_form=False):
+                   point_batch_count=None, free_form=False, unabort_failure=False):
         """Run a ProgramTrack track scan, with points provided by a
         generator.
 
@@ -2361,6 +2373,7 @@ class ACUAgent:
             beyond the minimum set internally based on step_time.
           free_form: if True, disable ACU linear interpolation and
             turn-around profiling.
+          unabort_failure: if True don't fail on a bad exit.
 
         Returns:
           Tuple (success, msg) where success is a bool.
@@ -2455,9 +2468,8 @@ class ACUAgent:
             first_upload_time = None
             wait_stop_timeout = None
 
-            # eesh
-            unabort_failure = False
-
+            prog_track_err = False
+            stop_message = ""
             while True:
                 now = time.time()
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
@@ -2490,7 +2502,7 @@ class ACUAgent:
                         if got_progtrack:
                             self.log.warn('Unexpected exit from ProgramTrack mode!')
                             if mode == 'stop':
-                                unabort_failure = True  # close enough!
+                                prog_track_err = True
                             mode = 'abort'
                         elif now - start_time > MAX_PROGTRACK_SET_TIME:
                             self.log.warn('Failed to set ProgramTrack mode in a timely fashion.')
@@ -2592,7 +2604,7 @@ class ACUAgent:
                                                 'Clear Stack')
 
         if mode == 'abort':
-            if unabort_failure:
+            if unabort_failure and prog_track_err:
                 return True, 'Problems on shutdown but close enough.'
             return False, 'Problems during scan'
         return True, f'Scan ended. {stop_message}'
