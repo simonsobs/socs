@@ -7,6 +7,8 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
+import socs.agents.acu.turnarounds as turnarounds
+
 #: The number of seconds in a day.
 DAY = 86400
 
@@ -17,6 +19,8 @@ MIN_GROUP_NEW_LEG = 4
 #: Registry for turn-around profile types.
 TURNAROUNDS_ENUM = {
     'standard': 0,
+    'standard_gen': 1,
+    'three_leg': 2,
 }
 
 
@@ -300,7 +304,8 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                                     batch_size=500,
                                     az_start='mid_inc',
                                     az_first_pos=None,
-                                    az_drift=None):
+                                    az_drift=None,
+                                    turnaround_method='standard'):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long constant-velocity azimuth scans.
@@ -344,6 +349,10 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
         az_drift (float): The rate (deg / s) at which to shift the
             scan endpoints in time.  This can be used to better track
             celestial sources in targeted scans.
+        turnaround_method (str): The method used for generating turnaround.
+            Default ('standard') generates the baseline minimal jerk trajectory.
+            'three_leg' generates a three-leg turnaround which attempts to
+            minimize the acceleration at the midpoint of the turnaround.
 
     Yields:
         points (list): a list of TrackPoint objects.  Raises
@@ -418,10 +427,15 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
     point_group_batch = 0
 
     i = 0
+    point_queue = []
     while i < stop_iter and check_num_scans():
         i += 1
         point_block = []
         for j in range(batch_size):
+            if len(point_queue):  # Pull from points in the queue first
+                point_block.append(point_queue.pop(0))
+                continue
+
             point_block.append(TrackPoint(
                 timestamp=t + t0,
                 az=az, el=el, az_vel=az_vel, el_vel=el_vel,
@@ -441,6 +455,13 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                 elif az == target_az:
                     # Turn around.
+                    turnaround_track = turnarounds.gen_turnaround(turnaround_method=turnaround_method,
+                                                                  t0=t + t0, az0=az, el0=el, v0=az_vel,
+                                                                  turntime=turntime,
+                                                                  az_flag=az_flag, el_flag=el_flag,
+                                                                  point_group_batch=point_group_batch)
+                    point_queue.extend(turnaround_track)
+
                     t += turntime
                     az_vel = -1 * az_speed
                     el_vel = el_speed
@@ -468,6 +489,13 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
                     el_flag = 0
                 elif az == target_az:
                     # Turn around.
+                    turnaround_track = turnarounds.gen_turnaround(turnaround_method=turnaround_method,
+                                                                  t0=t + t0, az0=az, el0=el, v0=az_vel,
+                                                                  turntime=turntime,
+                                                                  az_flag=az_flag, el_flag=el_flag,
+                                                                  point_group_batch=point_group_batch)
+                    point_queue.extend(turnaround_track)
+
                     t += turntime
                     az_vel = az_speed
                     el_vel = el_speed
@@ -509,7 +537,8 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                         batch_size=500,
                         az_start='mid_inc',
                         az_first_pos=None,
-                        az_drift=None):
+                        az_drift=None,
+                        turnaround_method='three_leg'):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long type 3 scan.
@@ -627,7 +656,6 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
     if step_time < 0.05:
         raise ValueError('Time step size too small, must be at least '
                          '0.05 seconds')
-    el_vel = el_throw * el_freq * 2 * np.pi * np.cos(t * el_freq * 2 * np.pi)
     az_flag = 0
     el_flag = 0
     if num_batches is None:
@@ -647,14 +675,23 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
     target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed / np.sin(np.deg2rad(az - az_cent)), az_drift)
     point_group_batch = 0
 
+    def get_el(_t):
+        return (el_cent - el_throw * np.cos(_t * el_freq * 2 * np.pi),
+                el_throw * el_freq * 2 * np.pi * np.sin(_t * el_freq * 2 * np.pi))
+
     i = 0
+    point_queue = []
     while i < stop_iter and check_num_scans():
         i += 1
         point_block = []
         for j in range(batch_size):
+            if len(point_queue):  # Pull from points in the queue first
+                point_block.append(point_queue.pop(0))
+                continue
+
             point_block.append(TrackPoint(
                 timestamp=t + t0,
-                az=az, el=el, az_vel=az_vel / np.sin(np.deg2rad(az - az_cent)), el_vel=el_vel,
+                az=az, el=el_cent, az_vel=az_vel / np.sin(np.deg2rad(az - az_cent)), el_vel=0,
                 az_flag=az_flag, el_flag=el_flag,
                 group_flag=int(point_group_batch > 0)))
 
@@ -665,57 +702,71 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                 if get_scan_time(az, target_az, az_speed, az_cent) > 2 * step_time:
                     t += step_time
                     az += step_time * az_speed / np.sin(np.deg2rad(az - az_cent))
-                    el = el_cent + el_throw * np.sin(t * el_freq * 2 * np.pi)
                     az_vel = az_speed
-                    el_vel = el_throw * el_freq * 2 * np.pi * np.cos(t * el_freq * 2 * np.pi)
-                    az_flag = 1
+                    az_flag = 1  # 1
                     el_flag = 0
                 elif az == target_az:
+                    point_group_batch = MIN_GROUP_NEW_LEG - 1
+                    # Turn around.
+                    _v = az_vel / np.sin(np.deg2rad(az - az_cent))
+                    turnaround_track = turnarounds.gen_turnaround(turnaround_method=turnaround_method,
+                                                                  t0=t + t0, az0=az, el0=el, v0=_v,
+                                                                  turntime=tt[1],
+                                                                  az_flag=az_flag, el_flag=el_flag,
+                                                                  step_time=step_time,
+                                                                  second_leg_time=0.,
+                                                                  point_group_batch=point_group_batch)
+                    point_queue.extend(turnaround_track)
+
                     # Turn around.
                     t += tt[1]
                     az_vel = -1 * az_speed
-                    el_vel = 0
-                    az_flag = 1
+                    az_flag = 1  # 1
                     el_flag = 0
                     increasing = False
                     target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed / np.sin(np.deg2rad(az - az_cent)), az_drift)
                     dec_num_scans()
-                    point_group_batch = MIN_GROUP_NEW_LEG - 1
                 else:
                     time_remaining = get_scan_time(az, target_az, az_speed, az_cent)
                     az = target_az
                     t += time_remaining
                     az_vel = az_speed
-                    el_vel = 0
-                    az_flag = 2
+                    az_flag = 1  # 2
                     el_flag = 0
             else:
                 if get_scan_time(az, target_az, az_speed, az_cent) > 2 * step_time:
                     t += step_time
                     az -= step_time * az_speed / np.sin(np.deg2rad(az - az_cent))
-                    el = el_cent + el_throw * np.sin(t * el_freq * 2 * np.pi)
                     az_vel = -1 * az_speed
-                    el_vel = el_throw * el_freq * 2 * np.pi * np.cos(t * el_freq * 2 * np.pi)
-                    az_flag = 1
+                    az_flag = 1  # 1
                     el_flag = 0
                 elif az == target_az:
+                    point_group_batch = MIN_GROUP_NEW_LEG - 1
+                    # Turn around.
+                    _v = az_vel / np.sin(np.deg2rad(az - az_cent))
+                    turnaround_track = turnarounds.gen_turnaround(turnaround_method=turnaround_method,
+                                                                  t0=t + t0, az0=az, el0=el, v0=_v,
+                                                                  turntime=tt[1],
+                                                                  az_flag=az_flag, el_flag=el_flag,
+                                                                  step_time=step_time,
+                                                                  second_leg_time=0.,
+                                                                  point_group_batch=point_group_batch)
+                    point_queue.extend(turnaround_track)
+
                     # Turn around.
                     t += tt[-1]
                     az_vel = az_speed
-                    el_vel = 0
-                    az_flag = 1
+                    az_flag = 1  # 1
                     el_flag = 0
                     increasing = True
                     target_az = _get_target_az(az, t, increasing, az_endpoint1, az_endpoint2, az_speed / np.sin(np.deg2rad(az - az_cent)), az_drift)
                     dec_num_scans()
-                    point_group_batch = MIN_GROUP_NEW_LEG - 1
                 else:
                     time_remaining = get_scan_time(az, target_az, az_speed, az_cent)
                     az = target_az
                     t += time_remaining
                     az_vel = -1 * az_speed
-                    el_vel = 0
-                    az_flag = 2
+                    az_flag = 1  # 2
                     el_flag = 0
 
             if not check_num_scans():
@@ -723,8 +774,15 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                 # was recommended at LAT FAT for smoothly stopping the
                 # motion at end of program.
                 point_block[-1].az_vel = 0
-                point_block[-1].el_vel = 0
+                point_block[-1].el_vel = 1000
                 break
+
+        for p in point_block:
+            if p.el_vel == 1000:
+                p.el_vel = 0.
+            elif el_throw != 0:
+                p.el, p.el_vel = get_el(p.timestamp - t0)
+                p.el_flag = 1
 
         yield point_block
 
@@ -740,7 +798,8 @@ def generate_type2_scan(az_endpoint1, az_endpoint2, az_speed,
                         batch_size=500,
                         az_start='mid_inc',
                         az_first_pos=None,
-                        az_drift=None):
+                        az_drift=None,
+                        turnaround_method='three_leg'):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long type 2 scan.
@@ -800,10 +859,12 @@ def generate_type2_scan(az_endpoint1, az_endpoint2, az_speed,
                                batch_size=batch_size,
                                az_start=az_start,
                                az_first_pos=az_first_pos,
-                               az_drift=az_drift)
+                               az_drift=az_drift,
+                               turnaround_method=turnaround_method)
 
 
-def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None):
+def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None,
+              scan_type=1):
     """Determine some important parameters for running a ProgramTrack
     scan with the desired end points, velocity, and mean turn-around
     acceleration.
@@ -868,8 +929,11 @@ def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None):
     plan = {}
 
     # Point time separation: at least 5 points per leg, preferably 10.
-    dt = 2 * abs(throw / v_az) / 10
-    dt = min(max(dt, 0.1), 1.0)
+    if scan_type in [2, 3]:
+        dt = .05
+    else:
+        dt = 2 * abs(throw / v_az) / 10
+        dt = min(max(dt, 0.1), 1.0)
     assert (2 * abs(throw / v_az) / dt >= 5)
     plan['step_time'] = dt
 
