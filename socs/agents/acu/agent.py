@@ -32,11 +32,13 @@ INIT_DEFAULT_SCAN_PARAMS = {
         'az_speed': 2,
         'az_accel': 1,
         'el_freq': .15,
+        'turnaround_method': 'standard',
     },
     'satp': {
         'az_speed': 1,
         'az_accel': 1,
         'el_freq': 0,
+        'turnaround_method': 'standard',
     },
 }
 
@@ -1794,6 +1796,9 @@ class ACUAgent:
     @ocs_agent.param('az_speed', type=float, default=None)
     @ocs_agent.param('az_accel', type=float, default=None)
     @ocs_agent.param('el_freq', type=float, default=None)
+    @ocs_agent.param('turnaround_method', type=str, default=None,
+                     choices=[None, 'standard', 'standard_gen',
+                              'three_leg'])
     @ocs_agent.param('reset', default=False, type=bool)
     @inlineCallbacks
     def set_scan_params(self, session, params):
@@ -1814,7 +1819,7 @@ class ACUAgent:
         """
         if params['reset']:
             self.scan_params.update(self.default_scan_params)
-        for k in ['az_speed', 'az_accel', 'el_freq']:
+        for k in ['az_speed', 'az_accel', 'el_freq', 'turnaround_method']:
             if params[k] is not None:
                 self.scan_params[k] = params[k]
         self.log.info('Updated default scan params to {sp}', sp=self.scan_params)
@@ -2034,18 +2039,24 @@ class ACUAgent:
                               'mid_inc', 'mid_dec'])
     @ocs_agent.param('az_drift', type=float, default=None)
     @ocs_agent.param('az_only', type=bool, default=True)
-    @ocs_agent.param('type', default=1, choices=[1, 2, 3])
+    @ocs_agent.param('scan_type', default=1, choices=[1, 2, 3])
     @ocs_agent.param('az_vel_ref', type=float, default=None)
+    @ocs_agent.param('turnaround_method', default=None,
+                     choices=[None, 'standard', 'standard_gen',
+                              'three_leg'])
     @ocs_agent.param('scan_upload_length', type=float, default=None)
+    @ocs_agent.param('type', default=None, choices=[1, 2, 3])
     @inlineCallbacks
     def generate_scan(self, session, params):
         """generate_scan(az_endpoint1, az_endpoint2, \
                          az_speed=None, az_accel=None, \
                          el_endpoint1=None, el_endpoint2=None, \
-                         el_speed=None, \
+                         el_speed=None, el_freq=None, \
                          num_scans=None, start_time=None, \
                          wait_to_start=None, step_time=None, \
                          az_start='end', az_drift=None, az_only=True, \
+                         scan_type=1, az_vel_ref=None, \
+                         turnaround_method=None, \
                          scan_upload_length=None)
 
         **Process** - Scan generator, currently only works for
@@ -2062,6 +2073,7 @@ class ACUAgent:
                 track.
             el_endpoint2 (float): this is ignored.
             el_speed (float): this is ignored.
+            el_freq(float): frequency of the elevation nods for scan_type=3.
             num_scans (int or None): if not None, limits the scan to
                 the specified number of constant velocity legs. The
                 process will exit without error once that has
@@ -2092,16 +2104,22 @@ class ACUAgent:
             az_only (bool): if True (the default), then only the
                 Azimuth axis is put in ProgramTrack mode, and the El axis
                 is put in Stop mode.
-            type (int): What type of scan to use. Only 1, 2, 3 are valid.
+            scan_type (int): What type of scan to use. Only 1, 2, 3 are valid.
                 Type 1 is a constant elevation scan.
                 Type 2 includes a variation in az speed that scales as sin(az).
                 Type 3 is a Type 2 with an sinusoidal el nod.
             az_vel_ref (float or None): azimuth to center the velocity profile at.
                 If None then the average of the endpoints is used.
+            turnaround_method (str): The method used for generating turnaround.
+                Default (None) generates the baseline minimal jerk trajectory.
+                'three_leg' generates a three-leg turnaround which attempts to
+                minimize the acceleration at the midpoint of the turnaround.
             scan_upload_length (float): number of seconds for each set
                 of uploaded points. If this is not specified, the
                 track manager will try to use as short a time as is
                 reasonable.
+            type (int): Temporary alias for scan_type. Do not
+                use. Will be removed.
 
         Notes:
           Note that all parameters are optional except for
@@ -2116,6 +2134,11 @@ class ACUAgent:
         if self._get_sun_policy('motion_blocked'):
             return False, "Motion blocked; Sun avoidance in progress."
 
+        if params['type'] is not None:
+            self.log.warn('Caller passed "type" instead of "scan_type" arg; moving.')
+            params['scan_type'] = params['type']
+        del params['type']
+
         self.log.info('User scan params: {params}', params=params)
 
         az_endpoint1 = params['az_endpoint1']
@@ -2128,12 +2151,23 @@ class ACUAgent:
         az_speed = params['az_speed']
         az_accel = params['az_accel']
         el_freq = params['el_freq']
+        turnaround_method = params['turnaround_method']
         if az_speed is None:
             az_speed = self.scan_params['az_speed']
         if az_accel is None:
             az_accel = self.scan_params['az_accel']
         if el_freq is None:
             el_freq = self.scan_params['el_freq']
+        if turnaround_method is None:
+            turnaround_method = self.scan_params['turnaround_method']
+            if params['scan_type'] in [2, 3] and turnaround_method == 'standard':
+                turnaround_method = 'standard_gen'
+                self.log.info('Setting turnaround_method="standard_gen" for type2/3 scan.')
+
+        # Check if the turnaround method is usable for the called scan type.
+        # This should never happen with the above turnaround_method setting.
+        if turnaround_method == "standard" and params['scan_type'] != 1:
+            raise ValueError("Cannot use standard turnaround method with type 2 or 3 scans!")
 
         # Do we need to limit the az_accel?  This limit comes from a
         # maximum jerk parameter; the equation below (without the
@@ -2172,10 +2206,21 @@ class ACUAgent:
             'wait_to_start', 'step_time', 'batch_size',
             'az_start', 'az_drift']
             if params.get(k) is not None}
+        if params['scan_type'] in [2, 3]:
+            scan_params["az_start"] = "mid_dec"
         el_speed = params.get('el_speed', 0.0)
+        az_edge_speed = az_speed
+        if params['scan_type'] in [2, 3]:
+            if az_vel_ref is None:
+                az_vel_ref = (az_endpoint1 + az_endpoint2) / 2.
+            az_cent = az_vel_ref - 90
+            az_edge = np.max(np.abs((az_endpoint1 - az_cent, az_endpoint2 - az_cent)))
+            az_edge_speed = az_speed / np.sin(az_edge)
+
         plan = sh.plan_scan(az_endpoint1, az_endpoint2,
-                            el=el_endpoint1, v_az=az_speed, a_az=az_accel,
-                            az_start=scan_params.get('az_start'))
+                            el=el_endpoint1, v_az=az_edge_speed, a_az=az_accel,
+                            az_start=scan_params.get('az_start'),
+                            scan_type=params['scan_type'])
 
         # Use the plan to set scan upload parameters.
         if scan_params.get('step_time') is None:
@@ -2237,30 +2282,36 @@ class ACUAgent:
 
         # Prepare the point generator.
         free_form = False
-        if params["type"] == 1:
+        if params['scan_type'] == 1:
+            if turnaround_method != 'standard':
+                free_form = True
+
             g = sh.generate_constant_velocity_scan(az_endpoint1=az_endpoint1,
                                                    az_endpoint2=az_endpoint2,
                                                    az_speed=az_speed, acc=az_accel,
+                                                   turnaround_method=turnaround_method,
                                                    el_endpoint1=el_endpoint1,
                                                    el_endpoint2=el_endpoint2,
                                                    el_speed=el_speed,
                                                    az_first_pos=plan['init_az'],
                                                    **scan_params)
-        elif params["type"] == 2:
+        elif params['scan_type'] == 2:
             free_form = True
             g = sh.generate_type2_scan(az_endpoint1=az_endpoint1,
                                        az_endpoint2=az_endpoint2,
                                        az_speed=az_speed, acc=az_accel,
+                                       turnaround_method=turnaround_method,
                                        el_endpoint1=el_endpoint1,
                                        az_vel_ref=az_vel_ref,
                                        az_first_pos=plan['init_az'],
                                        **scan_params)
-        elif params["type"] == 3:
+        elif params['scan_type'] == 3:
             free_form = True
             azonly = False
             g = sh.generate_type3_scan(az_endpoint1=az_endpoint1,
                                        az_endpoint2=az_endpoint2,
                                        az_speed=az_speed, acc=az_accel,
+                                       turnaround_method=turnaround_method,
                                        el_endpoint1=el_endpoint1,
                                        el_endpoint2=el_endpoint2,
                                        el_freq=el_freq,
@@ -2283,8 +2334,8 @@ class ACUAgent:
             'el1': el_endpoint1,
             'el2': el_endpoint2,
             'el_freq': el_freq,
-            'type': params['type'],
-            'turnaround_type': sh.TURNAROUNDS_ENUM['standard'],
+            'type': params['scan_type'],
+            'turnaround_type': sh.TURNAROUNDS_ENUM[turnaround_method],
         })
 
         self.agent.publish_to_feed('scan_params',
@@ -2294,7 +2345,7 @@ class ACUAgent:
 
         ret_val = (yield self._run_track(
             session=session, point_gen=g, step_time=step_time,
-            azonly=azonly, point_batch_count=point_batch_count, free_form=free_form))
+            azonly=azonly, point_batch_count=point_batch_count, free_form=free_form, unabort_failure=(params['scan_type'] in [2, 3])))
 
         self.agent.publish_to_feed('scan_params',
                                    {'timestamp': time.time(),
@@ -2305,7 +2356,7 @@ class ACUAgent:
 
     @inlineCallbacks
     def _run_track(self, session, point_gen, step_time, azonly=False,
-                   point_batch_count=None, free_form=False):
+                   point_batch_count=None, free_form=False, unabort_failure=False):
         """Run a ProgramTrack track scan, with points provided by a
         generator.
 
@@ -2322,6 +2373,7 @@ class ACUAgent:
             beyond the minimum set internally based on step_time.
           free_form: if True, disable ACU linear interpolation and
             turn-around profiling.
+          unabort_failure: if True don't fail on a bad exit.
 
         Returns:
           Tuple (success, msg) where success is a bool.
@@ -2416,6 +2468,8 @@ class ACUAgent:
             first_upload_time = None
             wait_stop_timeout = None
 
+            prog_track_err = False
+            stop_message = ""
             while True:
                 now = time.time()
                 current_modes = {'Az': self.data['status']['summary']['Azimuth_mode'],
@@ -2447,6 +2501,8 @@ class ACUAgent:
                     else:
                         if got_progtrack:
                             self.log.warn('Unexpected exit from ProgramTrack mode!')
+                            if mode == 'stop':
+                                prog_track_err = True
                             mode = 'abort'
                         elif now - start_time > MAX_PROGTRACK_SET_TIME:
                             self.log.warn('Failed to set ProgramTrack mode in a timely fashion.')
@@ -2458,7 +2514,7 @@ class ACUAgent:
                     if current_modes['Remote'] == 0:
                         self.log.warn('ACU no longer in remote mode!')
                         mode = 'abort'
-                    if session.status == 'stopping':
+                    if session.status == 'stopping' and mode not in ['stop', 'abort']:
                         mode = 'stop'
                         stop_message = 'User-requested stop.'
                         lines = []
@@ -2483,10 +2539,13 @@ class ACUAgent:
                             stop_message = 'Stop due to end of the planned track.'
 
                         if len(lines) > FULL_STACK / 2:
-                            # This could occur if group_flag was always set, for example.
-                            mode = 'abort'
-                            self.log.warn('Problem with point generator; too many points.')
-                            lines = []
+                            # This is used to raise an error and
+                            # abort; but it is more likely to occur in
+                            # the case where bad group_flag handling,
+                            # above, is messing things up.  So we just
+                            # break out and let some points get
+                            # processed.
+                            break
 
                     # Grab the minimum batch
                     upload_lines, lines = lines[:new_line_target], lines[new_line_target:]
@@ -2545,6 +2604,8 @@ class ACUAgent:
                                                 'Clear Stack')
 
         if mode == 'abort':
+            if unabort_failure and prog_track_err:
+                return True, 'Problems on shutdown but close enough.'
             return False, 'Problems during scan'
         return True, f'Scan ended. {stop_message}'
 
