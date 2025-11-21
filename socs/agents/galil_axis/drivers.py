@@ -230,16 +230,14 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command="CB", value=output_num)
         return resp
 
-    def get_brake_status(self, axis, output_map):
+    def get_brake_status(self, axis, output_num):
         """
         Return brake status for axis via @OUT[n].
 
         """
-        output_num = output_map[axis]
-        query_str = f"@OUT[{output_num}]"
-        val = self.galil_command(command="MG", value=query_str,
+        val = self.galil_command(command=f"MG @OUT[{output_num}]",
                                  expect_response=True)
-
+        
         state = int(round(float(val)))
 
         if state == 1:

@@ -338,8 +338,9 @@ class GalilAxisAgent:
             if not acquired:
                 self.log.warn(f"Could not start Task because {self.lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            state, status = self.stage.get_brake_status(axis=axis, output_map=self.brakes)
+            
+            output_num = self.brakes[axis]
+            state, status = self.stage.get_brake_status(axis=axis, output_num=output_num)
 
         return True, f'Brake status for {axis} is {state}, {status}'
 
