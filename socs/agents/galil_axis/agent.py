@@ -207,14 +207,18 @@ class GalilAxisAgent:
                     time.sleep(1)
                     continue
 
-                session.data = {"fields": data,
+                axis_fields = {}
+                for axis, stats in data.items():
+                    for key, value in stats.items():
+                        axis_fields[f"{axis}_{key}"] = value
+
+                session.data = {"fields": axis_fields,
                                 "timestamp": time.time()}
 
                 pub_data = {'timestamp': time.time(),
                             'block_name': 'axes',
-                            'data': {}}
+                            'data': axis_fields}
 
-                pub_data['data'] = data
 
                 self.agent.publish_to_feed('stage_status', pub_data)
 
