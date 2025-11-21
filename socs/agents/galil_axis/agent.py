@@ -366,9 +366,9 @@ class GalilAxisAgent:
             brake_outputnum = self.brakes[axis]
 
             if state == 'engage':
-                self.stage.engage_brake(brake_outputnum)
+                self.stage.engage_brake(output_num=brake_outputnum)
             elif state == 'release':
-                self.stage.release_brake(brake_outputnum)
+                self.stage.release_brake(output_num=brake_outputnum)
 
         return True, f"Commanded the brake for axis {axis} to be set to {state}."
 

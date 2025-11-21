@@ -219,7 +219,7 @@ class GalilAxis(TCPInterface):
         output to 1.
 
         """
-        resp = self.galil_command(command="SB", value=output_num)
+        resp = self.galil_command(command=f"SB {output_num}")
         return resp
 
     def engage_brake(self, output_num):
@@ -227,7 +227,7 @@ class GalilAxis(TCPInterface):
         Engage the brake for the specified axis using the Galil CB command.
 
         """
-        resp = self.galil_command(command="CB", value=output_num)
+        resp = self.galil_command(command=f"CB {output_num}")
         return resp
 
     def get_brake_status(self, axis, output_num):
