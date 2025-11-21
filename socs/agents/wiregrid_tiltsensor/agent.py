@@ -111,15 +111,18 @@ class WiregridTiltSensorAgent:
 
                 # data taking
                 current_time = time.time()
-                msg, angles = self.tiltsensor.get_angle()
-                self.log.info(f'self.tiltsensor.get_angle(): {msg}')
-                if angles[0] == -999:
+                try:
+                    msg, angles = self.tiltsensor.get_angle()
+                except Exception as e:
+                    self.log.warn(e)
                     msg = 'Failed to get angle. -> Reconnect to the sensor'
                     self.log.warn(msg)
                     del self.tiltsensor
                     self._connect()
                     self.pm.sleep()  # DAQ interval
                     continue
+                self.log.debug(f'self.tiltsensor.get_angle(): {msg}')
+
                 # the driver for sensor_type = 'sherborne' does NOT have
                 # the function of `get_temp()` now, so ignore the below lines
                 # We also may drop support for the 'sherborne' sensor type soon.
