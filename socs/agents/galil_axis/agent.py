@@ -219,7 +219,6 @@ class GalilAxisAgent:
                             'block_name': 'axes',
                             'data': axis_fields}
 
-
                 self.agent.publish_to_feed('stage_status', pub_data)
 
                 if params['test_mode']:
@@ -342,7 +341,7 @@ class GalilAxisAgent:
             if not acquired:
                 self.log.warn(f"Could not start Task because {self.lock.job} is already running")
                 return False, "Could not acquire lock"
-            
+
             output_num = self.brakes[axis]
             state, status = self.stage.get_brake_status(axis=axis, output_num=output_num)
 
@@ -375,6 +374,27 @@ class GalilAxisAgent:
                 self.stage.release_brake(output_num=brake_outputnum)
 
         return True, f"Commanded the brake for axis {axis} to be set to {state}."
+
+    @ocs_agent.param('axis', type=str)
+    def get_thermistor_voltage(self, session, params):
+        """get_thermistor_voltage(axis)
+
+        **Task** - Return's a given motor's thermistor reading in volts, which can be converted to a temperature.
+
+        Parameters:
+            axis (str): Axis/motor to query (e.g. 'A')
+        """
+        axis = params['axis']
+
+        with self.lock.acquire_timeout(timeout=5, job='get_thermistor_voltage') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because {self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            outputnum = self.brakes[axis]
+            volt = self.stage.get_thermistor_voltage(axis=axis, output_num=outputnum)
+
+        return True, f'Thermistor reading for motor {axis} ({outputnum}) is {volt} V.'
 
     @ocs_agent.param('axis', type=str)
     def begin_axis_motion(self, session, params):
@@ -841,6 +861,118 @@ class GalilAxisAgent:
         return True, f'Commanded axis {axis} speed to be set to {speed}.'
 
     @ocs_agent.param('axis', type=str)
+    def get_speed(self, session, params):
+        """get_speed(axis)
+
+        **Task** - Return the set speed for a given axis.
+
+        Parameters:
+            axis (str): Axis to query (e.g. 'A')
+        """
+        axis = params['axis']
+
+        with self.lock.acquire_timeout(timeout=5, job='get_speed') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because {self.lock.job} is already running.")
+                return False, "Could not acquire lock."
+
+            resp = self.stage.get_speed(axis)
+
+        return True, f"Speed for axis {axis}: {resp}"
+
+    @ocs_agent.param('axis', type=str)
+    @ocs_agent.param('acc', type=float)
+    def set_acceleration(self, session, params):
+        """set_acceleration(axis, acc)
+
+        **Task** - Sets the acceleration for a subsequent motion/move-to command.
+
+        Parameters:
+            axis (str): Specified axis. Ex. 'A'
+            acc (float): Specified acceleration value in raw encoder units.
+
+        Notes:
+            The acceleration value here is not defined in terms of millimters or degrees. User will have to define in encoder counts that are powers of 2. (i.e., '4096' for 4096 counts/sec^2).
+        """
+        axis = params['axis']
+        acc = params['acc']
+        with self.lock.acquire_timeout(timeout=5, job='set_acceleration') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            self.stage.set_acceleration(axis, acc)
+
+        return True, f'Commanded axis {axis} acceleration to be set to {acc}.'
+
+    @ocs_agent.param('axis', type=str)
+    def get_acceleration(self, session, params):
+        """get_acceleration(axis)
+
+        **Task** - Query acceleration for a given axis.
+
+        Parameters:
+            axis (str): Axis to query (e.g. 'A')
+        """
+
+        axis = params['axis']
+
+        with self.lock.acquire_timeout(timeout=5, job='get_acceleration') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because {self.lock.job} is already running.")
+                return False, "Could not acquire lock."
+
+            resp = self.stage.get_acceleration(axis)
+
+        return True, f"Acceleration for axis {axis}: {resp}"
+
+    @ocs_agent.param('axis', type=str)
+    @ocs_agent.param('decel', type=float)
+    def set_deceleration(self, session, params):
+        """set_deceleration(axis, decel)
+
+        **Task** - Sets the deceleration for a subsequent motion/move-to command.
+
+        Parameters:
+            axis (str): Specified axis. Ex. 'A'
+            decel (float): Deceleration in encoder units (counts/s^2)
+        Notes:
+            User will have to define in encoder counts/s^2 in powers of 2, (e.g. 8192).
+        """
+        axis = params['axis']
+        decel = params['decel']
+
+        with self.lock.acquire_timeout(timeout=5, job='set_deceleration') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because {self.lock.job} is already running.")
+                return False, "Could not acquire lock."
+
+            self.stage.set_deceleration(axis, decel)
+
+        return True, f'Command axis {axis} deceleration to be set to {decel}'
+
+    @ocs_agent.param('axis', type=str)
+    def get_deceleration(self, session, params):
+        """get_deceleration(axis)
+
+        **Task** - Returns the deceleration for a given axis.
+
+        Parameters:
+            axis (str): Axis to query (e.g. 'A')
+        """
+        axis = params['axis']
+
+        with self.lock.acquire_timeout(timeout=5, job='get_deceleration') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because {self.lock.job} is already running.")
+                return False, "Could not acquire lock."
+
+            resp = self.stage.get_deceleration(axis)
+
+        return True, f"Deceleration for axis {axis}: {resp}"
+
+    @ocs_agent.param('axis', type=str)
     def enable_sin_commutation(self, session, params):
         """enable_sin_commutation(axis)
 
@@ -862,25 +994,52 @@ class GalilAxisAgent:
         return True, f"Commanded sin commutation for axis {axis} to be enabled."
 
     @ocs_agent.param('axis', type=str)
-    def disable_limit_switch(self, session, params):
-        """disable_limit_switch(axis)
+    @ocs_agent.param('val', type=int)
+    def set_limit_switch(self, session, params):
+        """set_limit_switch(axis)
 
-        **Task** - Disable the hardware limit switch for a specified axis.
+        **Task** - Enable or disable limit switch for a specified axis.
 
         Parameters:
             axis (str): Specified axis. Ex. 'A'
+            val (int): 0 = both enabled; 1 = forward disabled; 2 = reverse disabled; 3 = both disabled
 
         """
+        lim_sw_dict = {0: "Both limits enabled", 1: "Forward limit disabled", 2: "Reverse limit disabled", 3: "Forward and reverse limits disabled"}
         axis = params['axis']
-        with self.lock.acquire_timeout(timeout=5, job='disable_limit_switch') as acquired:
+        val = params['val']
+        with self.lock.acquire_timeout(timeout=5, job='set_limit_switch') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            self.stage.disable_limit_switch(axis)
+            self.stage.set_limit_switch(axis, val)
 
-        return True, f'Commanded limit switch for {axis} to be disabled.'
+        msg = lim_sw_dict[val]
+        return True, f'Commanded limit switch for {axis} to be {msg}'
+
+    @ocs_agent.param('axis', type=str)
+    def get_limit_switch_setting(self, session, params):
+        """get_limit_switch_setting(axis)
+
+        **Task** - Get the limit switch enable/disable setting for a given axis.
+        Parameters:
+            axis (str): Specified axis. Ex. 'A'
+        """
+        lim_disable_dict = {0: "None disabled", 1: "Forward Disabled", 2: "Reverse Disabled", 3: "Both forward and reverse disabled"}
+
+        axis = params['axis']
+
+        with self.lock.acquire_timeout(timeout=5, job='get_limit_switch_setting') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            resp = self.stage.get_limit_switch_setting(axis)
+
+        return True, f'Limit switch for axis {axis} is set to ' + lim_disable_dict[resp]
 
     @ocs_agent.param('polarity', type=int)
     def set_limitswitch_polarity(self, session, params):
@@ -904,6 +1063,24 @@ class GalilAxisAgent:
             self.stage.set_limitswitch_polarity(pol)
 
         return True, f"Commanded limit switch polarity to be set to {pol}."
+
+    @ocs_agent.param('_')
+    def get_limitswitch_polarity(self, session, params):
+        """get_limitswitch_polarity()
+
+        **Task** - Query limit switch polarity setting.
+
+        Parameters: None
+
+        """
+        with self.lock.acquire_timeout(timeout=5, job='get_limitswitch_polarity') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because {self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            state, status = self.stage.get_limitswitch_polarity()
+
+        return True, f'Limit switch polarity is {status}'
 
     @ocs_agent.param('axis', type=str)
     def stop_axis_motion(self, session, params):
@@ -995,6 +1172,28 @@ class GalilAxisAgent:
             resp = self.stage.get_gearing_ratio(axis=axis)
 
         return True, f"Gearing ratio for axis {axis} is: {resp}."
+
+    @ocs_agent.param('axis', type=str)
+    def get_gearing_lead(self, session, params):
+        """get_gearing_lead(axis)
+
+        **Task** - Query the leader axis for a given follower axis.
+
+        Parameters:
+            axis (str): Axis to query (e.g., 'A')
+
+        """
+        axis = params['axis']
+
+        with self.lock.acquire_timeout(timeout=5, job='get_gearing_lead') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            resp = self.stage.get_gearing_lead(axis=axis)
+
+        return True, f"Gearing lead for axis {axis} is: {resp}"
 
     @ocs_agent.param('configfile', type=str, default=None)
     def input_configfile(self, session, params=None):
@@ -1115,6 +1314,7 @@ def main(args=None):
     agent.register_task('set_absolute_position', galilaxis_agent.set_absolute_position)
     agent.register_task('get_brake_status', galilaxis_agent.get_brake_status)
     agent.register_task('set_axis_brake', galilaxis_agent.set_axis_brake)
+    agent.register_task('get_thermistor_voltage', galilaxis_agent.get_thermistor_voltage)
     agent.register_task('begin_axis_motion', galilaxis_agent.begin_axis_motion)
     agent.register_task('stop_axis_motion', galilaxis_agent.stop_axis_motion)
     agent.register_task('set_motor_type', galilaxis_agent.set_motor_type)
@@ -1135,12 +1335,20 @@ def main(args=None):
     agent.register_task('define_position', galilaxis_agent.define_position)
     agent.register_task('set_jog_speed', galilaxis_agent.set_jog_speed)
     agent.register_task('set_speed', galilaxis_agent.set_speed)
+    agent.register_task('get_speed', galilaxis_agent.get_speed)
+    agent.register_task('set_acceleration', galilaxis_agent.set_acceleration)
+    agent.register_task('get_acceleration', galilaxis_agent.get_acceleration)
+    agent.register_task('set_deceleration', galilaxis_agent.set_deceleration)
+    agent.register_task('get_deceleration', galilaxis_agent.get_deceleration)
     agent.register_task('enable_sin_commutation', galilaxis_agent.enable_sin_commutation)
-    agent.register_task('disable_limit_switch', galilaxis_agent.disable_limit_switch)
+    agent.register_task('set_limit_switch', galilaxis_agent.set_limit_switch)
+    agent.register_task('get_limit_switch_setting', galilaxis_agent.get_limit_switch_setting)
     agent.register_task('set_limitswitch_polarity', galilaxis_agent.set_limitswitch_polarity)
+    agent.register_task('get_limitswitch_polarity', galilaxis_agent.get_limitswitch_polarity)
     agent.register_task('set_gearing', galilaxis_agent.set_gearing)
     agent.register_task('set_gearing_ratio', galilaxis_agent.set_gearing_ratio)
     agent.register_task('get_gearing_ratio', galilaxis_agent.get_gearing_ratio)
+    agent.register_task('get_gearing_lead', galilaxis_agent.get_gearing_lead)
     agent.register_task('input_configfile', galilaxis_agent.input_configfile)
     agent.register_process('acq', galilaxis_agent.acq, galilaxis_agent._stop_acq)
 
