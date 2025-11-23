@@ -4,21 +4,35 @@ galil:
     countsperdeg: 2000
   brakes:
     output_map:
-      E: '5'
-      F: '6'
+      A: '1'
+      B: '2'
+      C: '3'
+      D: '4'
   motorconfigparams:
-    E:              # linear axis
+    A:              # linear axis
       MT: '1' # motor type
       OE: '1' #
-      AG: '0'
-      TL: '2'
-      AU: '0'
-    F:              # linear axis
+      AG: '2'
+      TL: '5'
+      AU: '9'
+    B:              # linear axis
       MT: '1'
       OE: '1'
-      AG: '0'
-      TL: '2'
-      AU: '0'
+      AG: '2'
+      TL: '5'
+      AU: '9'
+    C:              # rotary axis
+      MT: '1'
+      OE: '1'
+      AG: '2'
+      TL: '5'
+      AU: '9'
+    D:              # rotary axis 
+      MT: '1'
+      OE: '1'
+      AG: '2'
+      TL: '5'
+      AU: '9'
   initaxisparams:
     BA: 'False'          # if True command will run as BAE / BAF / BAA / BAB
     BM: '3276.8'
