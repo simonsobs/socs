@@ -1279,9 +1279,6 @@ class GalilAxisAgent:
                 self.log.info(f"Setting amp current loop gain for axis {a} to be {self.axis_map[a]['AU']}")
                 self.stage.set_amp_currentloop_gain(axis=a, val=self.axis_map[a]['AU'])
 
-                # begin initialization steps
-                initstate = gal['initaxisparams']['BA']
-
                 if initstate == 'True':
                     # enable sin commutation
                     self.log.info(f"Enabling sinusoidal commutation for axis {a}")
