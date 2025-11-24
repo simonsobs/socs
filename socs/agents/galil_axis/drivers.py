@@ -219,7 +219,7 @@ class GalilAxis(TCPInterface):
         output to 1.
 
         """
-        resp = self.galil_command(command="SB", value=output_num)
+        resp = self.galil_command(command=f"SB {output_num}")
         return resp
 
     def engage_brake(self, output_num):
@@ -227,17 +227,15 @@ class GalilAxis(TCPInterface):
         Engage the brake for the specified axis using the Galil CB command.
 
         """
-        resp = self.galil_command(command="CB", value=output_num)
+        resp = self.galil_command(command=f"CB {output_num}")
         return resp
 
-    def get_brake_status(self, axis, output_map):
+    def get_brake_status(self, axis, output_num):
         """
         Return brake status for axis via @OUT[n].
 
         """
-        output_num = output_map[axis]
-        query_str = f"@OUT[{output_num}]"
-        val = self.galil_command(command="MG", value=query_str,
+        val = self.galil_command(command=f"MG @OUT[{output_num}]",
                                  expect_response=True)
 
         state = int(round(float(val)))
@@ -248,6 +246,16 @@ class GalilAxis(TCPInterface):
             status = "Brake Engaged"
 
         return state, status
+
+    def get_thermistor_voltage(self, axis, output_num):
+        """
+        Return thermistor voltage value for an axis via @AN[n]
+        """
+        val = self.galil_command(command=f"MG @AN[{output_num}]", expect_response=True)
+
+        temp_voltage = float(val)
+
+        return temp_voltage
 
     def get_motor_type(self, axis):
         """
@@ -263,6 +271,14 @@ class GalilAxis(TCPInterface):
 
         """
         resp = float(self.galil_command(command=f'MG _GR{axis}', expect_response=True))
+        return resp
+
+    def get_gearing_lead(self, axis):
+        """
+        Return gearing lead for a given follower axis. A response of "0" means the axis is a leader.
+        """
+        resp = self.galil_command(command=f'GA{axis}=?', expect_response=True)
+
         return resp
 
     def set_motor_type(self, axis, motortype):
@@ -371,6 +387,8 @@ class GalilAxis(TCPInterface):
         parameters must be defined before executing the BZ command.
 
         """
+        t_first = int(round(float(t_first)))
+        t_second = int(round(float(t_second)))
         cmd = f'BZ <{t_first}>{t_second}'
         resp = self.galil_command(command=cmd)
         return resp
@@ -395,15 +413,44 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=f'DP{axis}={val};')
         return resp
 
-    def disable_limit_switch(self, axis):
+    def set_limitswitch_mode(self, axis, val):
         """
-        Disable limit switch detection on a given axis (LDx=3).
+        Enable/disable limit switch detection on a given axis (LDx=val).
+
+        val 0 = Disable no limit switches (all enabled)
+        val 1 = Disable forward limit switch
+        val 2 = Disable reverse limit switch
+        val 3 = Disable both forward and reverse limit switches
 
         """
-        resp = self.galil_command(command=f'LD{axis}=3;')
+        resp = self.galil_command(command=f'LD{axis}={val};')
         return resp
 
-    def set_limitswitch_polarity(self, pol=1):
+    def get_limitswitch_mode(self, axis):
+        """
+        Returns the query from the disable limit switch command (LD) where:
+        0 = Both limits enabled,
+        1 = Forward disabled,
+        2 = Reverse disabled,
+        3 = Both forward and reverse disabled
+
+        """
+        resp = self.galil_command(command="MG _LD", axis=axis, expect_response=True)
+
+        state = int(round(float(resp)))
+
+        if state == 0:
+            status = "Both limits enabled"
+        if state == 1:
+            status = "Forward disabled"
+        if state == 2:
+            status = "Reverse disabled"
+        if state == 3:
+            status = "Both forward and reverse disabled"
+
+        return state, status
+
+    def set_limitswitch_polarity(self, pol):
         """
         CN -1 means active low, CN +1 is active high. Default is  1
         (active high).
@@ -411,6 +458,22 @@ class GalilAxis(TCPInterface):
         """
         resp = self.galil_command(command=f'CN {pol};')
         return resp
+
+    def get_limitswitch_polarity(self):
+        """
+        CN -1 means active low, CN +1 is active high. Our system is 1 (active high).
+
+        """
+        val = self.galil_command(command="MG _CN", expect_response=True)
+
+        state = int(round(float(val)))
+
+        if state == 1:
+            status = "+1; active high"
+        if state == -1:
+            status = "-1, active low"
+
+        return state, status
 
     def stop_motion(self, axis):
         """
@@ -462,6 +525,43 @@ class GalilAxis(TCPInterface):
         """
         cmd = f"SP{axis}={speed};"
         resp = self.galil_command(command=cmd)
+        return resp
+
+    def get_speed(self, axis):
+        """
+        Return speed for axis via MG _SP{axis}. Units of speed is in raw encoder units (counts/s).
+        """
+        resp = self.galil_command("MG _SP", axis=axis, expect_response=True)
+        return resp
+
+    def set_acceleration(self, axis, acc):
+        """
+        Set acceleration for axis. (encoder counts/sec^2) Value should be a power of 2. (e.g. 4096, 8192)
+        """
+        cmd = f"AC{axis}={acc};"
+        resp = self.galil_command(command=cmd)
+        return resp
+
+    def get_acceleration(self, axis):
+        """
+        Return acceleration for given axis via "MG _AC{axis}". Units of acceleration are in raw encoder units (counts/s^2).
+        """
+        resp = self.galil_command("MG _AC", axis=axis, expect_response=True)
+        return resp
+
+    def set_deceleration(self, axis, decel):
+        """
+        Set deceleration for axis. Units are encoder counts/s^2
+        """
+        cmd = f"DC{axis}={decel};"
+        resp = self.galil_command(command=cmd)
+        return resp
+
+    def get_deceleration(self, axis):
+        """
+        Return deceleration for given axis via "MG _DC{axis}". Units are in raw encoder units (counts/s^2).
+        """
+        resp = self.galil_command("MG _DC", axis=axis, expect_response=True)
         return resp
 
     def set_motor_state(self, axis, state):
