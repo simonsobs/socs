@@ -73,6 +73,7 @@ class GalilAxisAgent:
         # Configuration state
         self.cfg = None
         self.motorsettings = None
+        self.limitpol = None
         self.disable_limits_map = None
         self.disable_limit_axes = None
         self.axis_map = None
