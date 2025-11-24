@@ -2,6 +2,11 @@ galil:
   motorsettings:
     countspermm: 4000
     countsperdeg: 2000
+  limitsetting:
+    polarity: 1 # used  to be a string
+    nolimitsaxes:
+      B: '3'
+      D: '3'
   brakes:
     output_map:
       A: '1'
@@ -34,7 +39,7 @@ galil:
       TL: '5'
       AU: '9'
   initaxisparams:
-    BA: 'False'          # if True command will run as BAE / BAF / BAA / BAB
+    BA: 'True'          # if True command will run as BAE / BAF / BAA / BAB
     BM: '3276.8'
     BZ: '3'
   dwell_times:

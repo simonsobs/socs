@@ -1226,6 +1226,9 @@ class GalilAxisAgent:
                 gal = cfg['galil']
                 self.cfg = cfg
                 self.motorsettings = gal['motorsettings']
+                self.limitpol = gal['limitsetting']['polarity']
+                self.disableaxis_map = gal['limitsetting']['nolimitsaxes']
+                self.disableaxes = list(self.disableaxis_map.keys())
                 self.axis_map = gal['motorconfigparams']
                 self.axes = list(self.axis_map.keys())
                 self.brakes = gal['brakes']['output_map']
@@ -1234,36 +1237,72 @@ class GalilAxisAgent:
             except Exception as e:
                 return False, f'Config parse error: {e}'
 
+            # add line for limit switch polarity setting
+            self.stage.set_limitswitch_polarity(pol=self.limitpol)
+            
+            # disable limit switches for the follower axes
+            for x in self.disableaxes:
+                print("Disabling lim sw for axis:", x, "with setting:", self.disableaxis_map[x])
+                self.stage.set_limit_switch(axis=x, val=self.disableaxis_map[x])
+                print("sleeping")
+                time.sleep(2)
+
+            #add loop to release brakes
+            for x in self.brakes:
+                print("Release brakes for", x)
+                brake_outputnum = self.brakes[x]
+                print("Brake output num:", brake_outputnum)
+                self.stage.release_brake(output_num = brake_outputnum)
+                print('sleep')
+                time.sleep(2)
+
+            # set initialization dwell times if initialization setting is true
+            initstate = gal['initaxisparams']['BA']
+            if initstate == 'True':
+                # set dwell times before initializing
+                self.stage.set_dwell_times(t_first=self.first_dwell, t_second=self.sec_dwell)
+                print("Set the dwell times for BZ initialization")
+
+            # Configure motor settings
             for a in self.axes:
                 # set motor type
                 self.stage.set_motor_type(axis=a, motortype=self.axis_map[a]['MT'])
-
+                print("Motor type set for", a, " to be ", self.axis_map[a]['MT'])
+                
                 # set off on error
                 self.stage.set_off_on_error(axis=a, errtype=self.axis_map[a]['OE'])
+                print("finished setting on/off error for ", a)
 
                 # set amp gain
                 self.stage.set_amp_gain(axis=a, val=self.axis_map[a]['AG'])
-
+                print("set gain for ", a, " to be ", self.axis_map[a]['AG'])
+                
                 # set torque limit
                 self.stage.set_torque_limit(axis=a, val=self.axis_map[a]['TL'])
-
+                print("set torque lim for ", a, " to ", self.axis_map[a]['TL'])
+                
                 # set current loop gain
                 self.stage.set_amp_currentloop_gain(axis=a, val=self.axis_map[a]['AU'])
+                print("set amplifier current loop gain for ", a, " to ", self.axis_map[a]['AU']) 
+                print("##########")
 
                 # enable sin commutation
                 initstate = gal['initaxisparams']['BA']
+                
                 if initstate == 'True':
                     # enable sin commutation
                     self.stage.enable_sin_commutation(axis=a)
+                    print("Enabled sinusoidal commut for ", a)
 
                     # set magnetic cycle
                     self.stage.set_magnetic_cycle(axis=a, val=gal['initaxisparams']['BM'])
-
-                    # set dwell times before initializing
-                    self.stage.set_dwell_times(t_first=self.first_dwell, t_second=self.sec_dwell)
+                    print("Set the magnetic cycle for ", a)
 
                     # initialize
                     self.stage.initialize_axis(axis=a, val=gal['initaxisparams']['BZ'])
+                    print("Sent axis initialization command for ", a)
+                    print("sleeping")
+                    time.sleep(5)
 
         return True, "Commanded input_configfile task to set motor controller settings."
 
