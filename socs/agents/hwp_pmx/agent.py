@@ -349,6 +349,7 @@ class HWPPMXAgent:
 
         sleep_time = 1 / self.f_sample - 0.01
         last_daq = 0
+        session.degraded = False
         while session.status in ['starting', 'running']:
             try:
                 now = time.time()

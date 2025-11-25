@@ -1,0 +1,167 @@
+[1mdiff --git a/socs/agents/hwp_gripper/agent.py b/socs/agents/hwp_gripper/agent.py[m
+[1mindex 6424182d..5fbe38f2 100644[m
+[1m--- a/socs/agents/hwp_gripper/agent.py[m
+[1m+++ b/socs/agents/hwp_gripper/agent.py[m
+[36m@@ -879,12 +879,13 @@[m [mclass HWPGripperAgent:[m
+                 warning_issued = True[m
+ [m
+             if time_since_ok > params['no_data_shutdown_time']:[m
+[31m-                self.log.error([m
+[31m-                    f"Have not received 'ok' in "[m
+[31m-                    f"{params['no_data_shutdown_time'] / 60:.2f} minutes. "[m
+[31m-                    "Issuing shutdown"[m
+[31m-                )[m
+[31m-                self.agent.start('shutdown')[m
+[32m+[m[32m                if not self.shutdown_mode:[m
+[32m+[m[32m                    self.log.error([m
+[32m+[m[32m                        f"Have not received 'ok' in "[m
+[32m+[m[32m                        f"{params['no_data_shutdown_time'] / 60:.2f} minutes. "[m
+[32m+[m[32m                        "Issuing shutdown"[m
+[32m+[m[32m                    )[m
+[32m+[m[32m                    self.agent.start('shutdown')[m
+ [m
+             data = {[m
+                 'data': {'gripper_action': action},[m
+[1mdiff --git a/socs/agents/hwp_pcu/agent.py b/socs/agents/hwp_pcu/agent.py[m
+[1mindex aff2f614..547286b9 100644[m
+[1m--- a/socs/agents/hwp_pcu/agent.py[m
+[1m+++ b/socs/agents/hwp_pcu/agent.py[m
+[36m@@ -12,6 +12,7 @@[m [mtxaio.use_twisted()[m
+ from ocs import ocs_agent, site_config[m
+ [m
+ import socs.agents.hwp_pcu.drivers.hwp_pcu as pcu[m
+[32m+[m[32mfrom socs.agents.hwp_supervisor.agent import get_op_data[m
+ [m
+ [m
+ class Actions:[m
+[36m@@ -40,12 +41,16 @@[m [mclass HWPPCUAgent:[m
+         port (str): Path to USB device in '/dev/'[m
+     """[m
+ [m
+[31m-    def __init__(self, agent, port):[m
+[32m+[m[32m    def __init__(self, agent, port, supervisor_id=None, no_data_timeout=15 * 60):[m
+         self.agent: ocs_agent.OCSAgent = agent[m
+         self.log = agent.log[m
+         self.port = port[m
+         self.action_queue = Queue()[m
+ [m
+[32m+[m[32m        self.shutdown_mode = False[m
+[32m+[m[32m        self.supervisor_id = supervisor_id[m
+[32m+[m[32m        self.no_data_timeout = no_data_timeout[m
+[32m+[m
+         agg_params = {'frame_length': 60}[m
+         self.agent.register_feed([m
+             'hwppcu', record=True, agg_params=agg_params)[m
+[36m@@ -73,6 +78,10 @@[m [mclass HWPPCUAgent:[m
+     def _process_actions(self, PCU: pcu.PCU):[m
+         while not self.action_queue.empty():[m
+             action = self.action_queue.get()[m
+[32m+[m[32m            if action.__class__.__name__ in ['SendCommand']:[m
+[32m+[m[32m                if self.shutdown_mode:[m
+[32m+[m[32m                    self.log.warn("Shutdown mode is in effect")[m
+[32m+[m[32m                    action.deferred.errback(Exception("Action cancelled by shutdown mode"))[m
+             try:[m
+                 self.log.info(f"Running action {action}")[m
+                 res = process_action(action, PCU)[m
+[36m@@ -101,6 +110,26 @@[m [mclass HWPPCUAgent:[m
+             action = self.action_queue.get()[m
+             action.deferred.errback(Exception("Action cancelled"))[m
+ [m
+[32m+[m[32m    @defer.inlineCallbacks[m
+[32m+[m[32m    def initiate_shutdown(self, session, params):[m
+[32m+[m[32m        """initiate_shutdown()[m
+[32m+[m[32m        **Task** - Initiate the shutdown of the agent[m
+[32m+[m[32m        """[m
+[32m+[m[32m        self.log.warn("INITIATING SHUTDOWN")[m
+[32m+[m
+[32m+[m[32m        action = Actions.SendCommand(command = 'stop')[m
+[32m+[m[32m        self.action_queue.put(action)[m
+[32m+[m[32m        session.data = yield action.deferred[m
+[32m+[m[32m        self.shutdown_mode = True[m
+[32m+[m[32m        return True, "Initiated shutdown mode"[m
+[32m+[m
+[32m+[m[32m    def cancel_shutdown(self, session, params):[m
+[32m+[m[32m        """cancel_shutdown()[m
+[32m+[m[32m        **Task** - Cancels shutdown mode, allowing other tasks to update the PCU[m
+[32m+[m[32m        """[m
+[32m+[m[32m        self.shutdown_mode = False[m
+[32m+[m[32m        return True, "Cancelled shutdown mode"[m
+[32m+[m
+     def main(self, session, params):[m
+         """[m
+         **Process** - Main process for PCU agent.[m
+[36m@@ -151,6 +180,62 @@[m [mclass HWPPCUAgent:[m
+         session.set_status('stopping')[m
+         return True, 'Set main status to stopping'[m
+ [m
+[32m+[m[32m    def monitor_supervisor(self, session, params):[m
+[32m+[m[32m        """monitor_supervisor()[m
+[32m+[m
+[32m+[m[32m        **Process** - This is a process that is constantly running to monitor the[m
+[32m+[m[32m        HWP supervisor and the course of action recommended by the HWP supervisor.[m
+[32m+[m[32m        If certain conditions are met, this will trigger a shutdown and force the[m
+[32m+[m[32m        PCU into the 'stop' state.[m
+[32m+[m[32m        """[m
+[32m+[m
+[32m+[m[32m        last_ok_time = time.time()[m
+[32m+[m
+[32m+[m[32m        if self.supervisor_id is None:[m
+[32m+[m[32m            return False, "No supervisor ID set"[m
+[32m+[m
+[32m+[m[32m        while session.status in ['starting', 'running']:[m
+[32m+[m[32m            res = get_op_data(self.supervisor_id, 'monitor')[m
+[32m+[m[32m            if res['status'] != 'ok':[m
+[32m+[m[32m                action = 'no_data'[m
+[32m+[m[32m            else:[m
+[32m+[m[32m                action = res['data']['actions']['pmx'][m
+[32m+[m
+[32m+[m[32m            # If action is 'ok', update last_ok_time[m
+[32m+[m[32m            if action == 'ok':[m
+[32m+[m[32m                last_ok_time = time.time()[m
+[32m+[m
+[32m+[m[32m            # If action is 'no_data', check if last_ok_time, and potentially trigger shutdown[m
+[32m+[m[32m            elif action == 'no_data':[m
+[32m+[m[32m                if (time.time() - last_ok_time) > self.no_data_timeout:[m
+[32m+[m[32m                    if not self.shutdown_mode:[m
+[32m+[m[32m                        self.agent.start('initiate_shutdown')[m
+[32m+[m
+[32m+[m[32m            # If action is 'shutdown', trigger a shutdown[m
+[32m+[m[32m            elif action == 'stop':[m
+[32m+[m[32m                if not self.shutdown_mode:[m
+[32m+[m[32m                    self.agent.start('initiate_shutdown')[m
+[32m+[m
+[32m+[m[32m            data = {[m
+[32m+[m[32m                'data': {'rotation_action': action},[m
+[32m+[m[32m                'block_name': 'rotation_action',[m
+[32m+[m[32m                'timestamp': time.time()[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            self.agent.publish_to_feed('rotation_action', data)[m
+[32m+[m[32m            session.data = {[m
+[32m+[m[32m                'rotation_action': action[m
+[32m+[m[32m                'time': time.time()[m
+[32m+[m[32m            }[m
+[32m+[m
+[32m+[m[32m            time.sleep(1)[m
+[32m+[m
+[32m+[m[32m        return True, 'Supervisor monitor has exited'[m
+[32m+[m
+[32m+[m[32m    def _stop_monitor_supervisor(self, session, params):[m
+[32m+[m[32m        session.set_status('stopping')[m
+[32m+[m[32m        return True, 'Stopping monitor shutdown'[m
+[32m+[m
+ [m
+ def make_parser(parser=None):[m
+     """[m
+[36m@@ -163,6 +248,11 @@[m [mdef make_parser(parser=None):[m
+     # Add options specific to this agent[m
+     pgroup = parser.add_argument_group('Agent Options')[m
+     pgroup.add_argument('--port', type=str, help="Path to USB node for the PCU")[m
+[32m+[m[32m    pgroup.add_argument('--supevisor-id', type=str, default=None[m
+[32m+[m[32m                        help="Instance ID for HWP Supervisor agent")[m
+[32m+[m[32m    pgroup.add_argument('--no-data-timeout', type=float, default=15 * 60,[m[41m [m
+[32m+[m[32m                        help="Time (sec) after which a 'no_data' action should "[m
+[32m+[m[32m                             "trigger a shutdown")[m
+     return parser[m
+ [m
+ [m
