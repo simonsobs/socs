@@ -99,7 +99,7 @@ class DWL:
                     print('angle X = {angleX}')
                     print('angle Y = {angleY}')
         else:
-            msg = 'The header of the tilt sensor data does NOT matching.'
+            msg = 'The header of the tilt sensor data is NOT matching.'
             raise RuntimeError(msg)
         return msg, val
 
