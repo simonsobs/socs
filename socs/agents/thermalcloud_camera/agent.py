@@ -14,8 +14,7 @@ from ocs.ocs_twisted import Pacemaker, TimeoutLock
 txaio.use_twisted()
 
 from socs.common.camera import (CircularMediaBuffer, FakeCamera,
-                                image_read_callback,
-                                image_write_callback)
+                                image_read_callback, image_write_callback)
 
 
 class ThermalCloudCameraAgent:
