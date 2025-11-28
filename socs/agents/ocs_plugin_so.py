@@ -52,6 +52,7 @@ for n, f in [
         ('SynaccessAgent', 'synacc/agent.py'),
         ('SynthAgent', 'holo_synth/agent.py'),
         ('TektronixAWGAgent', 'tektronix3021c/agent.py'),
+        ('ThermalCloudCameraAgent', 'thermalcloud_camera/agent.py'),
         ('ThorlabsMC2000BAgent', 'thorlabs_mc2000b/agent.py'),
         ('UCSCRadiometerAgent', 'ucsc_radiometer/agent.py'),
         ('UPSAgent', 'ups/agent.py'),

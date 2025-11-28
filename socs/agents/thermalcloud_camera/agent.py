@@ -5,10 +5,8 @@ This is minor modification of RTSPCameraAgent
 """
 import os
 import time
-from datetime import datetime, timedelta, timezone
 
 import cv2
-import ocs
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
