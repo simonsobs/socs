@@ -119,7 +119,10 @@ client that sets Channel 1 of a 240 to read a diode::
 Agent API
 ---------
 
-.. autoclass:: socs.agents.lakeshore240.agent.LS240_Agent
+.. autoclass:: socs.agents.lakeshore240.agent.UploadCalCurve
+    :members:
+
+.. autoclass:: socs.agents.lakeshore240.agent.SetValues
     :members:
 
 Supporting APIs
