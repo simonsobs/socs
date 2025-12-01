@@ -227,7 +227,7 @@ class FTSAerotechAgent:
         **Task** - Move to absolute position relative to stage center (in mm).
 
         Parameters:
-            position (float): Position in mm, must be between -74.8 and 74.8.
+            position (float): Position in mm, must be between -80.0 and 80.0.
 
         """
         with self.lock.acquire_timeout(timeout=3, job='move') as acquired:
