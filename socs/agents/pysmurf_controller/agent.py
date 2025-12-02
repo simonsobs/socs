@@ -1077,6 +1077,7 @@ class PysmurfController:
         self.agent.wait('set_biases')
         return True, 'Finished zeroing biases'
 
+    @ocs_agent.param('rfrac', default=None)
     @ocs_agent.param('kwargs', default=None)
     def bias_dets(self, session, params):
         """bias_dets(rfrac=(0.3, 0.6), kwargs=None)
@@ -1096,9 +1097,7 @@ class PysmurfController:
         Args
         -------
         rfrac : float, tuple
-            Target rfrac range to aim for. If this is a float, bias voltages
-            will be chosen to get the median rfrac of each bias group as close
-            as possible to that value. If
+            Target rfrac (range) to aim for.
         kwargs : dict
             Additional kwargs to pass to the ``bias_dets`` function.
 
