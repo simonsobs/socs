@@ -392,7 +392,7 @@ def test_bias_dets(agent):
     """
     session = create_session('bias_dets')
     mm = mock.MagicMock()
-    res = agent.bias_dets(session, {'rfrac': None,
+    res = agent.bias_dets(session, {'rfrac': (0.3, 0.6),
                                     'kwargs': {'iva': mock_ivanalysis(S=mm, cfg=mm, run_kwargs=mm,
                                                                       sid=mm, start_times=mm, stop_times=mm)}})
     assert res[0] is True
