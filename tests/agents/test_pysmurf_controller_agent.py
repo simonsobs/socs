@@ -63,6 +63,8 @@ def mock_pysmurf(*args, **kwargs):
     exp_defaults = {
         # General stuff
         'downsample_factor': 20, 'coupling_mode': 'dc', 'synthesis_scale': 1,
+        'active_bands': [0, 1, 2, 3, 4, 5, 6, 7],
+        'active_bgs': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
 
         # Amp stuff
         "amps_to_bias": ['hemt', 'hemt1', 'hemt2', '50k', '50k1', '50k2'],
@@ -99,6 +101,9 @@ def mock_pysmurf(*args, **kwargs):
         # Misc files
         "tunefile": None, "bgmap_file": None, "iv_file": None,
         "res_fit_file": None,
+
+        # Biasing
+        'rfrac': [0.3, 0.6],
     }
     cfg.dev.exp.__getitem__.side_effect = exp_defaults.__getitem__
 
@@ -387,7 +392,7 @@ def test_bias_dets(agent):
     """
     session = create_session('bias_dets')
     mm = mock.MagicMock()
-    res = agent.bias_dets(session, {'rfrac': (0.3, 0.6),
+    res = agent.bias_dets(session, {'rfrac': None,
                                     'kwargs': {'iva': mock_ivanalysis(S=mm, cfg=mm, run_kwargs=mm,
                                                                       sid=mm, start_times=mm, stop_times=mm)}})
     assert res[0] is True
