@@ -151,7 +151,7 @@ def mock_ivanalysis(**kwargs):
     """
     iva = mock.MagicMock()
     # iva.load.return_value = iva
-    iva.R = np.full((2, 12), 1)
+    iva.R = np.full((NCHANS, 12), 1)
     iva.R_n = np.full(NCHANS, 7e-3)
     iva.bgmap = np.zeros(NCHANS)
     iva.v_bias = np.full((12, ), 2)
