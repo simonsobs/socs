@@ -1077,7 +1077,7 @@ class PysmurfController:
         self.agent.wait('set_biases')
         return True, 'Finished zeroing biases'
 
-    @ocs_agent.param('rfrac', default=(0.3, 0.6))
+    @ocs_agent.param('rfrac', default=None)
     @ocs_agent.param('kwargs', default=None)
     def bias_dets(self, session, params):
         """bias_dets(rfrac=(0.3, 0.6), kwargs=None)
@@ -1097,9 +1097,7 @@ class PysmurfController:
         Args
         -------
         rfrac : float, tuple
-            Target rfrac range to aim for. If this is a float, bias voltages
-            will be chosen to get the median rfrac of each bias group as close
-            as possible to that value. If
+            Target rfrac (range) to aim for.
         kwargs : dict
             Additional kwargs to pass to the ``bias_dets`` function.
 
@@ -1120,14 +1118,9 @@ class PysmurfController:
                 return False, f"Operation failed: {self.lock.job} is running."
 
             S, cfg = self._get_smurf_control(session=session)
-            if isinstance(params['rfrac'], (int, float)):
-                biases = bias_dets.bias_to_rfrac(
-                    S, cfg, rfrac=params['rfrac'], **params['kwargs']
-                )
-            else:
-                biases = bias_dets.bias_to_rfrac_range(
-                    S, cfg, rfrac_range=params['rfrac'], **params['kwargs']
-                )
+            biases = bias_dets.bias_to_rfrac(
+                S, cfg, rfrac=params['rfrac'], **params['kwargs']
+            )
 
             session.data['biases'] = biases.tolist()
 
