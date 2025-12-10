@@ -1086,6 +1086,46 @@ class GalilAxisAgent:
         return True, f'Limit switch polarity is {status}'
 
     @ocs_agent.param('axis', type=str)
+    def get_forward_limitswitch(self, session, params):
+        """get_forward_limitswitch(axis)
+
+        **Task** - Returns forward limit switch state for a given axis. 1 means not triggered, 0 means triggered.
+
+        Parameters:
+            axis (str): Axis to query (e.g. 'A')
+        """
+        axis = params['axis']
+
+        with self.lock.acquire_timeout(timeout=5, job='get_forward_limitswitch') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because {self.lock.job} is already running.")
+                return False, "Could not acquire lock."
+
+            state, human_state = self.stage.get_forward_limitswitch(axis)
+
+        return True, f"Axis {axis} forward limit: {human_state} (raw={state})"
+
+    @ocs_agent.param('axis', type=str)
+    def get_reverse_limitswitch(self, sesion, params):
+        """get_reverse_limitswitch(axis)
+
+        **Task** - Returns reverse limit switch state for a given axis. 1 means not triggered, 0 means triggered.
+        
+        Parameters:
+            axis (str): Axis to query (e.g. 'A')
+        """
+        axis = params['axis']
+
+        with self.lock.acquire_timeout(timeout=5, job='get_reverse_limitswitch') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because {self.lock.job} is already running.")
+                return False, "Could not acquire lock."
+
+            state, human_state = self.stage.get_reverse_limitswitch(axis)
+
+        return True, f"Axis {axis} reverse limit: {human_state} (raw={state})"
+    
+    @ocs_agent.param('axis', type=str)
     def stop_axis_motion(self, session, params):
         """stop_axis_motion(axis)
 
@@ -1374,6 +1414,8 @@ def main(args=None):
     agent.register_task('get_limitswitch_mode', galilaxis_agent.get_limitswitch_mode)
     agent.register_task('set_limitswitch_polarity', galilaxis_agent.set_limitswitch_polarity)
     agent.register_task('get_limitswitch_polarity', galilaxis_agent.get_limitswitch_polarity)
+    agent.register_task('get_forward_limitswitch', galilaxis_agent.get_forward_limitswitch)
+    agent.register_task('get_reverse_limitswitch', galilaxis_agent.get_reverse_limitswitch)
     agent.register_task('set_gearing', galilaxis_agent.set_gearing)
     agent.register_task('set_gearing_ratio', galilaxis_agent.set_gearing_ratio)
     agent.register_task('get_gearing_ratio', galilaxis_agent.get_gearing_ratio)
