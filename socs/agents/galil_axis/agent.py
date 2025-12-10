@@ -1064,6 +1064,47 @@ class GalilAxisAgent:
 
         return True, f"Commanded limit switch polarity to be set to {pol}."
 
+    @ocs_agent.param('axis', type=str)
+    def get_forward_limitswitch(self, session, params):
+        """get_forward_limitswitch(axis)
+
+        **Task** - Returns forward limit switch state for a given axis. 1 means not triggered, 0 means triggered.
+
+        Parameters:
+            axis (str): Axis to query (e.g. 'A')
+        """
+        axis = params['axis']
+
+        with self.lock.acquire_timeout(timeout=5, job='get_forward_limitswitch') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because {self.lock.job} is already running.")
+                return False, "Could not acquire lock."
+
+            state, human_state = self.stage.get_forward_limitswitch(axis)
+
+        return True, f"Axis {axis} forward limit: {human_state} (raw={state})"
+
+    @ocs_agent.param('axis', type=str)
+    def get_reverse_limitswitch(self, session, params):
+        """get_reverse_limitswitch(axis)
+
+        **Task** - Returns reverse limit switch state for a given axis. 1 means not triggered, 0 means triggered.
+
+        Parameters:
+            axis (str): Axis to query (e.g. 'A')
+        """
+        axis = params['axis']
+        
+        with self.lock.acquire_timeout(timeout=5, job='get_reverse_limitswitch') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because {self.lock.job} is already running.")
+                return False, "Could not acquire lock."
+
+            state, human_state = self.stage.get_reverse_limitswitch(axis)
+
+        return True, f"Axis {axis} reverse limit: {human_state} (raw={state})"
+
+
     @ocs_agent.param('_')
     def get_limitswitch_polarity(self, session, params):
         """get_limitswitch_polarity()
@@ -1380,6 +1421,8 @@ def main(args=None):
     agent.register_task('set_deceleration', galilaxis_agent.set_deceleration)
     agent.register_task('get_deceleration', galilaxis_agent.get_deceleration)
     agent.register_task('enable_sin_commutation', galilaxis_agent.enable_sin_commutation)
+    agent.register_task('get_forward_limiswitch', galilaxis_agent.get_forward_limitswitch)
+    agent.register_task('get_reverse_limitswitch', galilaxis_agent.get_reverse_limitswitch)
     agent.register_task('set_limit_switch', galilaxis_agent.set_limit_switch)
     agent.register_task('get_limit_switch_setting', galilaxis_agent.get_limit_switch_setting)
     agent.register_task('set_limitswitch_polarity', galilaxis_agent.set_limitswitch_polarity)

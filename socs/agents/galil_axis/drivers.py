@@ -444,6 +444,36 @@ class GalilAxis(TCPInterface):
         resp = self.galil_command(command=f'CN {pol};')
         return resp
 
+    def get_forward_limitswitch(self, axis):
+        """
+        Return forward limit switch state for a given axis. 1 means the limit switch is not triggered, 0 means the limit switch is triggered.
+        """
+        resp = self.galil_command("MG _LF", axis=axis, expect_response=True)
+        try: 
+            state = int(float(resp))
+        except Exception:
+            print(f"Unexpected response from MG _LF{axis}: {resp}")
+            return None, "unknown"
+
+        # --- Interpret the raw output ---
+        human_state = "not triggered" if state == 1 else "triggered" if state == 0 else f"uknown ({state})"
+        return state, human_state
+
+    def get_reverse_limitswitch(self, axis):
+        """
+        Return reverse limit switch state for a given axis. 1 means the limit swtich is not triggered, 0 means the limit switch is triggered.
+        """
+        resp = self.galil_command("MG _LR", axis=axis, expect_response=True)
+        try:
+            state = int(float(resp))
+        except Exception:
+            print(f"Unexpected response from MG _LR{axis}: {resp}")
+            return None, "unknown"
+
+        # --- Interpret the raw output ---
+        human_state = "not triggered" if state == 1 else "triggered" if state == 0 else f"unknown ({state})"
+        return state, human_state
+
     def get_limitswitch_polarity(self):
         """
         CN -1 means active low, CN +1 is active high. Our system is 1 (active high).
