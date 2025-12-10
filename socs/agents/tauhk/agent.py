@@ -24,7 +24,7 @@ import time
 import re
 import socket
 from functools import partial, update_wrapper
-
+from datetime import datetime
 from pb2.system_pb2 import HKdata, HKsystem
 # The linter may tell you that these are unused but they are needed for the protobuf validation
 from pb2 import validate_pb2, meta_pb2
@@ -72,6 +72,7 @@ class TauHKAgent:
             exclude_pattern (str, optional): Regex pattern to exclude specific data keys. Defaults to None
         
         Notes:
+        #THIS NOTE IS OUT OF DATE PLEASE FIX TODO:
             session["data"] will contain the latest received data as a dictionary with flattened keys such as 'channelname_quantityname'.
             Typically quanitites of interest will be postfixed with _temperature.
         """
@@ -86,36 +87,51 @@ class TauHKAgent:
             sock.bind(('localhost', 8080))
             self._take_data = True
             
-            
+            initialized_count = 0
+            initial_dict = dict()
+
             while self._take_data:
                 # generic try except to avoid breaking the loop.
                 try:
-                    data, addr = sock.recvfrom(1024)
+                    data, addr = sock.recvfrom(4096)
                     # print(f"Received data from {addr}: {data}")
                     message = HKdata()
                     message.ParseFromString(data)
-                    decoded_data = MessageToDict(message)
+                    decoded_data = MessageToDict(message, preserving_proto_field_name=True)
+                    # print(decoded_data)
+                    message_timestamp = int(decoded_data["global_data"]["system_time"])/1000 #convert from millis from epoche to seconds
+                    message_datetime = datetime.fromtimestamp(message_timestamp)
+                    # print(f"Message timestamp: {message_datetime.isoformat()}")
                     # The returned dict is nested with each channel containing its own dict of quantities
                     # This is inconvenient for OCS, so we flatten it out to key:value pairs with keys like channelname_quantityname
                     # However for data reasons we may want to filter which keys are included based on regex patterns
-                    data_dict = {}
+                    data_dicts = {}
                     for channel_name, channel_data in decoded_data.items():
                         for channel_quantity, value in channel_data.items():
                             key = "_".join([channel_name, channel_quantity])
                             
-                            # Apply include and exclude filters
-                            # is this logic right? Maybe include should override exclude?
-                            if include_pattern and not include_pattern.search(key):
-                                continue  # Skip if the key doesn't match the include pattern
-                            if exclude_pattern and exclude_pattern.search(key):
-                                continue  # Skip if the key matches the exclude pattern
-                            
-                            data_dict[key] = value
-                    
-                    # The data gets output to both a feed and as part of the session data
-                    session.data = data_dict
-                    feed_message = {'block_name': 'tauhk_data', 'timestamp': time.time(),'data': data_dict}
-                    self.agent.publish_to_feed('tauhk_data', feed_message)
+                            field_options = getattr(message, channel_name).DESCRIPTOR.fields_by_name[channel_quantity].GetOptions()
+                            spf = None
+                            for field_option in field_options.ListFields():
+                                if field_option[0].name == 'spf':
+                                    spf = field_option[1]
+                                    break
+                            if key == "global_data_system_time" or key == "global_data_mcu_time":
+                                spf=80
+
+                            if spf is None:
+                                raise ValueError(f"No spf found for field {key}")
+
+                            if spf not in data_dicts:
+                                data_dicts[spf] = {}
+
+                            data_dicts[spf][key] = value
+                    # print(f"Received data at {message_datetime.isoformat()}")
+                        
+                    # The data gets output to the feeds
+                    for spf, data_dict in data_dicts.items():
+                        feed_message = {'block_name': f'tauhk_data_{spf}_spf', 'timestamp': message_timestamp,'data': data_dict}
+                        self.agent.publish_to_feed('tauhk_data', feed_message)
                 except Exception as e:
                     self.log.error(f"Error receiving data: {e}")
 
