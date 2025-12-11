@@ -19,11 +19,16 @@ from ..meta_pb2 import *
 
 
 import os
+import queue
 import socket
+import subprocess
+import threading
 import time
 import re
 import socket
-from functools import partial, update_wrapper
+from functools import lru_cache, partial, update_wrapper
+import atexit
+from subprocess import Popen
 from datetime import datetime
 from pb2.system_pb2 import HKdata, HKsystem
 # The linter may tell you that these are unused but they are needed for the protobuf validation
@@ -55,10 +60,17 @@ class TauHKAgent:
         self.info_port = ("127.0.0.1", 3007)
         self.toplevel_messagae="system.HKsystem"
 
+        self.latest_data = dict()
+
+        self.process = None
+        # ensure the crate daemon is stopped on exit
+        atexit.register(self._stop_crate, None, None)
+
         agg_parameters = {
             'frame_length': 10 # seconds
         }
         self.agent.register_feed('tauhk_data', record=True, agg_params=agg_parameters, buffer_time=1.0)
+        self.agent.register_feed('tauhk_logs', record=True, agg_params=agg_parameters, buffer_time=1.0)
 
     @ocs_agent.param('include_pattern', default=None, type=str)
     @ocs_agent.param('exclude_pattern', default=None, type=str)
@@ -72,67 +84,82 @@ class TauHKAgent:
             exclude_pattern (str, optional): Regex pattern to exclude specific data keys. Defaults to None
         
         Notes:
-        #THIS NOTE IS OUT OF DATE PLEASE FIX TODO:
             session["data"] will contain the latest received data as a dictionary with flattened keys such as 'channelname_quantityname'.
             Typically quanitites of interest will be postfixed with _temperature.
         """
 
-        self.log.info("Opening port and listening on UDP port 8080...")
+        # Insure there is no duplicate data acquisition processes
+        if self._take_data:
+            return False, 'Data acquisition is already running. Call stop to end the current acquisition.'
 
         include_pattern=re.compile(params['include_pattern']) if params['include_pattern'] else None
         exclude_pattern=re.compile(params['exclude_pattern']) if params['exclude_pattern'] else None
         
+        
+        self.log.info("Opening port and listening on UDP port 8080...")
+        
         # Create UDP socket
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.bind(('localhost', 8080))
+            sock.settimeout(1.0)  # Set a timeout for the socket operations
+            # Aquire the "lock" ofc this is loosly unsafe so unlikely to get unlucky
             self._take_data = True
-            
-            initialized_count = 0
-            initial_dict = dict()
-
             while self._take_data:
                 # generic try except to avoid breaking the loop.
                 try:
                     data, addr = sock.recvfrom(4096)
-                    # print(f"Received data from {addr}: {data}")
+                    # Decode protobuf to a nested dictionary
                     message = HKdata()
                     message.ParseFromString(data)
                     decoded_data = MessageToDict(message, preserving_proto_field_name=True)
-                    # print(decoded_data)
+                    
+                    # Extract and convert the timestamp
                     message_timestamp = int(decoded_data["global_data"]["system_time"])/1000 #convert from millis from epoche to seconds
                     message_datetime = datetime.fromtimestamp(message_timestamp)
-                    # print(f"Message timestamp: {message_datetime.isoformat()}")
+
                     # The returned dict is nested with each channel containing its own dict of quantities
                     # This is inconvenient for OCS, so we flatten it out to key:value pairs with keys like channelname_quantityname
                     # However for data reasons we may want to filter which keys are included based on regex patterns
+                    # Finally data blocks need to always have the same data in them so we separate the data into different SPF blocks based on the spf metadata in the protobuf
+                    # hence data_dicts is a dict of spf:{key:value} where key is channelname_quantityname and value is the measurement
                     data_dicts = {}
                     for channel_name, channel_data in decoded_data.items():
                         for channel_quantity, value in channel_data.items():
+                            # Create the flattened key
                             key = "_".join([channel_name, channel_quantity])
                             
-                            field_options = getattr(message, channel_name).DESCRIPTOR.fields_by_name[channel_quantity].GetOptions()
-                            spf = None
-                            for field_option in field_options.ListFields():
-                                if field_option[0].name == 'spf':
-                                    spf = field_option[1]
-                                    break
-                            if key == "global_data_system_time" or key == "global_data_mcu_time":
-                                spf=80
+                            # Apply include and exclude filters
+                            # is this logic right? Maybe include should override exclude?
+                            if include_pattern and not include_pattern.search(key):
+                                continue  # Skip if the key doesn't match the include pattern
+                            if exclude_pattern and exclude_pattern.search(key):
+                                continue  # Skip if the key matches the exclude pattern
 
-                            if spf is None:
-                                raise ValueError(f"No spf found for field {key}")
+                            # Determine the SPF for this key
+                            spf = get_spf(channel_name, channel_quantity)
 
+                            # Initialize the dict for this SPF if it doesn't exist
                             if spf not in data_dicts:
                                 data_dicts[spf] = {}
 
                             data_dicts[spf][key] = value
-                    # print(f"Received data at {message_datetime.isoformat()}")
+
                         
-                    # The data gets output to the feeds
+                    # Since a single block needs to always have the same keys we split it into different
+                    # sample rates (spf)
+                    # So output one feed message per spf
                     for spf, data_dict in data_dicts.items():
                         feed_message = {'block_name': f'tauhk_data_{spf}_spf', 'timestamp': message_timestamp,'data': data_dict}
                         self.agent.publish_to_feed('tauhk_data', feed_message)
+                        # keep a running latest data dict
+                        # here newer and older spfs may overwrite each other but 
+                        # thats probably ok as it is the latest data after all
+                        self.latest_data.update(data_dict)
+                    # and make it available in the session
+                    session.data = self.latest_data
                 except Exception as e:
+                    # raise e
+                    #how best to handle an error here?
                     self.log.error(f"Error receiving data: {e}")
 
         self.agent.feeds['tauhk_data'].flush_buffer()
@@ -147,7 +174,74 @@ class TauHKAgent:
         if self._take_data:
             self._take_data = False
             return True, 'Stopping data acquisition request.'
-        return False, 'Data acquisition was not running.'
+        return True, 'Data acquisition was not running.'
+
+    def start_crate(self, session, params):
+        """Connect to tauHK crate
+        
+        **Process** - Runs the daemon that talks to the tauHK hardware.
+        """
+
+        # Insure there is no duplicate crate processes
+        # This is hardware - there is only the one...
+        if self.process is not None:
+            if self.process.poll() is None:
+                return False, 'tauHK crate daemon is already running.'
+            else:
+                return False, 'tauHK crate daemon stopped unexpectedly, call stop to cleanup'
+
+        # Call the crate interface binary
+        self.process = subprocess.Popen(['./tauhk-agent'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env={"RUST_LOG":"info"})
+        self.log.info(f"Started tauHK crate daemon with PID {self.process.pid}")
+
+        # Create a function that listens to the stdout and stderr streams and sends one line at a time
+        # Use a queue here since the self.agent.publish_to_feed is not thread safe
+        def send_from_stream(stream, name='', q=None):
+            for line in iter(stream.readline, ''):
+                q.put((name, line.strip()))
+            self.log.info(f"{name} stream ended")
+
+        q = queue.Queue()
+        # Non daemon threads since otherwise they end abruptly when the main thread ends and cause a segault on the .put
+        threading.Thread(target=partial(send_from_stream, name='stdout', q=q), args=(self.process.stdout,), daemon=False).start()
+        threading.Thread(target=partial(send_from_stream, name='stderr', q=q), args=(self.process.stderr,), daemon=False).start()
+
+        # the main thread hangs out here sending log lines to the feed
+        # If it's been a while between messages it can check if the process is still alive
+        retval = None
+        while True:
+            try:
+                name, line = q.get(timeout=1.0)
+                feed_message = {'block_name': f'tauhk_logs_{name}', 'timestamp': time.time(),'data': {f'tauhk_logs_{name}': line}}
+                self.agent.publish_to_feed('tauhk_logs', feed_message)
+            except queue.Empty:
+                # When exiting cleanly the process will be None
+                if self.process is None:
+                    retval = (True, 'tauHK crate daemon stopped by user.')
+                    break
+                # When it crashes it will be not None but have a return code
+                if self.process.poll() is not None:
+                    retval = (False, 'tauHK crate daemon stopped unexpectedly.')
+                    break
+
+        self.agent.feeds['tauhk_logs'].flush_buffer()
+        return retval
+
+        
+
+    def _stop_crate(self, session, params):
+        """_stop_crate()
+
+        Stops the tauHK crate daemon.
+        """
+        if self.process is None:
+            return True, 'tauHK crate daemon was not running.'
+        if self.process.poll() is not None:
+            return True, 'tauHK crate daemon stopped unexpectedly.'
+        self.process.terminate()
+        self.process.wait()
+        self.process = None
+        return True, 'tauHK crate daemon stopped.'
 
 
     @ocs_agent.param('value', type=str)
@@ -215,6 +309,28 @@ class TauHKAgent:
         self.log.info(f'Sent the following message to tauHK: {message}')
         return True, f'Sent command to set {channel_name}.{option_name} to {value}.'
         
+@lru_cache(maxsize=256)
+def get_spf(channel_name, channel_quantity):
+    '''
+    Docstring for get_spf
+    
+    :param channel_name: Description
+    :param channel_quantity: Description
+    '''
+    message = HKdata()
+    field_options = getattr(message, channel_name).DESCRIPTOR.fields_by_name[channel_quantity].GetOptions()
+    spf = None
+    for field_option in field_options.ListFields():
+        if field_option[0].name == 'spf':
+            spf = field_option[1]
+            break
+    if channel_name == "global_data" and (channel_quantity == "system_time" or channel_quantity == "mcu_time"):
+        spf=80
+
+    if spf is None:
+        raise ValueError(f"No spf found for field {channel_name}.{channel_quantity}")
+
+    return spf
 
 
 def main(args = None):
@@ -245,10 +361,13 @@ def main(args = None):
             task_func = partial(system.generic_send, channel_name=field, option_name=option)
             #copy over the docstring
             update_wrapper(task_func, system.generic_send)
-            agent.register_task(f'{field}_{option}', task_func)
+            # agent.register_task(f'{field}_{option}', task_func)
     
     #register the data receiving process
     agent.register_process('receive_data', system.receive_data, system._stop_receive)
+
+    #register the crate start/stop commands
+    agent.register_process('start_crate', system.start_crate, system._stop_crate)
     
     #and start!
     runner.run(agent, auto_reconnect=True)
