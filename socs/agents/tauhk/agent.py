@@ -33,7 +33,7 @@ from datetime import datetime
 from pb2.system_pb2 import HKdata, HKsystem
 # The linter may tell you that these are unused but they are needed for the protobuf validation
 from pb2 import validate_pb2, meta_pb2
-
+import yaml
 from ocs import ocs_agent, site_config
 import txaio
 
@@ -191,7 +191,15 @@ class TauHKAgent:
                 return False, 'tauHK crate daemon stopped unexpectedly, call stop to cleanup'
 
         # Call the crate interface binary
-        self.process = subprocess.Popen(['./tauhk-agent'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env={"RUST_LOG":"info"})
+        # There are problems with buffering and logs arriving out of order
+        self.process = subprocess.Popen(
+            ['./tauhk-agent'], 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE, 
+            text=True, 
+            env={"RUST_LOG":"info"}, 
+            bufsize=1
+        )
         self.log.info(f"Started tauHK crate daemon with PID {self.process.pid}")
 
         # Create a function that listens to the stdout and stderr streams and sends one line at a time
@@ -245,74 +253,181 @@ class TauHKAgent:
 
 
     @ocs_agent.param('value', type=str)
-    def generic_send(self, session, params, channel_name=None, option_name=None):
-        """channelname_optionname(value=str)
+    @ocs_agent.param('channel_name', type=str)
+    @ocs_agent.param('option_name', type=str)
+    def generic_send(self, session, params):
+        """generic_send(channel_name=str, option_name=str, value=str)
         **Task** - Send a command for a specific channel and option to tauHK.
 
         Args:
+            channel_name (str): The name of the channel to which the command is sent.
+            option_name (str): The name of the option within the channel to which the command is
             value (str): The value to set for the specified channel and option.
         
         Notes:
-            This function has been dynamically registered for each channel and option using functools.partial.
-            Refer to the task name for the specific channel and option being set.
-
-            rtd_logdac sets the excitation range for RTDs from 0(min) to 15(max)
-            rtd_uvolts sets the excitation voltage in microvolts (e.g., 56 for 56uV)
-            diode_excitation sets the excitation mode for diodes: 0=DC, 1=AC, 2=None
-            heater_mvolts sets the heater voltage in millivolts (e.g., 500 for 500mV)
-            heater_percent sets the heater power as a percentage (0-100) of input voltage.
+            Channels defintions are in the config file for tauHK. 
+            Different channel types have different options.
+            A list of valid channel names and options is provided by the advertise task.
+ 
+            In case you are writing a script, the following commands are available:
+            rtdChannel.logdac sets the excitation range for RTDs from 0(min) to 15(max)
+            rtdChannel.uvolts sets the excitation voltage in microvolts (e.g., 56 for 56uV)
+            diodeChannel.excitation sets the excitation mode for diodes: 0=DC, 1=AC, 2=None
         """
-        try:
-            val = params['value']
-        except KeyError:
-            return False, 'No value provided in parameters.'
-        
+        val = params['value']
+        channel_name = params['channel_name']
+        option_name = params['option_name']
         # instantiate a message proto
         message = HKsystem()
-        # get the type of the option we are setting
-        thing_type = type(getattr(getattr(message, channel_name), option_name))
-        value = thing_type()
-        #deal with special bool case
-        if thing_type == bool:
-            if val.lower() in ['true', '1', 'yes']:
-                value = True
-            elif val.lower() in ['false', '0', 'no']:
-                value = False
-            else:
-                return False, f"Invalid boolean value: {val} for {channel_name}.{option_name}"
-        else:
-            #try the generic type cast
-            try:
-                value = thing_type(val)
-            except Exception as e:
-                return False, f"Failed type cast for: {val} for {channel_name}.{option_name} due to {e}"
-        try:
-            # set the value in the message
-            ## TODO: this likely fails on an empty message. Need to use setinparent for that special case
-            setattr(getattr(message, channel_name), option_name, value)
-        except Exception as e:
-            return False, f"Failed to set {channel_name}.{option_name} to {value}: {e}"
+
+        ret, status = set_param(message, channel_name, option_name, val)
+        if not ret:
+            return False, status
         
-        # validate the message
-        try:
-            validate_all(message)
-        except Exception as e:
-            return False, f"Validation failed for {channel_name}.{option_name} with value {value}: {e}"
+        ret, status = send_command(message, self.command_port)
+        if not ret:
+            return False, status
+        
+        return True, f"Sent {channel_name}.{option_name}={val} successfully."
     
-        # and send it off
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-                sock.sendto(message.SerializeToString(), self.command_port)
-        except Exception as e:
-            return False, f"Failed to send message to tauHK: {e}"
+
+
+    def advertise(self, session, params):
+        """advertise()
+
+        **Task** - Advertise available commands by filling session.data
+
+        Notes:
+            Session.data will contain a dictionary with the available commands and their types.
+            The Session.data dictionary is structured as follows:
+                channelName:{optionName:optionType}
+                OptionType is a list containing the following:
+                    ["int", (min, max)]                     for integer types
+                    ["enum", {"label_1": 0, "label_2": 1}]  for enum types
+                    list()                                  for commands without parameters
+            An example of a valid session.data is:
+            {
+                'global_options': {
+                    'restart': list()                       # Restart the firmware running on the crate
+                }, 
+                'rtd_0': {
+                    'logdac': ["int", (0, 15)],             # Set excitation in logdac units (more is more)
+                    'uvolts': ["int", (0, 1000)]            # Set excitation voltage in microvolts
+                }, 
+                'diode_0': {
+                    'excitation': ["enum", {                # Set excitation mode for diodes
+                        'DC': 0, 
+                        'AC': 1, 
+                        'None': 2
+                    }]                         
+                },
+            }
+        """
+        advertised = dict()
+
+
+        # Restricted type mapping from the TYPE_* constants that FieldDescriptor.type returns 
+        type_mapping = {14: "enum", 13: "uint32",}
+
+        # Grab the protobuf message definition as it contains the channel names and options
+        message = HKsystem()
+        #this grabs the names of all the channels (+ global_options)
+        all_fields = message.DESCRIPTOR.fields_by_name.keys()
+        for field in all_fields:
+            advertised[field] = dict()
+            #similarly this grabs all the commandable options for each channel
+            options = getattr(message, field).DESCRIPTOR.fields_by_name.keys()
+            for option in options:
+                if option == 'raw':
+                    #we skip raw as its not user friendly
+                    continue
+                if option == 'restart':
+                    #special case for restart this is the empaty message
+                    advertised[field][option] = list()
+                    continue
+                # generic case
+                try:
+                    data_type = type_mapping[getattr(message, field).DESCRIPTOR.fields_by_name[option].type]
+                except KeyError:
+                    # ugh oh not in my restricted mapping
+                    self.log.error(f"Unknown type {getattr(message, field).DESCRIPTOR.fields_by_name[option].type} for {field}.{option}")
+                    continue
+                
+                if data_type == "enum":
+                    # we need to get the enum values
+                    enum_dict = getattr(message, field).DESCRIPTOR.fields_by_name[option].enum_type.values_by_name
+                    enum_dict = {k: v.number for k, v in enum_dict.items()}
+                    advertised[field][option] = ["enum", enum_dict]
+                elif data_type == "uint32":
+                    # Lets check for validate rules
+                    field_options = getattr(message, field).DESCRIPTOR.fields_by_name[option].GetOptions()
+                    for field_option in field_options.ListFields():
+                        found = False
+                        if field_option[0].full_name == 'validate.rules':
+                            found = True
+                            rule = field_option[1]
+                            max_val = rule.uint32.lte
+                            min_val = rule.uint32.gte
+                            advertised[field][option] = ["int", (min_val, max_val)]
+                            break
+                    if not found:
+                        # no explicit rules so assume full range of uint32
+                        advertised[field][option] = ["int", (0, 2**32-1)]
+                else:
+                    # Currently unimplemented
+                    self.log.error(f"Unknown type {data_type} for {field}.{option}")
+        session.data = advertised
+        return True, 'Advertised tauHK commands.'
+    
+    @ocs_agent.param('config_file', type=str)
+    def load_config(self, session, params):
+        """load_config()
+
+        **Task** - Load a config .
+
+        Args:
+            config_file (str): The path to the configuration file in YAML format.
+
+        Notes:
+            The YAML configuration file should contain all the commands to be sent to tauHK.
             
-        self.log.info(f'Sent the following message to tauHK: {message}')
-        return True, f'Sent command to set {channel_name}.{option_name} to {value}.'
+            An example of a valid configuration file is:
+            rtd_1:
+                - logdac: 10
+            rtd_2:
+                - uvolts: 56
+                - option: 42        # multiple options can be set for a channel
+            diode_3:
+                - excitation: 1     # 0=DC, 1=AC, 2=None enums not supported currently
+        """
+        if 'config_file' not in params:
+            return False, 'No config file provided.'
+        with open(params['config_file'], 'r') as f:
+            config = yaml.safe_load(f)
+        
+
+        message = HKsystem()
+        for channel_name, channel_command in config.items():
+            #key is channel name
+            #value is a list of options
+            #each element has key value pairs of option_name:option_value
+            for command in channel_command:
+                option, value = iter(command.items()).__next__()
+
+                ret_val, ret_str = set_param(message, channel_name, option, value)
+                if not ret_val:
+                    return False, ret_str
+        
+        ret, status = send_command(message, self.command_port)
+        if not ret:
+            return False, status
+
+        return True, f"Loaded config from {params['config_file']} successfully."
         
 @lru_cache(maxsize=256)
 def get_spf(channel_name, channel_quantity):
-    '''
-    Docstring for get_spf
+    '''get_spf(channel_name, channel_quantity)
+    Return the samples per frame (spf) for a given channel and quantity as defined in the protobuf options.
     
     :param channel_name: Description
     :param channel_quantity: Description
@@ -332,6 +447,61 @@ def get_spf(channel_name, channel_quantity):
 
     return spf
 
+def send_command(message, command_port):
+    """send_command(message, command_port)
+    Send a premade protobuf command to the tauHK system.
+    
+    :param message: Protobuf message to be sent
+    :param command_port: The port on which to send it to
+    """
+    # and send it off
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.sendto(message.SerializeToString(), command_port)
+    except Exception as e:
+        return False, f"Failed to send message to tauHK: {e}"
+    return True, 'Sent scuccessfully.'
+
+
+def set_param(message, channel_name, option_name, val):
+    """set_param(message, channel_name, option_name, val)
+    Set a parameter in a premade protobuf command.
+
+    :param message: Protobuf message to be modified
+    :param channel_name: The name of the channel to which the command is sent.
+    :param option_name: The name of the option within the channel to which the command is sent.
+    :param val: The value to set for the specified channel and option.
+    """
+    # get the type of the option we are setting
+    thing_type = type(getattr(getattr(message, channel_name), option_name))
+    value = thing_type()
+    #deal with special bool case
+    if thing_type == bool:
+        if val.lower() in ['true', '1', 'yes']:
+            value = True
+        elif val.lower() in ['false', '0', 'no']:
+            value = False
+        else:
+            return False, f"Invalid boolean value: {val} for {channel_name}.{option_name}"
+    else:
+        #try the generic type cast
+        try:
+            value = thing_type(val)
+        except Exception as e:
+            return False, f"Failed type cast for: {val} for {channel_name}.{option_name} due to {e}"
+    try:
+        # set the value in the message
+        ## TODO: this likely fails on an empty message. Need to use setinparent for that special case
+        setattr(getattr(message, channel_name), option_name, value)
+    except Exception as e:
+        return False, f"Failed to set {channel_name}.{option_name} to {value}: {e}"
+    
+    # validate the message
+    try:
+        validate_all(message)
+    except Exception as e:
+        return False, f"Validation failed for {channel_name}.{option_name} with value {value}: {e}"
+    return True, f"Set {channel_name}.{option_name} to {value} successfully."
 
 def main(args = None):
 
@@ -346,23 +516,11 @@ def main(args = None):
     #instantiate the system
     system = TauHKAgent(agent)
     
-    #dynamically register the commands present in the protobuf
-    message = HKsystem()
-    #this grabs the names of all the channels (+ global_options)
-    all_fields = message.DESCRIPTOR.fields_by_name.keys()
-    for field in all_fields:
-        #similarly this grabs all the options for each channel
-        options = getattr(message, field).DESCRIPTOR.fields_by_name.keys()
-        for option in options:
-            #we skip raw as its not user friendly
-            if option == 'raw':
-                continue
-            # register as channelname_optionname by partially prefilling the generic_send method
-            task_func = partial(system.generic_send, channel_name=field, option_name=option)
-            #copy over the docstring
-            update_wrapper(task_func, system.generic_send)
-            # agent.register_task(f'{field}_{option}', task_func)
-    
+    #register the generic send command and advertise
+    agent.register_task('generic_send', system.generic_send)
+    agent.register_task('advertise', system.advertise)
+    agent.register_task('load_config', system.load_config)
+
     #register the data receiving process
     agent.register_process('receive_data', system.receive_data, system._stop_receive)
 
