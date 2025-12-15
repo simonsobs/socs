@@ -1102,7 +1102,15 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock."
 
             state, human_state = self.stage.get_forward_limitswitch(axis)
-
+        
+        # store data
+        session.data = {
+                'axis': axis,
+                'raw_state': state,
+                'human_state': human_state,
+                'timestamp': time.time(),
+        }
+        
         return True, f"Axis {axis} forward limit: {human_state} (raw={state})"
 
     @ocs_agent.param('axis', type=str)
@@ -1122,6 +1130,14 @@ class GalilAxisAgent:
                 return False, "Could not acquire lock."
 
             state, human_state = self.stage.get_reverse_limitswitch(axis)
+
+        # store data
+        session.data = {
+                'axis': axis,
+                'raw_state': state,
+                'human_state': human_state,
+                'timestamp': time.time(),
+        }
 
         return True, f"Axis {axis} reverse limit: {human_state} (raw={state})"
     
