@@ -86,6 +86,7 @@ class TauHKAgent:
         Notes:
             session["data"] will contain the latest received data as a dictionary with flattened keys such as 'channelname_quantityname'.
             Typically quanitites of interest will be postfixed with _temperature.
+            There will also be a timestamp field but this time corresponds to the latest update and some fields may not be updated at every timestamp.
         """
 
         # Insure there is no duplicate data acquisition processes
@@ -115,7 +116,6 @@ class TauHKAgent:
                     
                     # Extract and convert the timestamp
                     message_timestamp = int(decoded_data["global_data"]["system_time"])/1000 #convert from millis from epoche to seconds
-                    message_datetime = datetime.fromtimestamp(message_timestamp)
 
                     # The returned dict is nested with each channel containing its own dict of quantities
                     # This is inconvenient for OCS, so we flatten it out to key:value pairs with keys like channelname_quantityname
@@ -157,6 +157,7 @@ class TauHKAgent:
                         self.latest_data.update(data_dict)
                     # and make it available in the session
                     session.data = self.latest_data
+                    session.data['timestamp'] = message_timestamp
                 except Exception as e:
                     # raise e
                     #how best to handle an error here?
@@ -180,6 +181,11 @@ class TauHKAgent:
         """Connect to tauHK crate
         
         **Process** - Runs the daemon that talks to the tauHK hardware.
+
+        Notes:
+            This process will start the tauHK crate daemon and listen for log messages from it.
+            The logs will be published to the tauhk_logs feed and placed in session['data']['latest_log'].
+            TODO: There is currently a bug with stderr buffering and logs arriving out of order
         """
 
         # Insure there is no duplicate crate processes
@@ -213,22 +219,26 @@ class TauHKAgent:
         # Non daemon threads since otherwise they end abruptly when the main thread ends and cause a segault on the .put
         threading.Thread(target=partial(send_from_stream, name='stdout', q=q), args=(self.process.stdout,), daemon=False).start()
         threading.Thread(target=partial(send_from_stream, name='stderr', q=q), args=(self.process.stderr,), daemon=False).start()
-
+        
         # the main thread hangs out here sending log lines to the feed
         # If it's been a while between messages it can check if the process is still alive
         retval = None
+        session.data = {'is_alive': True}
         while True:
             try:
                 name, line = q.get(timeout=1.0)
                 feed_message = {'block_name': f'tauhk_logs_{name}', 'timestamp': time.time(),'data': {f'tauhk_logs_{name}': line}}
+                session.data = {'latest_log': line, 'timestamp': time.time(), "is_alive": True}
                 self.agent.publish_to_feed('tauhk_logs', feed_message)
             except queue.Empty:
                 # When exiting cleanly the process will be None
                 if self.process is None:
+                    session.data["is_alive"] = False
                     retval = (True, 'tauHK crate daemon stopped by user.')
                     break
                 # When it crashes it will be not None but have a return code
                 if self.process.poll() is not None:
+                    session.data["is_alive"] = False
                     retval = (False, 'tauHK crate daemon stopped unexpectedly.')
                     break
 
@@ -253,15 +263,15 @@ class TauHKAgent:
 
 
     @ocs_agent.param('value', type=str)
-    @ocs_agent.param('channel_name', type=str)
-    @ocs_agent.param('option_name', type=str)
+    @ocs_agent.param('option', type=str)
+    @ocs_agent.param('channel', type=str)
     def generic_send(self, session, params):
-        """generic_send(channel_name=str, option_name=str, value=str)
+        """generic_send(channel=str, option=str, value=str)
         **Task** - Send a command for a specific channel and option to tauHK.
 
         Args:
-            channel_name (str): The name of the channel to which the command is sent.
-            option_name (str): The name of the option within the channel to which the command is
+            channel (str): The name of the channel to which the command is sent.
+            option (str): The name of the option within the channel to which the command is
             value (str): The value to set for the specified channel and option.
         
         Notes:
@@ -275,8 +285,8 @@ class TauHKAgent:
             diodeChannel.excitation sets the excitation mode for diodes: 0=DC, 1=AC, 2=None
         """
         val = params['value']
-        channel_name = params['channel_name']
-        option_name = params['option_name']
+        channel_name = params['channel']
+        option_name = params['option']
         # instantiate a message proto
         message = HKsystem()
 
@@ -295,17 +305,20 @@ class TauHKAgent:
     def advertise(self, session, params):
         """advertise()
 
-        **Task** - Advertise available commands by filling session.data
+        **Process** - Advertise available commands by filling session.data
 
         Notes:
-            Session.data will contain a dictionary with the available commands and their types.
-            The Session.data dictionary is structured as follows:
-                channelName:{optionName:optionType}
-                OptionType is a list containing the following:
+            `Session.data['settables']` will contain a dictionary with the available commands and their types.
+            This dictionary is structured as follows:
+                `channelName:{optionName:optionType}`
+                `OptionType` is a list containing the following:
+                ```
                     ["int", (min, max)]                     for integer types
                     ["enum", {"label_1": 0, "label_2": 1}]  for enum types
                     list()                                  for commands without parameters
+                ```
             An example of a valid session.data is:
+            ```
             {
                 'global_options': {
                     'restart': list()                       # Restart the firmware running on the crate
@@ -322,6 +335,7 @@ class TauHKAgent:
                     }]                         
                 },
             }
+            ```
         """
         advertised = dict()
 
@@ -376,14 +390,14 @@ class TauHKAgent:
                 else:
                     # Currently unimplemented
                     self.log.error(f"Unknown type {data_type} for {field}.{option}")
-        session.data = advertised
+        session.data = {"settables": advertised}
         return True, 'Advertised tauHK commands.'
     
     @ocs_agent.param('config_file', type=str)
     def load_config(self, session, params):
         """load_config()
 
-        **Task** - Load a config .
+        **Task** - Send a config containing nominal excitations to tauHK.
 
         Args:
             config_file (str): The path to the configuration file in YAML format.
@@ -392,6 +406,7 @@ class TauHKAgent:
             The YAML configuration file should contain all the commands to be sent to tauHK.
             
             An example of a valid configuration file is:
+            ```
             rtd_1:
                 - logdac: 10
             rtd_2:
@@ -399,6 +414,7 @@ class TauHKAgent:
                 - option: 42        # multiple options can be set for a channel
             diode_3:
                 - excitation: 1     # 0=DC, 1=AC, 2=None enums not supported currently
+            ```
         """
         if 'config_file' not in params:
             return False, 'No config file provided.'
@@ -510,16 +526,21 @@ def main(args = None):
 
     txaio.start_logging(level= os.environ.get('LOGLEVEL', 'info'))
 
-    args = site_config.parse_args(agent_class='TauHKAgent', args=args)
+    args = site_config.parse_args(agent_class='tauHKAgent', args=args)
     agent, runner = ocs_agent.init_site_agent(args)
 
     #instantiate the system
     system = TauHKAgent(agent)
     
-    #register the generic send command and advertise
+    #register the generic send command config commands
     agent.register_task('generic_send', system.generic_send)
-    agent.register_task('advertise', system.advertise)
     agent.register_task('load_config', system.load_config)
+
+    #register the advertise process and run it on startup. 
+    # The config is compiled in so it can never change and therefore it never needs tio be re-run
+    def dummy_stop(*args, **kwargs):
+        return True, "Advertise process does not support stopping."
+    agent.register_process('advertise', system.advertise, stop_func=dummy_stop, startup=True)
 
     #register the data receiving process
     agent.register_process('receive_data', system.receive_data, system._stop_receive)
