@@ -488,7 +488,7 @@ class GalilAxis(TCPInterface):
 
         # --- Interpret raw
         human_state = "not triggered" if state == 1 else "triggered" if state == 0 else f"unknown ({state})"
-        
+
         return state, human_state
 
     def get_reverse_limitswitch(self, axis):
