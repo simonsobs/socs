@@ -6,7 +6,7 @@
 tauHK Agent
 =============
 
-The tauHK system is an all in one cryogenic temperature control system. 
+The tauHK system is an all in one cryogenic temperature control system.
 More information can be found in the accompanying `paper <https://pubs.aip.org/aip/rsi/article/96/9/094902/3363308/HK-A-modular-housekeeping-system-for-cryostats-and>`.
 
 This docs page is currently a stub.
