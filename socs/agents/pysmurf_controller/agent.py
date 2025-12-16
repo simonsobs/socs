@@ -14,7 +14,6 @@ import sys
 import time
 from typing import Optional
 
-import epics
 import numpy as np
 import sodetlib as sdl
 from ocs import ocs_agent, site_config
@@ -22,6 +21,7 @@ from ocs.ocs_agent import log_formatter
 from ocs.ocs_twisted import TimeoutLock
 from sodetlib.det_config import DetConfig
 from sodetlib.operations import bias_dets
+from pyrogue.interfaces import VirtualClient
 
 from socs.agents.pysmurf_controller.smurf_subprocess_util import (
     QuantileData, RunCfg, RunResult, run_smurf_func)
@@ -348,7 +348,7 @@ class PysmurfController:
                              'num_active_channels': d['num_active_channels']}
                 }
                 self.agent.publish_to_feed('state_results', data)
-            except (RuntimeError, epics.ca.ChannelAccessGetFailure):
+            except Exception:  # TODO can we make this more specific?
                 self.log.warn("Could not connect to epics server! Waiting and "
                               "then trying again")
 
@@ -1173,28 +1173,38 @@ class PysmurfController:
                 return False, f"Operation failed: {self.lock.job} is running."
 
             # this register being unresponsive is a symptom of an rssi lock-up
-            slot_reg = f"smurf_server_s{self.slot}:AMCc:FpgaTopLevel:AmcCarrierCore:AmcCarrierBsi:SlotNumber"
+            slot_reg = "AMCc.FpgaTopLevel.AmcCarrierCore.AmcCarrierBsi.SlotNumber"
 
-            # if the system is locked up, spawning a SmurfControl instance will hang so we use epics
-            slot = epics.caget(slot_reg, timeout=2)
+            # if the system is locked up, spawning a SmurfControl instance will hang
+            # so we use a rogue client
+            server_port = 9000 + 3 * self.slot
+            server_addr = "localhost"
+            with VirtualClient(addr=server_addr, port=server_port) as client:
+                try:
+                    slot = client._root.getNode(slot_reg).get()  # 1s timeout
+                except Exception:
+                    slot = None
 
-            # reset if RSSI is locked-up
-            success = True
-            msg = ""
-            if slot is not None:  # query suceeded
-                success, msg = True, "RSSI is not locked-up -- Doing nothing."
-            else:
-                # send the reset command
-                epics.caput(f"smurf_server_s{self.slot}:AMCc:RestartRssi", 1)
+                # reset if RSSI is locked-up
+                success = True
+                msg = ""
+                if slot is not None:  # query suceeded
+                    success, msg = True, "RSSI is not locked-up -- Doing nothing."
+                else:
+                    # send the reset command
+                    client._root.getNode("AMCc.RestartRssi").set(1)
 
-                # check the system has recovered
-                slot = epics.caget(slot_reg, timeout=2)
-                success = slot is not None
-                msg = "RSSI remains locked-up" if slot is None else "RSSI has recovered"
+                    # check the system has recovered
+                    try:
+                        slot = client._root.getNode(slot_reg).get()  # 1s timeout
+                        success = True
+                    except Exception:
+                        success = False
+                    msg = "RSSI has recovered" if success else "RSSI remains locked-up"
 
             # store state in the session data
             session.data.update({
-                "rssi_responsive": slot is not None,
+                "rssi_responsive": success,
                 "last_updated": time.time()
             })
 
