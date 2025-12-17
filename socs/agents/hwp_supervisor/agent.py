@@ -1597,7 +1597,7 @@ class HWPSupervisor:
         """
         pm = Pacemaker(1. / self.sleep_time)
         test_mode = params.get('test_mode', False)
-        last_ok_time = time.time()
+        last_okay_time = time.time()
 
         session.data = {
             'timestamp': time.time(),
@@ -1625,9 +1625,9 @@ class HWPSupervisor:
 
             action = self.hwp_state.pmx_action
             if action == 'ok':
-                last_ok_time = time.time()
+                last_okay_time = time.time()
             elif action == 'no_data' and self.shutdown_no_data_timeout >= 0:
-                if (time.time - last_okay_time) > self.shutdown_no_data_timeout:
+                if (time.time() - last_okay_time) > self.shutdown_no_data_timeout:
                     if not self.shutdown_mode:
                         self.agent.start('disable_driver_board', params={})
                         self.shutdown_mode = True
@@ -2117,7 +2117,7 @@ def make_parser(parser=None):
              "cw or ccw is defined when hwp is viewed from the sky side."
     )
     pgroup.add_argument(
-        '--shutdown-no-data-timeout', type=float, default=15 * 60
+        '--shutdown-no-data-timeout', type=float, default=15 * 60,
         help="Time(sec) after which a 'no_data' action should trigger a shutdown"
     )
     return parser
