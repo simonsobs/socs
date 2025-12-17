@@ -2014,12 +2014,17 @@ class ACUAgent:
 
         point_gen = line_batcher(ff_scan, t_shift)
 
+        if params['azonly']:
+            track_axes = ['az']
+        else:
+            track_axes = ['az', 'el']
+
         ok, err = yield self._run_track(
             session,
             point_gen,
             step_time=ff_scan.step_time,
             free_form=ff_scan.free_form,
-            azonly=params['azonly'])
+            track_axes=track_axes)
         return ok, err
 
     @ocs_agent.param('az_endpoint1', type=float)
@@ -2030,6 +2035,8 @@ class ACUAgent:
     @ocs_agent.param('el_endpoint2', type=float, default=None)
     @ocs_agent.param('el_speed', type=float, default=0.)
     @ocs_agent.param('el_freq', type=float, default=None)
+    @ocs_agent.param('el_mode', choices=['stop', 'preset', 'programtrack'],
+                     default=None)
     @ocs_agent.param('num_scans', type=float, default=None)
     @ocs_agent.param('start_time', type=float, default=None)
     @ocs_agent.param('wait_to_start', type=float, default=None)
@@ -2038,7 +2045,6 @@ class ACUAgent:
                      choices=['end', 'mid', 'az_endpoint1', 'az_endpoint2',
                               'mid_inc', 'mid_dec'])
     @ocs_agent.param('az_drift', type=float, default=None)
-    @ocs_agent.param('az_only', type=bool, default=True)
     @ocs_agent.param('scan_type', default=1, choices=[1, 2, 3])
     @ocs_agent.param('az_vel_ref', type=float, default=None)
     @ocs_agent.param('turnaround_method', default=None,
@@ -2052,9 +2058,10 @@ class ACUAgent:
                          az_speed=None, az_accel=None, \
                          el_endpoint1=None, el_endpoint2=None, \
                          el_speed=None, el_freq=None, \
+                         el_mode=None, \
                          num_scans=None, start_time=None, \
                          wait_to_start=None, step_time=None, \
-                         az_start='end', az_drift=None, az_only=True, \
+                         az_start='end', az_drift=None, \
                          scan_type=1, az_vel_ref=None, \
                          turnaround_method=None, \
                          scan_upload_length=None)
@@ -2073,7 +2080,14 @@ class ACUAgent:
                 track.
             el_endpoint2 (float): this is ignored.
             el_speed (float): this is ignored.
-            el_freq(float): frequency of the elevation nods for scan_type=3.
+            el_freq (float): frequency of the elevation nods for
+                scan_type=3.
+            el_mode (str): By default, the elevation axis mode for
+                type 1 and 2 scans will be left in Preset after the
+                initial move.  To force it instead into Stop mode,
+                pass "stop" (case-sensitive) here.  ("preset" and
+                "programtrack" are also accepted, and will result in
+                that mode being set prior to launching the track.)
             num_scans (int or None): if not None, limits the scan to
                 the specified number of constant velocity legs. The
                 process will exit without error once that has
@@ -2101,9 +2115,6 @@ class ACUAgent:
                 in deg/s.  The scan extrema will move accordingly.  This
                 can be used to better follow compact sources as they
                 rise or set through the focal plane.
-            az_only (bool): if True (the default), then only the
-                Azimuth axis is put in ProgramTrack mode, and the El axis
-                is put in Stop mode.
             scan_type (int): What type of scan to use. Only 1, 2, 3 are valid.
                 Type 1 is a constant elevation scan.
                 Type 2 includes a variation in az speed that scales as sin(az).
@@ -2199,7 +2210,6 @@ class ACUAgent:
             return False, "Current elevation (%.4f) is well outside limits." % _untweaked_el
         init_el = el_endpoint1
 
-        azonly = params.get('az_only', True)
         scan_upload_len = params.get('scan_upload_length')
         scan_params = {k: params.get(k) for k in [
             'num_scans', 'num_batches', 'start_time',
@@ -2280,9 +2290,19 @@ class ACUAgent:
             if not ok:
                 return False, f'Start position seek failed with message: {msg}'
 
+        # Force elevation axis to stop mode?
+        if params['el_mode']:
+            for k in ['Stop', 'Preset', 'ProgramTrack']:
+                if params['el_mode'].lower() == k.lower():
+                    yield self._set_modes(el=k)
+                    break
+            else:
+                return False, f'User requested invalid el_mode={params["el_mode"]}'
+
         # Prepare the point generator.
         free_form = False
         if params['scan_type'] == 1:
+            track_axes = ['az']
             if turnaround_method != 'standard':
                 free_form = True
 
@@ -2297,6 +2317,7 @@ class ACUAgent:
                                                    **scan_params)
         elif params['scan_type'] == 2:
             free_form = True
+            track_axes = ['az']
             g = sh.generate_type2_scan(az_endpoint1=az_endpoint1,
                                        az_endpoint2=az_endpoint2,
                                        az_speed=az_speed, acc=az_accel,
@@ -2307,7 +2328,7 @@ class ACUAgent:
                                        **scan_params)
         elif params['scan_type'] == 3:
             free_form = True
-            azonly = False
+            track_axes = ['az', 'el']
             g = sh.generate_type3_scan(az_endpoint1=az_endpoint1,
                                        az_endpoint2=az_endpoint2,
                                        az_speed=az_speed, acc=az_accel,
@@ -2336,6 +2357,7 @@ class ACUAgent:
             'el_freq': el_freq,
             'type': params['scan_type'],
             'turnaround_type': sh.TURNAROUNDS_ENUM[turnaround_method],
+            'track_axes': ','.join(track_axes),
         })
 
         self.agent.publish_to_feed('scan_params',
@@ -2345,7 +2367,8 @@ class ACUAgent:
 
         ret_val = (yield self._run_track(
             session=session, point_gen=g, step_time=step_time,
-            azonly=azonly, point_batch_count=point_batch_count, free_form=free_form, unabort_failure=(params['scan_type'] in [2, 3])))
+            track_axes=track_axes, point_batch_count=point_batch_count,
+            free_form=free_form, unabort_failure=(params['scan_type'] in [2, 3])))
 
         self.agent.publish_to_feed('scan_params',
                                    {'timestamp': time.time(),
@@ -2355,7 +2378,7 @@ class ACUAgent:
         return ret_val
 
     @inlineCallbacks
-    def _run_track(self, session, point_gen, step_time, azonly=False,
+    def _run_track(self, session, point_gen, step_time, track_axes=['az'],
                    point_batch_count=None, free_form=False, unabort_failure=False):
         """Run a ProgramTrack track scan, with points provided by a
         generator.
@@ -2367,7 +2390,9 @@ class ACUAgent:
             This is used to guarantee that points are uploaded
             sufficiently in advance for the servo unit to process
             them.
-          azonly: set to True to leave the el axis locked.
+          track_axes: list of strings indicating which axes ('az',
+            'el') should be put in ProgramTrack mode.  Axes not
+            included here will not have their mode changed.
           point_batch_count: number of points to include in batch
             uploads.  This parameter can be used to increase the value
             beyond the minimum set internally based on step_time.
@@ -2442,10 +2467,10 @@ class ACUAgent:
                 if _d > 0:
                     yield dsleep(_d)
 
-            if azonly:
-                yield self._set_modes(az='ProgramTrack')
-            else:
-                yield self._set_modes(az='ProgramTrack', el='ProgramTrack')
+            if track_axes is not None and len(track_axes) > 0:
+                assert ([_ax in ['az', 'el'] for _ax in track_axes])
+                mode_args = {_ax: 'ProgramTrack' for _ax in track_axes}
+                yield self._set_modes(**mode_args)
 
             yield dsleep(0.1)
 
