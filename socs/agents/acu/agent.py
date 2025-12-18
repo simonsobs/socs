@@ -33,12 +33,14 @@ INIT_DEFAULT_SCAN_PARAMS = {
         'az_accel': 1,
         'el_freq': .15,
         'turnaround_method': 'standard',
+        'el_mode': None,
     },
     'satp': {
         'az_speed': 1,
         'az_accel': 1,
         'el_freq': 0,
         'turnaround_method': 'standard',
+        'el_mode': None,
     },
 }
 
@@ -1796,6 +1798,8 @@ class ACUAgent:
     @ocs_agent.param('az_speed', type=float, default=None)
     @ocs_agent.param('az_accel', type=float, default=None)
     @ocs_agent.param('el_freq', type=float, default=None)
+    @ocs_agent.param('el_mode', choices=['stop', 'preset', 'programtrack', ''],
+                     default=None)
     @ocs_agent.param('turnaround_method', type=str, default=None,
                      choices=[None, 'standard', 'standard_gen',
                               'three_leg'])
@@ -1813,15 +1817,22 @@ class ACUAgent:
             acceleration at turn-around.
           el_freq (float, optional): The frequency of elevation nods in
             type 3 scans.
+          el_mode (str, optional): If not null, the elevation axis
+            will be put in this mode after the initial position seek
+            (but before scan begins).  This can be used to do type 1/2
+            scans with el axis held in Stop mode.  The special value
+            of '' will revert el_mode to the default (None).
           reset (bool, optional): If True, reset all params to default
             values before applying any updates passed explicitly here.
 
         """
         if params['reset']:
             self.scan_params.update(self.default_scan_params)
-        for k in ['az_speed', 'az_accel', 'el_freq', 'turnaround_method']:
+        for k in ['az_speed', 'az_accel', 'el_freq', 'turnaround_method', 'el_mode']:
             if params[k] is not None:
                 self.scan_params[k] = params[k]
+        if params['el_mode'] == '':
+            self.scan_params['el_mode'] = None
         self.log.info('Updated default scan params to {sp}', sp=self.scan_params)
         yield
         return True, 'Done'
@@ -2163,6 +2174,7 @@ class ACUAgent:
         az_accel = params['az_accel']
         el_freq = params['el_freq']
         turnaround_method = params['turnaround_method']
+        el_mode = params['el_mode']
         if az_speed is None:
             az_speed = self.scan_params['az_speed']
         if az_accel is None:
@@ -2174,6 +2186,8 @@ class ACUAgent:
             if params['scan_type'] in [2, 3] and turnaround_method == 'standard':
                 turnaround_method = 'standard_gen'
                 self.log.info('Setting turnaround_method="standard_gen" for type2/3 scan.')
+        if el_mode is None:
+            el_mode = self.scan_params['el_mode']  # ... which may also be None.
 
         # Check if the turnaround method is usable for the called scan type.
         # This should never happen with the above turnaround_method setting.
@@ -2291,13 +2305,13 @@ class ACUAgent:
                 return False, f'Start position seek failed with message: {msg}'
 
         # Force elevation axis to stop mode?
-        if params['el_mode']:
+        if el_mode:
             for k in ['Stop', 'Preset', 'ProgramTrack']:
-                if params['el_mode'].lower() == k.lower():
+                if el_mode.lower() == k.lower():
                     yield self._set_modes(el=k)
                     break
             else:
-                return False, f'User requested invalid el_mode={params["el_mode"]}'
+                return False, f'User requested invalid el_mode={el_mode}'
 
         # Prepare the point generator.
         free_form = False
