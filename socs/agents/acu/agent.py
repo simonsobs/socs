@@ -1603,10 +1603,10 @@ class ACUAgent:
 
     @ocs_agent.param('az', type=float, default=None)
     @ocs_agent.param('el', type=float, default=None)
-    @ocs_agent.param('end_stop', default=False, type=bool)
+    @ocs_agent.param('end_stop', default=True, type=bool)
     @inlineCallbacks
     def go_to(self, session, params):
-        """go_to(az, el, end_stop=False)
+        """go_to(az, el, end_stop=True)
 
         **Task** - Move the telescope to a particular point (azimuth,
         elevation) in Preset mode. When motion has ended and the telescope
@@ -1687,16 +1687,16 @@ class ACUAgent:
         return all_ok, msg
 
     @ocs_agent.param('target', type=float)
-    @ocs_agent.param('end_stop', default=False, type=bool)
+    @ocs_agent.param('end_stop', default=True, type=bool)
     @inlineCallbacks
     def set_boresight(self, session, params):
-        """set_boresight(target, end_stop=False)
+        """set_boresight(target, end_stop=True)
 
         **Task** - Move the telescope to a particular third-axis angle.
 
         Parameters:
             target (float): destination angle for boresight rotation
-            end_stop (bool): put axes in Stop mode after motion
+            end_stop (bool): put axis in Stop mode after motion
 
         """
         with self.boresight_lock.acquire_timeout(0, job='set_boresight') as acquired:
