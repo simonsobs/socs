@@ -1461,6 +1461,9 @@ class HWPSupervisor:
         self.driver_power_cycle_twice = args.driver_power_cycle_twice
         self.driver_power_cycle_wait_time = args.driver_power_cycle_wait_time
 
+        self.shutdown_no_data_timeout = args.shutdown_no_data_timeout
+        self.shutdown_mode = False
+
     def _get_hwp_clients(self):
         def get_client(id):
             args = []
@@ -1594,6 +1597,7 @@ class HWPSupervisor:
         """
         pm = Pacemaker(1. / self.sleep_time)
         test_mode = params.get('test_mode', False)
+        last_okay_time = time.time()
 
         session.data = {
             'timestamp': time.time(),
@@ -1618,6 +1622,19 @@ class HWPSupervisor:
                 'pmx': self.hwp_state.pmx_action,
                 'gripper': self.hwp_state.gripper_action,
             }
+
+            action = self.hwp_state.pmx_action
+            if action == 'ok':
+                last_okay_time = time.time()
+            elif action == 'no_data' and self.shutdown_no_data_timeout >= 0:
+                if (time.time() - last_okay_time) > self.shutdown_no_data_timeout:
+                    if not self.shutdown_mode:
+                        self.agent.start('disable_driver_board', params={})
+                        self.shutdown_mode = True
+            elif action == 'stop':
+                if not self.shutdown_mode:
+                    self.agent.start('disable_driver_board', params={})
+                    self.shutdown_mode = True
 
             if test_mode:
                 break
@@ -1987,6 +2004,13 @@ class HWPSupervisor:
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
+    def cancel_shutdown(self, session, params):
+        """cancel_shutdown()
+        **Task** - Cancels shutdown mode
+        """
+        self.shutdown_mode = False
+        return True, "Cancelled shutdown mode"
+
 
 def make_parser(parser=None):
     if parser is None:
@@ -2092,6 +2116,10 @@ def make_parser(parser=None):
         help="Whether the PID 'forward' direction is cw or ccw. "
              "cw or ccw is defined when hwp is viewed from the sky side."
     )
+    pgroup.add_argument(
+        '--shutdown-no-data-timeout', type=float, default=15 * 60,
+        help="Time(sec) after which a 'no_data' action should trigger a shutdown"
+    )
     return parser
 
 
@@ -2118,6 +2146,7 @@ def main(args=None):
     agent.register_task('enable_driver_board', hwp.enable_driver_board)
     agent.register_task('disable_driver_board', hwp.disable_driver_board)
     agent.register_task('abort_action', hwp.abort_action)
+    agent.register_task('cancel_shutdown', hwp.cancel_shutdown)
 
     runner.run(agent, auto_reconnect=True)
 
