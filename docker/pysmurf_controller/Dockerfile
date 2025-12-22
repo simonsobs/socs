@@ -4,7 +4,7 @@ FROM simonsobs/so_smurf_base:v0.0.6
 # sodetlib Install
 #################################################################
 WORKDIR /
-RUN git clone --branch v0.6.0 --depth 1 https://github.com/simonsobs/sodetlib.git
+RUN git clone --branch v0.6.1 --depth 1 https://github.com/simonsobs/sodetlib.git
 # allow versioneer to determine sodetlib version safely
 USER cryo
 RUN git config --global --add safe.directory /sodetlib
