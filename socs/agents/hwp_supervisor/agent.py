@@ -915,6 +915,28 @@ class ControlState:
                     "Must be in ['iboot', 'synaccess']"
                 )
 
+    @dataclass
+    class PowerCycleGripper:
+        """
+        Power Cycle Gripper elesctronics
+
+        Attributes
+        -----------
+        driver_power_agent_type: Literal['iboot, synaccess']
+            Type of agent used for controlling the driver power
+        outlets: List[int]
+            List of outlets to power cycle in this order
+        """
+        driver_power_agent_type: Literal['iboot, synaccess']
+        outlets: List[int]
+
+        def __post_init__(self):
+            if self.driver_power_agent_type not in ['iboot', 'synaccess']:
+                raise ValueError(
+                    f"Invalid driver_power_agent_type: {self.driver_power_agent_type}. "
+                    "Must be in ['iboot', 'synaccess']"
+                )
+
     completed_states = (Done, Error, Abort, Idle)
 
 
@@ -1383,9 +1405,24 @@ class ControlStateMachine:
                     else:
                         kw = {'outlet': outlet, 'on': outlet_state}
                     self.run_and_validate(clients.driver_iboot.set_outlet, kwargs=kw)
-
                 for outlet in state.outlets:
                     set_outlet_state(outlet, False)
+                self.action.set_state(ControlState.Done(success=True))
+                return
+
+            elif isinstance(state, ControlState.PowerCycleGripper):
+                def set_outlet_state(outlet: int, outlet_state: bool):
+                    if state.gripper_power_agent_type == 'iboot':
+                        kw = {'outlet': outlet, 'state': 'on' if outlet_state else 'off'}
+                    else:
+                        kw = {'outlet': outlet, 'on': outlet_state}
+                    self.run_and_validate(clients.gripper_iboot.set_outlet, kwargs=kw)
+                for outlet in state.outlets:
+                    set_outlet_state(outlet, False)
+                    time.sleep(2)
+                for outlet in state.outlets:
+                    set_outlet_state(outlet, True)
+                    time.sleep(2)
                 self.action.set_state(ControlState.Done(success=True))
                 return
 
@@ -2004,6 +2041,34 @@ class HWPSupervisor:
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
+    def power_cycle_gripper(self, session, params):
+        """power_cycle_gripper()
+
+        **Task** - Power cycle gripper electronics
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data']
+            {'action':
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+                'state_history': List[ConrolState],
+                'success': False}
+            }
+        """
+        kw = {
+            'gripper_power_agent_type': self.gripper_power_agent_type,
+            'outlets': self.gripper_iboot_outlets,
+        }
+        state = ControlState.PowerCylceGripper(**kw)
+        action = self.control_state_machine.request_new_action(state)
+        action.sleep_until_complete(session=session)
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
+
     def cancel_shutdown(self, session, params):
         """cancel_shutdown()
         **Task** - Cancels shutdown mode
@@ -2145,6 +2210,7 @@ def main(args=None):
     agent.register_task('ungrip_hwp', hwp.ungrip_hwp)
     agent.register_task('enable_driver_board', hwp.enable_driver_board)
     agent.register_task('disable_driver_board', hwp.disable_driver_board)
+    agent.register_task('power_cycle_gripper', hwp.power_cycle_gripper)
     agent.register_task('abort_action', hwp.abort_action)
     agent.register_task('cancel_shutdown', hwp.cancel_shutdown)
 
