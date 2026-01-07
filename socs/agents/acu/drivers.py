@@ -21,6 +21,7 @@ TURNAROUNDS_ENUM = {
     'standard': 0,
     'standard_gen': 1,
     'three_leg': 2,
+    'two_leg': 3,
 }
 
 
@@ -350,9 +351,12 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             scan endpoints in time.  This can be used to better track
             celestial sources in targeted scans.
         turnaround_method (str): The method used for generating turnaround.
-            Default ('standard') generates the baseline minimal jerk trajectory.
+            (Default) 'standard' generates the baseline minimal jerk trajectory.
+            'standard_gen' genetares a list of track_points throughout the turnaround
+            to mimic the standard acu turnaround.
             'three_leg' generates a three-leg turnaround which attempts to
             minimize the acceleration at the midpoint of the turnaround.
+            'two_leg' generates a "three_leg" turnaround with second_leg_time = 0.
 
     Yields:
         points (list): a list of TrackPoint objects.  Raises
@@ -538,7 +542,7 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                         az_start='mid_inc',
                         az_first_pos=None,
                         az_drift=None,
-                        turnaround_method='three_leg'):
+                        turnaround_method='two_leg'):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long type 3 scan.
@@ -583,6 +587,13 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
         az_drift (float): The rate (deg / s) at which to shift the
             scan endpoints in time.  This can be used to better track
             celestial sources in targeted scans.
+        turnaround_method (str): The method used for generating turnaround.
+            'standard' is unusable with type3 scans!
+            'standard_gen' genetares a list of track_points throughout the turnaround
+            to mimic the standard acu turnaround and is usable for type3 scans.
+            'three_leg' generates a three-leg turnaround which attempts to
+            minimize the acceleration at the midpoint of the turnaround.
+            (Default) 'two_leg' generates a "three_leg" turnaround with second_leg_time = 0.
 
     Yields:
         points (list): a list of TrackPoint objects.  Raises
@@ -714,7 +725,6 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                                                                   turntime=tt[1],
                                                                   az_flag=az_flag, el_flag=el_flag,
                                                                   step_time=step_time,
-                                                                  second_leg_time=0.,
                                                                   point_group_batch=point_group_batch)
                     point_queue.extend(turnaround_track)
 
@@ -749,7 +759,6 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
                                                                   turntime=tt[1],
                                                                   az_flag=az_flag, el_flag=el_flag,
                                                                   step_time=step_time,
-                                                                  second_leg_time=0.,
                                                                   point_group_batch=point_group_batch)
                     point_queue.extend(turnaround_track)
 
@@ -799,7 +808,7 @@ def generate_type2_scan(az_endpoint1, az_endpoint2, az_speed,
                         az_start='mid_inc',
                         az_first_pos=None,
                         az_drift=None,
-                        turnaround_method='three_leg'):
+                        turnaround_method='two_leg'):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long type 2 scan.
@@ -841,6 +850,13 @@ def generate_type2_scan(az_endpoint1, az_endpoint2, az_speed,
         az_drift (float): The rate (deg / s) at which to shift the
             scan endpoints in time.  This can be used to better track
             celestial sources in targeted scans.
+        turnaround_method (str): The method used for generating turnaround.
+            'standard' is unusable with type2 scans!
+            'standard_gen' genetares a list of track_points throughout the turnaround
+            to mimic the standard acu turnaround and is usable for type2 scans.
+            'three_leg' generates a three-leg turnaround which attempts to
+            minimize the acceleration at the midpoint of the turnaround.
+            'two_leg' (Default) generates a "three_leg" turnaround with second_leg_time = 0.
 
     Yields:
         points (list): a list of TrackPoint objects.  Raises
