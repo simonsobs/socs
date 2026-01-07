@@ -131,6 +131,41 @@ class LS240_Agent:
 
         return True, 'Set values for channel {}'.format(params['channel'])
 
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 8)
+    def get_values(self, session, params):
+        """get_values(channel)
+
+        **Task** - Get the set values for a particular channel.
+
+        Parameters:
+            channel (int): Channel to get the dwell time for. Valid values
+                are 1-8.
+        """
+        with self._lock.acquire_timeout(job='get_values') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            current_values = self.module.channels[params["channel"]].get_values()
+            current_sensor = current_values['sensor']
+            current_range = current_values['range']
+            current_auto_range = current_values['auto_range']
+            current_current_reversal = current_values['current_reversal']
+            current_unit = current_values['unit']
+            current_enabled = current_values['enabled']
+
+            session.add_message(f'Sensor for channel {params["channel"]} is {current_sensor}')
+            session.add_message(f'Range for channel {params["channel"]} is {current_range} Ohms')
+            session.add_message(f'Auto Range for channel {params["channel"]} is {current_auto_range}')
+            session.add_message(f'Current Reversal for channel {params["channel"]} is {current_current_reversal}')
+            session.add_message(f'Unit for channel {params["channel"]} is {current_unit}')
+            session.add_message(f'Enabled for channel {params["channel"]} is {current_enabled}')
+
+            session.data = current_values
+
+        return True, current_values
+
     def upload_cal_curve(self, session, params=None):
         """upload_cal_curve(channel, filename)
 
