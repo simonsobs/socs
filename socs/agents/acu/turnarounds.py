@@ -2,7 +2,7 @@ import numpy as np
 
 
 def gen_turnaround(turnaround_method, t0, az0, el0, v0, turntime, az_flag, el_flag,
-                   point_group_batch, second_leg_time=0, second_leg_velocity=0,
+                   point_group_batch, second_leg_time=None, second_leg_velocity=0,
                    step_time=0.05):
     from .drivers import TrackPoint
     """
@@ -104,7 +104,7 @@ def _gen_standard_turnaround(v0, turntime, step_time=0.05):
     return ts, azs, vs
 
 
-def _gen_three_leg_turnaround(v0, turntime, second_leg_time=0, second_leg_velocity=0, step_time=0.05):
+def _gen_three_leg_turnaround(v0, turntime, second_leg_time=None, second_leg_velocity=0, step_time=0.05):
     """
     Function for generating the times, azimuths, and velocities for a three_leg turnaround.
     This function generates a turnaround in three "legs":
