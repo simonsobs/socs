@@ -152,7 +152,7 @@ class LS240_Agent:
                  "enabled": True},
              "timestamp":1601925677.6914878}
         """
-        with self._lock.acquire_timeout(job='get_values') as acquired:
+        with self.lock.acquire_timeout(job='get_values') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self._lock.job} is already running")
