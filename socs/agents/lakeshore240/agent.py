@@ -128,7 +128,7 @@ class LS240_Agent:
 
         return True, 'Set values for channel {}'.format(params['channel'])
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 0 <= x <= 7)
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 8)
     def get_values(self, session, params):
         """get_values(channel)
 
@@ -158,7 +158,7 @@ class LS240_Agent:
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            current_values = self.module.channels[params["channel"]].get_values()
+            current_values = self.module.channels[params["channel"] - 1].get_values()
             current_sensor = current_values['sensor']
             current_range = current_values['range']
             current_auto_range = current_values['auto_range']
