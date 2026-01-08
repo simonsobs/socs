@@ -128,7 +128,7 @@ class LS240_Agent:
 
         return True, 'Set values for channel {}'.format(params['channel'])
 
-    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 8)
+    @ocs_agent.param('channel', type=int, check=lambda x: 0 <= x <= 7)
     def get_values(self, session, params):
         """get_values(channel)
 
