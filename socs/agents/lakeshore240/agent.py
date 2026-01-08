@@ -152,10 +152,10 @@ class LS240_Agent:
                  "enabled": True},
              "timestamp":1601925677.6914878}
         """
-        with self.lock.acquire_timeout(job='get_values') as acquired:
+        with self.lock.acquire_timeout(0, job='get_values') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
-                              f"{self._lock.job} is already running")
+                              f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
             current_values = self.module.channels[params["channel"]].get_values()
