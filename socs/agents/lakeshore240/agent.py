@@ -135,8 +135,22 @@ class LS240_Agent:
         **Task** - Get the set values for a particular channel.
 
         Parameters:
-            channel (int): Channel to get the dwell time for. Valid values
-                are 1-8.
+            channel (int): Channel to get the set sensor type, range,
+                auto_range, current_reversal, units, and enabled values for.
+                Valid values for channel are 1-8.
+
+        The most recent data collected is stored in session data in the
+        structure::
+
+            >>> response.session['data']
+            {"fields":
+                {"sensor": "Diode",
+                 "range": 1000,
+                 "auto_range": True,
+                 "current_reversal": True,
+                 "unit": "K",
+                 "enabled": True},
+             "timestamp":1601925677.6914878}
         """
         with self._lock.acquire_timeout(job='get_values') as acquired:
             if not acquired:
@@ -360,6 +374,7 @@ def main(args=None):
     agent.register_task('init_lakeshore', therm.init_lakeshore,
                         startup=init_params)
     agent.register_task('set_values', therm.set_values)
+    agent.register_tast('get_values', therm.get_values)
     agent.register_task('upload_cal_curve', therm.upload_cal_curve)
     agent.register_process('acq', therm.acq, therm._stop_acq)
 
