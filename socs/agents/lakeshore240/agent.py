@@ -5,13 +5,10 @@ import warnings
 from typing import Optional
 
 import txaio
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 
 from socs.Lakeshore.Lakeshore240 import Module
-
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
 
 
 class LS240_Agent:
