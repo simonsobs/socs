@@ -374,7 +374,7 @@ def main(args=None):
     agent.register_task('init_lakeshore', therm.init_lakeshore,
                         startup=init_params)
     agent.register_task('set_values', therm.set_values)
-    agent.register_tast('get_values', therm.get_values)
+    agent.register_task('get_values', therm.get_values)
     agent.register_task('upload_cal_curve', therm.upload_cal_curve)
     agent.register_process('acq', therm.acq, therm._stop_acq)
 
