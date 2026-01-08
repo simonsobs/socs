@@ -297,7 +297,7 @@ class Channel:
         """
 
         sensor = ["Diode", "PlatRTC", "NTC RTD"]
-        return sensor[self._sensor]
+        return sensor[self._sensor-1]
 
     def _get_readable_range(self):
         """
@@ -315,7 +315,7 @@ class Channel:
         """
 
         units = ["Kelvin", "Celsius", "Sensor", "Fahrenheit"]
-        return units[self._unit]
+        return units[self._unit-1]
 
     def get_values(self):
         """
