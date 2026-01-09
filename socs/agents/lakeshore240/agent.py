@@ -5,13 +5,10 @@ import warnings
 from typing import Optional
 
 import txaio
+from ocs import ocs_agent, site_config
+from ocs.ocs_twisted import TimeoutLock
 
 from socs.Lakeshore.Lakeshore240 import Module
-
-on_rtd = os.environ.get('READTHEDOCS') == 'True'
-if not on_rtd:
-    from ocs import ocs_agent, site_config
-    from ocs.ocs_twisted import TimeoutLock
 
 
 class LS240_Agent:
@@ -130,6 +127,55 @@ class LS240_Agent:
             )
 
         return True, 'Set values for channel {}'.format(params['channel'])
+
+    @ocs_agent.param('channel', type=int, check=lambda x: 1 <= x <= 8)
+    def get_values(self, session, params):
+        """get_values(channel)
+
+        **Task** - Get the set values for a particular channel.
+
+        Parameters:
+            channel (int): Channel to get the set sensor type, range,
+                auto_range, current_reversal, units, and enabled values for.
+                Valid values for channel are 1-8.
+
+        The most recent data collected is stored in session data in the
+        structure::
+
+            >>> response.session['data']
+            {"fields":
+                {"sensor": "Diode",
+                 "range": 1000,
+                 "auto_range": True,
+                 "current_reversal": True,
+                 "unit": "K",
+                 "enabled": True},
+             "timestamp":1601925677.6914878}
+        """
+        with self.lock.acquire_timeout(0, job='get_values') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            current_values = self.module.channels[params["channel"] - 1].get_values()
+            current_sensor = current_values['sensor']
+            current_range = current_values['range']
+            current_auto_range = current_values['auto_range']
+            current_current_reversal = current_values['current_reversal']
+            current_unit = current_values['unit']
+            current_enabled = current_values['enabled']
+
+            session.add_message(f'Sensor for channel {params["channel"]} is {current_sensor}')
+            session.add_message(f'Range for channel {params["channel"]} is {current_range} Ohms')
+            session.add_message(f'Auto Range for channel {params["channel"]} is {current_auto_range}')
+            session.add_message(f'Current Reversal for channel {params["channel"]} is {current_current_reversal}')
+            session.add_message(f'Unit for channel {params["channel"]} is {current_unit}')
+            session.add_message(f'Enabled for channel {params["channel"]} is {current_enabled}')
+
+            session.data = current_values
+
+        return True, current_values
 
     def upload_cal_curve(self, session, params=None):
         """upload_cal_curve(channel, filename)
@@ -328,6 +374,7 @@ def main(args=None):
     agent.register_task('init_lakeshore', therm.init_lakeshore,
                         startup=init_params)
     agent.register_task('set_values', therm.set_values)
+    agent.register_task('get_values', therm.get_values)
     agent.register_task('upload_cal_curve', therm.upload_cal_curve)
     agent.register_process('acq', therm.acq, therm._stop_acq)
 
