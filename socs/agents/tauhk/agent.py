@@ -18,46 +18,47 @@ from ..meta_pb2 import *
 '''
 
 
-import atexit
 import os
 import queue
-import re
 import socket
 import subprocess
 import threading
 import time
-from datetime import datetime
+import re
+import socket
 from functools import lru_cache, partial, update_wrapper
+import atexit
 from subprocess import Popen
-
-import txaio
-import yaml
-from google.protobuf.json_format import MessageToDict
-from ocs import ocs_agent, site_config
-# The linter may tell you that these are unused but they are needed for the protobuf validation
-from pb2 import meta_pb2, validate_pb2
+from datetime import datetime
 from pb2.system_pb2 import HKdata, HKsystem
+# The linter may tell you that these are unused but they are needed for the protobuf validation
+from pb2 import validate_pb2, meta_pb2
+import yaml
+from ocs import ocs_agent, site_config
+import txaio
+
+
 from protoc_gen_validate.validator import ValidationFailed, validate_all
+from google.protobuf.json_format import MessageToDict
 
 
 class TauHKAgent:
     """TauHKAgent handles communication with the tauHK housekeeping system.
 
-    This agent acts as a bridge between the tauHK system and the OCS framework.
+    This agent acts as a bridge between the tauHK system and the OCS framework. 
     For support please contact: simont@princeton.edu
 
     Notes:
         This agent relies on protobuf definitions that contain the experiment configurations.
     """
-
     def __init__(self, agent):
         self.agent = agent
         self.log = agent.log
         self._take_data = False
 
-        self.command_port = ("127.0.0.1", 3006)
+        self.command_port=("127.0.0.1", 3006)
         self.info_port = ("127.0.0.1", 3007)
-        self.toplevel_messagae = "system.HKsystem"
+        self.toplevel_messagae="system.HKsystem"
 
         self.latest_data = dict()
 
@@ -66,7 +67,7 @@ class TauHKAgent:
         atexit.register(self._stop_crate, None, None)
 
         agg_parameters = {
-            'frame_length': 10  # seconds
+            'frame_length': 10 # seconds
         }
         self.agent.register_feed('tauhk_data', record=True, agg_params=agg_parameters, buffer_time=1.0)
         self.agent.register_feed('tauhk_logs', record=True, agg_params=agg_parameters, buffer_time=1.0)
@@ -81,7 +82,7 @@ class TauHKAgent:
         Args:
             include_pattern (str, optional): Regex pattern to include specific data keys. Defaults to None.
             exclude_pattern (str, optional): Regex pattern to exclude specific data keys. Defaults to None
-
+        
         Notes:
             session["data"] will contain the latest received data as a dictionary with flattened keys such as 'channelname_quantityname'.
             Typically quanitites of interest will be postfixed with _temperature.
@@ -92,11 +93,12 @@ class TauHKAgent:
         if self._take_data:
             return False, 'Data acquisition is already running. Call stop to end the current acquisition.'
 
-        include_pattern = re.compile(params['include_pattern']) if params['include_pattern'] else None
-        exclude_pattern = re.compile(params['exclude_pattern']) if params['exclude_pattern'] else None
-
+        include_pattern=re.compile(params['include_pattern']) if params['include_pattern'] else None
+        exclude_pattern=re.compile(params['exclude_pattern']) if params['exclude_pattern'] else None
+        
+        
         self.log.info("Opening port and listening on UDP port 8080...")
-
+        
         # Create UDP socket
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.bind(('localhost', 8080))
@@ -111,9 +113,9 @@ class TauHKAgent:
                     message = HKdata()
                     message.ParseFromString(data)
                     decoded_data = MessageToDict(message, preserving_proto_field_name=True)
-
+                    
                     # Extract and convert the timestamp
-                    message_timestamp = int(decoded_data["global_data"]["system_time"]) / 1000  # convert from millis from epoche to seconds
+                    message_timestamp = int(decoded_data["global_data"]["system_time"])/1000 #convert from millis from epoche to seconds
 
                     # The returned dict is nested with each channel containing its own dict of quantities
                     # This is inconvenient for OCS, so we flatten it out to key:value pairs with keys like channelname_quantityname
@@ -125,7 +127,7 @@ class TauHKAgent:
                         for channel_quantity, value in channel_data.items():
                             # Create the flattened key
                             key = "_".join([channel_name, channel_quantity])
-
+                            
                             # Apply include and exclude filters
                             # is this logic right? Maybe include should override exclude?
                             if include_pattern and not include_pattern.search(key):
@@ -142,14 +144,15 @@ class TauHKAgent:
 
                             data_dicts[spf][key] = value
 
+                        
                     # Since a single block needs to always have the same keys we split it into different
                     # sample rates (spf)
                     # So output one feed message per spf
                     for spf, data_dict in data_dicts.items():
-                        feed_message = {'block_name': f'tauhk_data_{spf}_spf', 'timestamp': message_timestamp, 'data': data_dict}
+                        feed_message = {'block_name': f'tauhk_data_{spf}_spf', 'timestamp': message_timestamp,'data': data_dict}
                         self.agent.publish_to_feed('tauhk_data', feed_message)
                         # keep a running latest data dict
-                        # here newer and older spfs may overwrite each other but
+                        # here newer and older spfs may overwrite each other but 
                         # thats probably ok as it is the latest data after all
                         self.latest_data.update(data_dict)
                     # and make it available in the session
@@ -157,7 +160,7 @@ class TauHKAgent:
                     session.data['timestamp'] = message_timestamp
                 except Exception as e:
                     # raise e
-                    # how best to handle an error here?
+                    #how best to handle an error here?
                     self.log.error(f"Error receiving data: {e}")
 
         self.agent.feeds['tauhk_data'].flush_buffer()
@@ -176,7 +179,7 @@ class TauHKAgent:
 
     def start_crate(self, session, params):
         """Connect to tauHK crate
-
+        
         **Process** - Runs the daemon that talks to the tauHK hardware.
 
         Notes:
@@ -196,11 +199,16 @@ class TauHKAgent:
         # Call the crate interface binary
         # There are problems with buffering and logs arriving out of order
         self.process = subprocess.Popen(
-            ['./tauhk-agent'],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env={"RUST_LOG": "info"},
+            ['./tauhk-agent'], 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE, 
+            text=True, 
+            env={
+                "RUST_LOG":"info", 
+                "TAUHK_IP_CMD_SEND":"10.1.0.74", 
+                "TAUHK_IP_CMD_RECV":"10.1.0.77", 
+                "TAUHK_IP_DATA":"10.1.0.77"
+                }, 
             bufsize=1
         )
         self.log.info(f"Started tauHK crate daemon with PID {self.process.pid}")
@@ -216,7 +224,7 @@ class TauHKAgent:
         # Non daemon threads since otherwise they end abruptly when the main thread ends and cause a segault on the .put
         threading.Thread(target=partial(send_from_stream, name='stdout', q=q), args=(self.process.stdout,), daemon=False).start()
         threading.Thread(target=partial(send_from_stream, name='stderr', q=q), args=(self.process.stderr,), daemon=False).start()
-
+        
         # the main thread hangs out here sending log lines to the feed
         # If it's been a while between messages it can check if the process is still alive
         retval = None
@@ -224,7 +232,7 @@ class TauHKAgent:
         while True:
             try:
                 name, line = q.get(timeout=1.0)
-                feed_message = {'block_name': f'tauhk_logs_{name}', 'timestamp': time.time(), 'data': {f'tauhk_logs_{name}': line}}
+                feed_message = {'block_name': f'tauhk_logs_{name}', 'timestamp': time.time(),'data': {f'tauhk_logs_{name}': line}}
                 session.data = {'latest_log': line, 'timestamp': time.time(), "is_alive": True}
                 self.agent.publish_to_feed('tauhk_logs', feed_message)
             except queue.Empty:
@@ -242,6 +250,8 @@ class TauHKAgent:
         self.agent.feeds['tauhk_logs'].flush_buffer()
         return retval
 
+        
+
     def _stop_crate(self, session, params):
         """_stop_crate()
 
@@ -256,6 +266,7 @@ class TauHKAgent:
         self.process = None
         return True, 'tauHK crate daemon stopped.'
 
+
     @ocs_agent.param('value', type=str)
     @ocs_agent.param('option', type=str)
     @ocs_agent.param('channel', type=str)
@@ -267,12 +278,12 @@ class TauHKAgent:
             channel (str): The name of the channel to which the command is sent.
             option (str): The name of the option within the channel to which the command is
             value (str): The value to set for the specified channel and option.
-
+        
         Notes:
-            Channels defintions are in the config file for tauHK.
+            Channels defintions are in the config file for tauHK. 
             Different channel types have different options.
             A list of valid channel names and options is provided by the advertise task.
-
+ 
             In case you are writing a script, the following commands are available:
             rtdChannel.logdac sets the excitation range for RTDs from 0(min) to 15(max)
             rtdChannel.uvolts sets the excitation voltage in microvolts (e.g., 56 for 56uV)
@@ -287,12 +298,14 @@ class TauHKAgent:
         ret, status = set_param(message, channel_name, option_name, val)
         if not ret:
             return False, status
-
+        
         ret, status = send_command(message, self.command_port)
         if not ret:
             return False, status
-
+        
         return True, f"Sent {channel_name}.{option_name}={val} successfully."
+    
+
 
     def advertise(self, session, params):
         """advertise()
@@ -314,40 +327,41 @@ class TauHKAgent:
             {
                 'global_options': {
                     'restart': list()                       # Restart the firmware running on the crate
-                },
+                }, 
                 'rtd_0': {
                     'logdac': ["int", (0, 15)],             # Set excitation in logdac units (more is more)
                     'uvolts': ["int", (0, 1000)]            # Set excitation voltage in microvolts
-                },
+                }, 
                 'diode_0': {
                     'excitation': ["enum", {                # Set excitation mode for diodes
-                        'DC': 0,
-                        'AC': 1,
+                        'DC': 0, 
+                        'AC': 1, 
                         'None': 2
-                    }]
+                    }]                         
                 },
             }
             ```
         """
         advertised = dict()
 
-        # Restricted type mapping from the TYPE_* constants that FieldDescriptor.type returns
-        type_mapping = {14: "enum", 13: "uint32", }
+
+        # Restricted type mapping from the TYPE_* constants that FieldDescriptor.type returns 
+        type_mapping = {14: "enum", 13: "uint32",}
 
         # Grab the protobuf message definition as it contains the channel names and options
         message = HKsystem()
-        # this grabs the names of all the channels (+ global_options)
+        #this grabs the names of all the channels (+ global_options)
         all_fields = message.DESCRIPTOR.fields_by_name.keys()
         for field in all_fields:
             advertised[field] = dict()
-            # similarly this grabs all the commandable options for each channel
+            #similarly this grabs all the commandable options for each channel
             options = getattr(message, field).DESCRIPTOR.fields_by_name.keys()
             for option in options:
                 if option == 'raw':
-                    # we skip raw as its not user friendly
+                    #we skip raw as its not user friendly
                     continue
                 if option == 'restart':
-                    # special case for restart this is the empaty message
+                    #special case for restart this is the empaty message
                     advertised[field][option] = list()
                     continue
                 # generic case
@@ -357,7 +371,7 @@ class TauHKAgent:
                     # ugh oh not in my restricted mapping
                     self.log.error(f"Unknown type {getattr(message, field).DESCRIPTOR.fields_by_name[option].type} for {field}.{option}")
                     continue
-
+                
                 if data_type == "enum":
                     # we need to get the enum values
                     enum_dict = getattr(message, field).DESCRIPTOR.fields_by_name[option].enum_type.values_by_name
@@ -377,13 +391,13 @@ class TauHKAgent:
                             break
                     if not found:
                         # no explicit rules so assume full range of uint32
-                        advertised[field][option] = ["int", (0, 2**32 - 1)]
+                        advertised[field][option] = ["int", (0, 2**32-1)]
                 else:
                     # Currently unimplemented
                     self.log.error(f"Unknown type {data_type} for {field}.{option}")
         session.data = {"settables": advertised}
         return True, 'Advertised tauHK commands.'
-
+    
     @ocs_agent.param('config_file', type=str)
     def load_config(self, session, params):
         """load_config()
@@ -395,7 +409,7 @@ class TauHKAgent:
 
         Notes:
             The YAML configuration file should contain all the commands to be sent to tauHK.
-
+            
             An example of a valid configuration file is:
             ```
             rtd_1:
@@ -411,31 +425,31 @@ class TauHKAgent:
             return False, 'No config file provided.'
         with open(params['config_file'], 'r') as f:
             config = yaml.safe_load(f)
+        
 
         message = HKsystem()
         for channel_name, channel_command in config.items():
-            # key is channel name
-            # value is a list of options
-            # each element has key value pairs of option_name:option_value
+            #key is channel name
+            #value is a list of options
+            #each element has key value pairs of option_name:option_value
             for command in channel_command:
                 option, value = iter(command.items()).__next__()
 
                 ret_val, ret_str = set_param(message, channel_name, option, value)
                 if not ret_val:
                     return False, ret_str
-
+        
         ret, status = send_command(message, self.command_port)
         if not ret:
             return False, status
 
         return True, f"Loaded config from {params['config_file']} successfully."
-
-
+        
 @lru_cache(maxsize=256)
 def get_spf(channel_name, channel_quantity):
     '''get_spf(channel_name, channel_quantity)
     Return the samples per frame (spf) for a given channel and quantity as defined in the protobuf options.
-
+    
     :param channel_name: Description
     :param channel_quantity: Description
     '''
@@ -447,18 +461,17 @@ def get_spf(channel_name, channel_quantity):
             spf = field_option[1]
             break
     if channel_name == "global_data" and (channel_quantity == "system_time" or channel_quantity == "mcu_time"):
-        spf = 80
+        spf=80
 
     if spf is None:
         raise ValueError(f"No spf found for field {channel_name}.{channel_quantity}")
 
     return spf
 
-
 def send_command(message, command_port):
     """send_command(message, command_port)
     Send a premade protobuf command to the tauHK system.
-
+    
     :param message: Protobuf message to be sent
     :param command_port: The port on which to send it to
     """
@@ -483,7 +496,7 @@ def set_param(message, channel_name, option_name, val):
     # get the type of the option we are setting
     thing_type = type(getattr(getattr(message, channel_name), option_name))
     value = thing_type()
-    # deal with special bool case
+    #deal with special bool case
     if thing_type == bool:
         if val.lower() in ['true', '1', 'yes']:
             value = True
@@ -492,18 +505,18 @@ def set_param(message, channel_name, option_name, val):
         else:
             return False, f"Invalid boolean value: {val} for {channel_name}.{option_name}"
     else:
-        # try the generic type cast
+        #try the generic type cast
         try:
             value = thing_type(val)
         except Exception as e:
             return False, f"Failed type cast for: {val} for {channel_name}.{option_name} due to {e}"
     try:
         # set the value in the message
-        # TODO: this likely fails on an empty message. Need to use setinparent for that special case
+        ## TODO: this likely fails on an empty message. Need to use setinparent for that special case
         setattr(getattr(message, channel_name), option_name, value)
     except Exception as e:
         return False, f"Failed to set {channel_name}.{option_name} to {value}: {e}"
-
+    
     # validate the message
     try:
         validate_all(message)
@@ -511,37 +524,36 @@ def set_param(message, channel_name, option_name, val):
         return False, f"Validation failed for {channel_name}.{option_name} with value {value}: {e}"
     return True, f"Set {channel_name}.{option_name} to {value} successfully."
 
-
-def main(args=None):
+def main(args = None):
 
     txaio.use_twisted()
     LOG = txaio.make_logger()
 
-    txaio.start_logging(level=os.environ.get('LOGLEVEL', 'info'))
+    txaio.start_logging(level= os.environ.get('LOGLEVEL', 'info'))
 
     args = site_config.parse_args(agent_class='tauHKAgent', args=args)
     agent, runner = ocs_agent.init_site_agent(args)
 
-    # instantiate the system
+    #instantiate the system
     system = TauHKAgent(agent)
-
-    # register the generic send command config commands
+    
+    #register the generic send command config commands
     agent.register_task('generic_send', system.generic_send)
     agent.register_task('load_config', system.load_config)
 
-    # register the advertise process and run it on startup.
+    #register the advertise process and run it on startup. 
     # The config is compiled in so it can never change and therefore it never needs tio be re-run
     def dummy_stop(*args, **kwargs):
         return True, "Advertise process does not support stopping."
     agent.register_process('advertise', system.advertise, stop_func=dummy_stop, startup=True)
 
-    # register the data receiving process
+    #register the data receiving process
     agent.register_process('receive_data', system.receive_data, system._stop_receive)
 
-    # register the crate start/stop commands
+    #register the crate start/stop commands
     agent.register_process('start_crate', system.start_crate, system._stop_crate)
-
-    # and start!
+    
+    #and start!
     runner.run(agent, auto_reconnect=True)
 
 
