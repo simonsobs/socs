@@ -927,13 +927,13 @@ class ControlState:
         outlets: List[int]
             List of outlets to power cycle in this order
         """
-        driver_power_agent_type: Literal['iboot, synaccess']
+        gripper_power_agent_type: Literal['iboot, synaccess']
         outlets: List[int]
 
         def __post_init__(self):
-            if self.driver_power_agent_type not in ['iboot', 'synaccess']:
+            if self.gripper_power_agent_type not in ['iboot', 'synaccess']:
                 raise ValueError(
-                    f"Invalid driver_power_agent_type: {self.driver_power_agent_type}. "
+                    f"Invalid driver_power_agent_type: {self.gripper_power_agent_type}. "
                     "Must be in ['iboot', 'synaccess']"
                 )
 
@@ -1497,6 +1497,8 @@ class HWPSupervisor:
         self.driver_iboot_outlets = args.driver_iboot_outlets
         self.driver_power_cycle_twice = args.driver_power_cycle_twice
         self.driver_power_cycle_wait_time = args.driver_power_cycle_wait_time
+        self.gripper_power_agent_type = args.gripper_power_agent_type
+        self.gripper_iboot_outlets = args.gripper_iboot_outlets
 
         self.shutdown_no_data_timeout = args.shutdown_no_data_timeout
         self.shutdown_mode = False
@@ -2064,7 +2066,7 @@ class HWPSupervisor:
             'gripper_power_agent_type': self.gripper_power_agent_type,
             'outlets': self.gripper_iboot_outlets,
         }
-        state = ControlState.PowerCylceGripper(**kw)
+        state = ControlState.PowerCycleGripper(**kw)
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
