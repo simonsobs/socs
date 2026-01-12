@@ -923,7 +923,7 @@ class ControlState:
         Attributes
         -----------
         driver_power_agent_type: Literal['iboot, synaccess']
-            Type of agent used for controlling the driver power
+            Type of agent used for controlling the gripper power
         outlets: List[int]
             List of outlets to power cycle in this order
         """
@@ -933,7 +933,7 @@ class ControlState:
         def __post_init__(self):
             if self.gripper_power_agent_type not in ['iboot', 'synaccess']:
                 raise ValueError(
-                    f"Invalid driver_power_agent_type: {self.gripper_power_agent_type}. "
+                    f"Invalid gripper_power_agent_type: {self.gripper_power_agent_type}. "
                     "Must be in ['iboot', 'synaccess']"
                 )
 
