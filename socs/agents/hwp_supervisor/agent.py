@@ -1462,6 +1462,7 @@ class HWPSupervisor:
         self.driver_power_cycle_wait_time = args.driver_power_cycle_wait_time
 
         self.shutdown_no_data_timeout = args.shutdown_no_data_timeout
+        self.shutdown_delay = args.shutdown_delay
         self.shutdown_mode = False
 
     def _get_hwp_clients(self):
@@ -1627,14 +1628,16 @@ class HWPSupervisor:
             if action == 'ok':
                 last_okay_time = time.time()
             elif action == 'no_data' and self.shutdown_no_data_timeout >= 0:
-                if (time.time() - last_okay_time) > self.shutdown_no_data_timeout:
+                if (time.time() - last_okay_time) > \
+                        self.shutdown_no_data_timeout + self.shutdown_delay:
                     if not self.shutdown_mode:
                         self.agent.start('disable_driver_board', params={})
                         self.shutdown_mode = True
             elif action == 'stop':
-                if not self.shutdown_mode:
-                    self.agent.start('disable_driver_board', params={})
-                    self.shutdown_mode = True
+                if (time.time() - last_okay_time) > self.shutdown_delay:
+                    if not self.shutdown_mode:
+                        self.agent.start('disable_driver_board', params={})
+                        self.shutdown_mode = True
 
             if test_mode:
                 break
@@ -2119,6 +2122,11 @@ def make_parser(parser=None):
     pgroup.add_argument(
         '--shutdown-no-data-timeout', type=float, default=15 * 60,
         help="Time(sec) after which a 'no_data' action should trigger a shutdown"
+    )
+    pgroup.add_argument(
+        '--shutdown-delay', type=float, default=15 * 60,
+        help="Time(sec) to delay the supervisor shutdown to let "
+             "other hwp shutdown protocols finish"
     )
     return parser
 
