@@ -918,7 +918,7 @@ class ControlState:
     @dataclass
     class PowerCycleGripper:
         """
-        Power Cycle Gripper elesctronics
+        Power Cycle Gripper electronics.
 
         Attributes
         -----------
