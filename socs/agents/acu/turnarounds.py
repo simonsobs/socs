@@ -18,6 +18,7 @@ def gen_turnaround(turnaround_method, t0, az0, el0, v0, turntime, az_flag, el_fl
             2. "three_leg": Generates a special turnaround that splits the turnaround into three "legs" that attempt to
                 minimize the acceleration at the midpoint of the turnaround. See the _gen_three_leg_turnaround() docstring
                 for further documentation.
+            3. "two_leg": Generates a "three_leg" turnaround with second_leg_time = 0. 
         t0 (float): The initial time of the turnaround.
         az0 (float): The iniital azimuth position of the turnaround. Should be equal to the final azimuth position of the turnaround.
         el0 (float): The initial elevation of the turnaround. El velocity is forced to 0 here so this is only used for creating TrackPoints.
