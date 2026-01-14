@@ -352,7 +352,7 @@ def generate_constant_velocity_scan(az_endpoint1, az_endpoint2, az_speed,
             celestial sources in targeted scans.
         turnaround_method (str): The method used for generating turnaround.
             (Default) 'standard' generates the baseline minimal jerk trajectory.
-            'standard_gen' genetares a list of track_points throughout the turnaround
+            'standard_gen' generates a list of track_points throughout the turnaround
             to mimic the standard acu turnaround.
             'three_leg' generates a three-leg turnaround which attempts to
             minimize the acceleration at the midpoint of the turnaround.
@@ -589,7 +589,7 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
             celestial sources in targeted scans.
         turnaround_method (str): The method used for generating turnaround.
             'standard' is unusable with type3 scans!
-            'standard_gen' genetares a list of track_points throughout the turnaround
+            'standard_gen' generates a list of track_points throughout the turnaround
             to mimic the standard acu turnaround and is usable for type3 scans.
             'three_leg' generates a three-leg turnaround which attempts to
             minimize the acceleration at the midpoint of the turnaround.
@@ -852,7 +852,7 @@ def generate_type2_scan(az_endpoint1, az_endpoint2, az_speed,
             celestial sources in targeted scans.
         turnaround_method (str): The method used for generating turnaround.
             'standard' is unusable with type2 scans!
-            'standard_gen' genetares a list of track_points throughout the turnaround
+            'standard_gen' generates a list of track_points throughout the turnaround
             to mimic the standard acu turnaround and is usable for type2 scans.
             'three_leg' generates a three-leg turnaround which attempts to
             minimize the acceleration at the midpoint of the turnaround.
