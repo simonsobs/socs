@@ -1802,7 +1802,7 @@ class ACUAgent:
                      default=None)
     @ocs_agent.param('turnaround_method', type=str, default=None,
                      choices=[None, 'standard', 'standard_gen',
-                              'three_leg'])
+                              'three_leg', 'two_leg'])
     @ocs_agent.param('reset', default=False, type=bool)
     @inlineCallbacks
     def set_scan_params(self, session, params):
@@ -2060,7 +2060,7 @@ class ACUAgent:
     @ocs_agent.param('az_vel_ref', type=float, default=None)
     @ocs_agent.param('turnaround_method', default=None,
                      choices=[None, 'standard', 'standard_gen',
-                              'three_leg'])
+                              'three_leg', 'two_leg'])
     @ocs_agent.param('scan_upload_length', type=float, default=None)
     @ocs_agent.param('type', default=None, choices=[1, 2, 3])
     @inlineCallbacks
@@ -2134,8 +2134,12 @@ class ACUAgent:
                 If None then the average of the endpoints is used.
             turnaround_method (str): The method used for generating turnaround.
                 Default (None) generates the baseline minimal jerk trajectory.
+                'standard' uses the acu standard turnaround generation (same as None).
+                'standard_gen' generates a track_point list of points that mimics
+                the acu standard turnaround generation for use in type2/type3 scans.
                 'three_leg' generates a three-leg turnaround which attempts to
                 minimize the acceleration at the midpoint of the turnaround.
+                'two_leg' generates a three-leg turnaround with second_leg_time = 0.
             scan_upload_length (float): number of seconds for each set
                 of uploaded points. If this is not specified, the
                 track manager will try to use as short a time as is
