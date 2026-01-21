@@ -2,7 +2,9 @@ import argparse
 import os
 import subprocess
 import time
+import traceback
 
+import sqlalchemy
 import txaio
 from ocs import ocs_agent, site_config
 
@@ -111,7 +113,8 @@ class SupRsync:
                     "iterations": 1,
                     "copies": 0,
                     "errors_timeout": 0,
-                    "errors_nonzero": 0
+                    "errors_nonzero": 0,
+                    "errors_sqlite": 0
                   },
                 }
         """
@@ -138,6 +141,7 @@ class SupRsync:
             'copies': 0,
             'errors_timeout': 0,
             'errors_nonzero': 0,
+            'errors_sqlite': 0,
         }
 
         session.data = {
@@ -164,6 +168,7 @@ class SupRsync:
                 op['files'] = handler.copy_files(max_copy_attempts=self.max_copy_attempts,
                                                  num_files=self.files_per_batch)
                 counters['copies'] += len(op['files'])
+                session.degraded = False
             except subprocess.TimeoutExpired as e:
                 self.log.error("Timeout when copying files! {e}", e=e)
                 op['error'] = 'timed out'
@@ -172,6 +177,14 @@ class SupRsync:
                 self.log.error("rsync returned non-zero exit code! {e}", e=e)
                 op['error'] = 'nonzero exit'
                 counters['errors_nonzero'] += 1
+            except sqlalchemy.exc.OperationalError as e:  # database is locked
+                session.degraded = True
+                counters['errors_sqlite'] += 1
+                self.log.warn(f"Operational error: {e}")
+                self.log.debug("{e}", e=traceback.format_exc())
+                self.log.info("Waiting 5 seconds before continuing...")
+                time.sleep(5)
+                continue
 
             now = time.time()
 
@@ -180,16 +193,37 @@ class SupRsync:
             if now - last_tcdir_update > tcdir_update_interval:
                 # add timecode-dirs for all files from the last week
                 self.log.info("Creating timecode dirs for recent files.....")
-                # DB: Queries w/occasional writes when a new dir is found.
-                srfm.create_all_timecode_dirs(
-                    self.archive_name, min_ctime=now - (7 * 24 * 3600)
-                )
-                self.log.info("Finished creating tcdirs")
-                last_tcdir_update = now
+                try:
+                    # DB: Queries w/occasional writes when a new dir is found.
+                    srfm.create_all_timecode_dirs(
+                        self.archive_name, min_ctime=now - (7 * 24 * 3600)
+                    )
+                    self.log.info("Finished creating tcdirs")
+                    last_tcdir_update = now
+                    session.degraded = False
+                except sqlalchemy.exc.OperationalError as e:  # database is locked
+                    session.degraded = True
+                    counters['errors_sqlite'] += 1
+                    self.log.warn(f"Operational error: {e}")
+                    self.log.debug("{e}", e=traceback.format_exc())
+                    self.log.info("Waiting 5 seconds before continuing...")
+                    time.sleep(5)
+                    continue
 
             # Compute archive statistics.
-            # DB: Query only.
-            archive_stats = srfm.get_archive_stats(self.archive_name)
+            try:
+                # DB: Query only.
+                archive_stats = srfm.get_archive_stats(self.archive_name)
+                session.degraded = False
+            except sqlalchemy.exc.OperationalError as e:  # database is locked
+                session.degraded = True
+                counters['errors_sqlite'] += 1
+                self.log.warn(f"Operational error: {e}")
+                self.log.debug("{e}", e=traceback.format_exc())
+                self.log.info("Waiting 5 seconds before continuing...")
+                time.sleep(5)
+                continue
+
             if archive_stats is not None:
                 self.agent.publish_to_feed('archive_stats', {
                     'block_name': self.archive_name,
@@ -212,13 +246,33 @@ class SupRsync:
             # Delete transferred files from disk after specified time.
             if self.delete_after is not None:
                 session.data['activity'] = 'deleting'
-                # DB: Begins a session, queries, and writes.
-                handler.delete_files(self.delete_after)
+                try:
+                    # DB: Begins a session, queries, and writes.
+                    handler.delete_files(self.delete_after)
+                    session.degraded = False
+                except sqlalchemy.exc.OperationalError as e:  # database is locked
+                    session.degraded = True
+                    counters['errors_sqlite'] += 1
+                    self.log.warn(f"Operational error: {e}")
+                    self.log.debug("{e}", e=traceback.format_exc())
+                    self.log.info("Waiting 5 seconds before continuing...")
+                    time.sleep(5)
+                    continue
 
             # After handling files, update the timecode dirs
-            # DB: Mostly queries, w/occasional writes.
-            srfm.update_all_timecode_dirs(
-                self.archive_name, self.suprsync_file_root, self.instance_id)
+            try:
+                # DB: Mostly queries, w/occasional writes.
+                srfm.update_all_timecode_dirs(
+                    self.archive_name, self.suprsync_file_root, self.instance_id)
+                session.degraded = False
+            except sqlalchemy.exc.OperationalError as e:  # database is locked
+                session.degraded = True
+                counters['errors_sqlite'] += 1
+                self.log.warn(f"Operational error: {e}")
+                self.log.debug("{e}", e=traceback.format_exc())
+                self.log.info("Waiting 5 seconds before continuing...")
+                time.sleep(5)
+                continue
 
             session.data['activity'] = 'idle'
             time.sleep(self.sleep_time)
