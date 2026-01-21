@@ -667,6 +667,7 @@ class SupRsyncFileHandler:
                     cmd.extend(['--rsh', f'ssh -i {self.ssh_key}'])
                 cmd.extend([tmp_dir + '/', dest])
 
+                self.log.debug(f"Running: {' '.join(cmd)}")
                 subprocess.run(cmd, check=True, timeout=self.copy_timeout)
 
             for file in files:
