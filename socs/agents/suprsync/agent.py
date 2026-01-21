@@ -116,6 +116,8 @@ class SupRsync:
                 }
         """
 
+        # DB: These two objects don't establish a DB session on creation, just
+        # within their respective methods.
         srfm = SupRsyncFilesManager(
             self.db_path, create_all=True, echo=self.db_echo,
             pool_size=self.db_pool_size, max_overflow=self.db_pool_max_overflow
@@ -155,8 +157,10 @@ class SupRsync:
 
             op = {'start_time': time.time()}
 
+            # Copy files to remote, check remote md5sums.
             try:
                 session.data['activity'] = 'copying'
+                # DB: Begins a session, queries, and writes when done.
                 op['files'] = handler.copy_files(max_copy_attempts=self.max_copy_attempts,
                                                  num_files=self.files_per_batch)
                 counters['copies'] += len(op['files'])
@@ -171,15 +175,20 @@ class SupRsync:
 
             now = time.time()
 
+            # Record 5-digit timecode dirs in DB. (Doesn't actually create any
+            # directories on disk.)
             if now - last_tcdir_update > tcdir_update_interval:
                 # add timecode-dirs for all files from the last week
                 self.log.info("Creating timecode dirs for recent files.....")
+                # DB: Queries w/occasional writes when a new dir is found.
                 srfm.create_all_timecode_dirs(
                     self.archive_name, min_ctime=now - (7 * 24 * 3600)
                 )
                 self.log.info("Finished creating tcdirs")
                 last_tcdir_update = now
 
+            # Compute archive statistics.
+            # DB: Query only.
             archive_stats = srfm.get_archive_stats(self.archive_name)
             if archive_stats is not None:
                 self.agent.publish_to_feed('archive_stats', {
@@ -200,11 +209,14 @@ class SupRsync:
                     'data': counters})
                 next_feed_update = now + 10 * 60
 
+            # Delete transferred files from disk after specified time.
             if self.delete_after is not None:
                 session.data['activity'] = 'deleting'
+                # DB: Begins a session, queries, and writes.
                 handler.delete_files(self.delete_after)
 
             # After handling files, update the timecode dirs
+            # DB: Mostly queries, w/occasional writes.
             srfm.update_all_timecode_dirs(
                 self.archive_name, self.suprsync_file_root, self.instance_id)
 
