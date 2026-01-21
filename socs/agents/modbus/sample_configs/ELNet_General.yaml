@@ -1,0 +1,151 @@
+read_len: 58
+read_start: 2
+read_type: input
+registers:
+  V_L1N:
+    offset: 0
+    read_as: 32F
+    scale: 1.0
+    units: V
+  V_L2N:
+    offset: 2
+    read_as: 32F
+    scale: 1.0
+    units: V
+  V_L3N:
+    offset: 4
+    read_as: 32F
+    scale: 1.0
+    units: V
+  V_L1L2:
+    offset: 6
+    read_as: 32F
+    scale: 1.0
+    units: V
+  V_L2L3:
+    offset: 8
+    read_as: 32F
+    scale: 1.0
+    units: V
+  V_L3L1:
+    offset: 10
+    read_as: 32F
+    scale: 1.0
+    units: V
+  I_L1:
+    offset: 12
+    read_as: 32F
+    scale: 1.0
+    units: A
+  I_L2:
+    offset: 14
+    read_as: 32F
+    scale: 1.0
+    units: A
+  I_L3:
+    offset: 16
+    read_as: 32F
+    scale: 1.0
+    units: A
+  Active_Power_L1:
+    offset: 18
+    read_as: 32F
+    scale: 1.0
+    units: W
+  Active_Power_L2:
+    offset: 20
+    read_as: 32F
+    scale: 1.0
+    units: W
+  Active_Power_L3:
+    offset: 22
+    read_as: 32F
+    scale: 1.0
+    units: W
+  Total_Active_Power:
+    offset: 24
+    read_as: 32F
+    scale: 1.0
+    units: W
+  Apparent_Power_L1:
+    offset: 26
+    read_as: 32F
+    scale: 1.0
+    units: VA
+  Apparent_Power_L2:
+    offset: 28
+    read_as: 32F
+    scale: 1.0
+    units: VA
+  Apparent_Power_L3:
+    offset: 30
+    read_as: 32F
+    scale: 1.0
+    units: VA
+  Total_Apparent_Power:
+    offset: 32
+    read_as: 32F
+    scale: 1.0
+    units: VA
+  Reactive_Power_L1:
+    offset: 34
+    read_as: 32F
+    scale: 1.0
+    units: VAr
+  Reactive_Power_L2:
+    offset: 36
+    read_as: 32F
+    scale: 1.0
+    units: VAr
+  Reactive_Power_L3:
+    offset: 38
+    read_as: 32F
+    scale: 1.0
+    units: VAr
+  Total_Reactive_Power:
+    offset: 40
+    read_as: 32F
+    scale: 1.0
+    units: VAr
+  PF_1:
+    offset: 42
+    read_as: 32F
+    scale: 1.0
+    units: None
+  PF_2:
+    offset: 44
+    read_as: 32F
+    scale: 1.0
+    units: None
+  PF_3:
+    offset: 46
+    read_as: 32F
+    scale: 1.0
+    units: None
+  Total_PF:
+    offset: 48
+    read_as: 32F
+    scale: 1.0
+    units: None
+  Frequency_L1:
+    offset: 50
+    read_as: 32F
+    scale: 1.0
+    units: Hz
+  Frequency_L2:
+    offset: 52
+    read_as: 32F
+    scale: 1.0
+    units: Hz
+  Frequency_L3:
+    offset: 54
+    read_as: 32F
+    scale: 1.0
+    units: Hz
+  I_N:
+    offset: 56
+    read_as: 32F
+    scale: 1.0
+    units: A
+
+block_name: General Data
