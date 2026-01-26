@@ -34,8 +34,10 @@ from pb2.system_pb2 import HKdata, HKsystem
 # The linter may tell you that these are unused but they are needed for the protobuf validation
 from pb2 import validate_pb2, meta_pb2
 import yaml
-from ocs import ocs_agent, site_config
+from ocs import ocs_agent, site_config, ocs_feed
 import txaio
+from copy import deepcopy
+
 
 
 from protoc_gen_validate.validator import ValidationFailed, validate_all
@@ -61,26 +63,26 @@ class TauHKAgent:
         self.toplevel_messagae="system.HKsystem"
 
         self.latest_data = dict()
+        self.averaged_data = dict()
 
         self.process = None
         # ensure the crate daemon is stopped on exit
         atexit.register(self._stop_crate, None, None)
+        
+        self.agent.register_feed('tauhk_data_full', record=True, agg_params={'frame_length': 10, 'exclude_influx': True,}, buffer_time=1.0)
+        self.agent.register_feed('tauhk_data_influx', record=True, agg_params={'frame_length': 10,}, buffer_time=1.0 )
+        self.agent.register_feed('tauhk_logs', record=True, agg_params={'frame_length': 10}, buffer_time=1.0)
 
-        agg_parameters = {
-            'frame_length': 10 # seconds
-        }
-        self.agent.register_feed('tauhk_data', record=True, agg_params=agg_parameters, buffer_time=1.0)
-        self.agent.register_feed('tauhk_logs', record=True, agg_params=agg_parameters, buffer_time=1.0)
-
-    @ocs_agent.param('include_pattern', default=None, type=str)
+    @ocs_agent.param('include_pattern', default='(.*_temperature$)|(.*_voltage$)|(.*_resistance$)|(.*_logdac$)|(.*_enabled_dc$)|(.*_enabled_chop$)', type=str)
     @ocs_agent.param('exclude_pattern', default=None, type=str)
     def receive_data(self, session, params):
-        """receive_data(include_pattern=None, exclude_pattern=None)
+        """receive_data(include_pattern='(.*_temperature$)|(.*_voltage$)|(.*_resistance$)|(.*_logdac$)|(.*_enabled_dc$)|(.*_enabled_chop$)', exclude_pattern=None)
 
         **Process** - Receive housekeeping data from tauHK and publish to OCS feed.
 
         Args:
-            include_pattern (str, optional): Regex pattern to include specific data keys. Defaults to None.
+            include_pattern (str, optional): Regex pattern to include specific data keys. 
+                Defaults to save temperature, resistance, voltage, lodac, enabled_dc, and enabled_chop
             exclude_pattern (str, optional): Regex pattern to exclude specific data keys. Defaults to None
         
         Notes:
@@ -110,6 +112,7 @@ class TauHKAgent:
                 try:
                     data, addr = sock.recvfrom(4096)
                     # Decode protobuf to a nested dictionary
+                    # print("got data")
                     message = HKdata()
                     message.ParseFromString(data)
                     decoded_data = MessageToDict(message, preserving_proto_field_name=True)
@@ -150,20 +153,41 @@ class TauHKAgent:
                     # So output one feed message per spf
                     for spf, data_dict in data_dicts.items():
                         feed_message = {'block_name': f'tauhk_data_{spf}_spf', 'timestamp': message_timestamp,'data': data_dict}
-                        self.agent.publish_to_feed('tauhk_data', feed_message)
+                        # print("sent data")
+                        self.agent.publish_to_feed('tauhk_data_full', feed_message)
                         # keep a running latest data dict
                         # here newer and older spfs may overwrite each other but 
                         # thats probably ok as it is the latest data after all
                         self.latest_data.update(data_dict)
+                        if spf not in self.averaged_data:
+                            self.averaged_data[spf] = data_dict
+                        else:
+                            for measurement, value in data_dict.items():
+                                self.averaged_data[spf][measurement] += value
                     # and make it available in the session
                     session.data = self.latest_data
                     session.data['timestamp'] = message_timestamp
+
+                    # if we hit the 1 spf data (happens about every second)
+                    # we publish to the influx database
+                    if 1 in data_dicts:                     
+                        data_averaged = dict()
+                        for spf, data_dict in self.averaged_data.items():
+                            for measurement, value in data_dict.items():
+                                # average but keep the data type!
+                                value_type = type(value)
+                                data_averaged[measurement] = value_type(value/spf)
+                        
+                        average_message = {'block_name': 'tauhk_data_averaged', 'timestamp': message_timestamp,'data': data_averaged}
+                        self.agent.publish_to_feed('tauhk_data_influx', average_message )
+                        self.averaged_data = dict()
                 except Exception as e:
                     # raise e
                     #how best to handle an error here?
                     self.log.error(f"Error receiving data: {e}")
 
-        self.agent.feeds['tauhk_data'].flush_buffer()
+        self.agent.feeds['tauhk_data_influx'].flush_buffer()
+        self.agent.feeds['tauhk_data_full'].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
 
@@ -234,6 +258,7 @@ class TauHKAgent:
                 name, line = q.get(timeout=1.0)
                 feed_message = {'block_name': f'tauhk_logs_{name}', 'timestamp': time.time(),'data': {f'tauhk_logs_{name}': line}}
                 session.data = {'latest_log': line, 'timestamp': time.time(), "is_alive": True}
+                # self.log.info(str(line))
                 self.agent.publish_to_feed('tauhk_logs', feed_message)
             except queue.Empty:
                 # When exiting cleanly the process will be None
