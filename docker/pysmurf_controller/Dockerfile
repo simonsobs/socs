@@ -10,7 +10,8 @@ USER cryo
 RUN git config --global --add safe.directory /sodetlib
 USER root
 WORKDIR /sodetlib
-RUN pip3 install .
+RUN pip3 install -U pip
+RUN pip3 install -e .
 RUN pip3 install -r requirements.txt
 
 ENV OCS_CONFIG_DIR /config
