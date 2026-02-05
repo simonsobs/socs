@@ -670,6 +670,7 @@ class SupRsyncFileHandler:
                 self.log.debug(f"Running: {' '.join(cmd)}")
                 subprocess.run(cmd, check=True, timeout=self.copy_timeout)
 
+            # Mark all files as 'copied' to remote.
             for file in files:
                 file.copied = time.time()
 
