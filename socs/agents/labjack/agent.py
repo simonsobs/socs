@@ -249,8 +249,22 @@ class LabJackAgent:
                 return False, "Could not acquire lock."
 
             # Connect with the labjack
-            self.handle = ljm.openS("ANY", "ANY", self.ip_address)
-            info = ljm.getHandleInfo(self.handle)
+            try:
+                self.handle = ljm.openS("ANY", "ANY", self.ip_address)
+                info = ljm.getHandleInfo(self.handle)
+            except LJMError as e:
+                self.log.error(f"Failed to connect to device: {e}")
+                self.log.error("{e}", e=traceback.format_exc())
+                self.log.critical("Stopping reactor.")
+                reactor.callFromThread(reactor.stop)
+                return False, 'Initialization failed.'
+            except Exception as e:
+                self.log.error(f"Caught unexpected {type(e).__name__} during init:")
+                self.log.error("{e}", e=traceback.format_exc())
+                self.log.critical("Stopping reactor.")
+                reactor.callFromThread(reactor.stop)
+                return False, 'Initialization failed.'
+
             self.log.info("\nOpened LabJack of type: %i, Connection type: %i,\n"
                           "Serial number: %i, IP address: %s, Port: %i" %
                           (info[0], info[1], info[2],
