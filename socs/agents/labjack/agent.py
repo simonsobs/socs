@@ -3,6 +3,7 @@ import csv
 import os
 import struct
 import time
+import traceback
 
 import numexpr
 import numpy as np
@@ -13,6 +14,7 @@ from labjack.ljm.ljm import LJMError
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 from scipy.interpolate import interp1d
+from twisted.internet import reactor
 
 txaio.use_twisted()
 
@@ -336,7 +338,22 @@ class LabJackAgent:
                 }
 
                 # Query the labjack
-                raw_output = ljm.eStreamRead(self.handle)
+                try:
+                    raw_output = ljm.eStreamRead(self.handle)
+                except LJMError as e:
+                    session.degraded = True
+                    self.log.error(f"Failed to read stream: {e}")
+                    self.log.error("{e}", e=traceback.format_exc())
+                    self.log.critical("Stopping reactor.")
+                    reactor.callFromThread(reactor.stop)
+                    return False, 'Acquisition failed.'
+                except Exception as e:
+                    session.degraded = True
+                    self.log.error(f"Caught unexpected {type(e).__name__} while streaming:")
+                    self.log.error("{e}", e=traceback.format_exc())
+                    self.log.critical("Stopping reactor.")
+                    reactor.callFromThread(reactor.stop)
+                    return False, 'Acquisition failed.'
                 output = raw_output[0]
 
                 # Data comes in form ['AIN0_1', 'AIN1_1', 'AIN0_2', ...]
