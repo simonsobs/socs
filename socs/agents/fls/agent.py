@@ -8,6 +8,9 @@ from ocs.ocs_twisted import Pacemaker, TimeoutLock
 from socs.agents.fls.drivers import DLCSmart
 
 BYTE_END = "\n>"
+MAX_FREQ = 880.
+MIN_FREQ = 20.
+
 
 class FLSAgent:
     """
@@ -48,6 +51,11 @@ class FLSAgent:
 
         
     def initialize(self, session, params=None):
+        """
+        initialize()
+
+        ***Task*** - Initialize the connection to the DLC Smart
+        """
         if self.initialized:
             return True, "Already initialized"
         with self.lock.acquire_timeout(0, job='initialize') as acquired:
@@ -81,6 +89,21 @@ class FLSAgent:
         return True, "FLS agent initialized"
 
     def sampling(self, session, params):
+        """
+        sampling()
+
+        ***Process*** - Starts the 'sampling' data acquisiton from the DLC Smart.
+
+        Notes:
+            The data collected are stored in session data in the structure:
+
+                >> response.session['data']
+                {'fields':
+                    {'set_frequency': 110.0,
+                     'actual_frequency': 109.3425,
+                     'photocurrent': 0.1124,
+                     'timestamp': 1771277799.562098}
+        """
         with self.lock.acquire_timeout(0, job='sampling') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start sampling because {self.lock.job}"
@@ -129,6 +152,9 @@ class FLSAgent:
         return True, 'Acquisition exited cleanly.'
 
     def _stop_acq(self, session, params):
+        """
+        Stops sampling process.
+        """
         if self.take_sampling:
             self.take_sampling = False
             return True, 'requested to stop taking sampling data.'
@@ -136,6 +162,11 @@ class FLSAgent:
             return False, 'acq is not currently running.'
 
     def turn_lasers_on(self, session, params):
+        """
+        turn_lasers_on()
+
+        ***Task*** - Enable emission from both lasers
+        """
         with self.lock.acquire_timeout(timeout=5, job='turn_lasers_on') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
@@ -161,6 +192,11 @@ class FLSAgent:
                     return False, "Lasers did not turn on"
 
     def turn_lasers_off(self, session, params):
+        """
+        turn_lasers_off()
+
+        ***Task*** - Disable emission from both lasers
+        """
         with self.lock.acquire_timeout(timeout=5, job='turn_lasers_off') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
@@ -187,6 +223,17 @@ class FLSAgent:
     
     @ocs_agent.param('bias', type=str)
     def set_bias(self, sesssion, params):
+        """
+        set_bias(bias)
+
+        ***Task*** - Set the bias amplitude and offset of the lasers to a preset
+                     condition.
+
+        Parameters:
+            bias (str): Preset condition to set the bias for the lasers. Options are
+                        'zero' to set the bias to zero, or 'default' to set the bias to
+                        default.
+        """
         bias_to_set = params['bias']
         with self.lock.acquire_timeout(timeout=5, job='turn_lasers_off') as acquired:
             if not acquired:
@@ -211,35 +258,54 @@ class FLSAgent:
                 return False, "Bias not successfully set.')
         return True, f"Bias successfully set to {bias_to_set}."
 
-    @ocs_agent.param('set_frequency', type=float)
+    @ocs_agent.param('frequency', type=float)
     def set_frequency(self, session, params):
-        set_frequency = params['set_frequency']
+        """
+        set_frequency(frequency)
+
+        ***Task*** - Set the frequency of the laser system, and wait until the system
+                     reaches that frequency. Frequency must be between 20 GHz and
+                     880 GHz.
+
+        Parameters:
+            frequency (float): The frequency to set the laser to.
+        """
+        set_frequency = params['frequency']
+        assert set_frequency >= MIN_FREQ, "Frequency must be above 20 GHz!"
+        assert set_frequency < MAX_FREQ, "Frequency must be below 880 GHz!"
+
         with self.lock.acquire_timeout(timeout=5, job='set_frequency') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-        # Read the actual frequency
-        actual_frequency = self.dlcsmart.get_actual_frequency()
-
-        # Set the new frequency
-        set_the_freq = self.dlcsmart.set_frequency(set_frequency)
-
-        # Check to see when the actual frequency gets 'close enough' to the set frequency
-        while round(actual_frequency, 2) != set_frequency:
-            time.sleep(1)
+            # Read the actual frequency
             actual_frequency = self.dlcsmart.get_actual_frequency()
-        if round(actual_frequency, 2) == set_frequency:
-            time.sleep(2)
-            actual_frequency = self.dlcsmart.get_actual_frequency()
+
+            # Set the new frequency
+            set_the_freq = self.dlcsmart.set_frequency(set_frequency)
+
+            # Check to see when the actual frequency gets 'close enough' to the set frequency
             while round(actual_frequency, 2) != set_frequency:
                 time.sleep(1)
                 actual_frequency = self.dlcsmart.get_actual_frequency()
+                self.log.info(f"Frequency is {actual_frequency} GHz")
+            if round(actual_frequency, 2) == set_frequency:
+                time.sleep(2)
+                actual_frequency = self.dlcsmart.get_actual_frequency()
+                self.log.info(f"Frequency is {actual_frequency} GHz")
+                while round(actual_frequency, 2) != set_frequency:
+                    time.sleep(1)
+                    actual_frequency = self.dlcsmart.get_actual_frequency()
+                    self.log.info(f"Frequency is {actual_frequency} GHz")
 
         return True, f"Set frequency to {set_frequency} GHz"
 
     def _check_scan_params(min_freq, max_freq, freq_step, start_dir):
+        """
+        Check that the scan parameters are the same as what you set them to.
+        """
         scan_param_check = self.dlcsmart.check_scan_params()
         if scan_param_check[0] == "#t" + BYTE_END:
             self.log.info("Scan mode set to fast")
@@ -270,12 +336,39 @@ class FLSAgent:
     @ocs_agent.param('frequency_step', type=float, default=0.05)
     @ocs_agent_param('num_of_sweeps', type=int, default=1)
     def run_frequency_sweeps(self, session, params):
+        """
+        run_frequency_sweeps(min_frequency, max_frequency, start_direction,
+                             frequency_step, num_of_sweeps)
+
+        ***Task*** - Run frequency sweeps between the two frequency values.
+
+        Parameters:
+            min_frequency (float): Minimum frequency for the sweeps (GHz).
+            max_frequency (float): Maximum frequency for the sweeps (GHz).
+            start_direction (int): Indicates increasing or decreasing frequency. Use
+                                   start_direction = 1 for increasing frequency, or 
+                                   start_direction = -1 for decreasing frequency
+            frequency_step (float): Step size between frequencies during the sweep (GHz).
+                                    Must be at least 0.01 GHz.
+            num_of_sweeps (int): Number of times to sweep across the frequency range.
+                                 Automatically changes between increasing and decreasing
+                                 frequency.
+        """
+        
         min_freq = params['min_frequency']
         max_freq = params['max_frequency']
         start_dir = params['start_direction']
         freq_step = params['frequency_step']
         nsweeps = params['num_of_sweeps']
 
+        assert min_freq < max_freq, "max_freq must be greater than min_freq!"
+        assert min_freq >= MIN_FREQ, "min_freq must be at least 20 GHz."
+        assert min_freq < MAX_FREQ, "min_freq must be less than 880 GHz."
+        assert max_freq >= MIN_FREQ, "max_freq must be at least 20 GHz."
+        assert max_freq < MAX_FREQ, "max_freq must be less than 880 GHz."
+        assert freq_step >= 0.01, "minimum step size is 0.01 GHz."
+        assert start_dir in (-1, 1), "Choose start_dir=1 (increasing) or -1 (decreasing)"
+ 
         with self.lock.acquire_timeout(timeout=5, job='set_frequency') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
@@ -368,19 +461,3 @@ def main(args=None):
     agent.register_task('set_frequency', fls_agent.set_frequency)
     agent.register_task('run_frequency_sweeps', fls_agent.run_frequency_sweeps)
     agent.register_process('sampling', fls_agent.sampling, fls_agent._stop_acq)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
