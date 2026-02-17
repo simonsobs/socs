@@ -2,6 +2,7 @@ import os
 import subprocess
 import tempfile
 import time
+from contextlib import nullcontext
 
 import txaio
 import yaml
@@ -220,42 +221,45 @@ class SupRsyncFilesManager:
 
     def get_archive_stats(self, archive_name, session=None):
         if session is None:
-            session = self.Session()
+            cm = self.Session.begin()
+        else:
+            cm = nullcontext(session)
 
-        files = session.query(SupRsyncFile).filter(
-            SupRsyncFile.archive_name == archive_name,
-        ).order_by(asc(SupRsyncFile.timestamp)).all()
+        with cm as session:
+            files = session.query(SupRsyncFile).filter(
+                SupRsyncFile.archive_name == archive_name,
+            ).order_by(asc(SupRsyncFile.timestamp)).all()
 
-        finalized_until = None
-        num_files_to_copy = 0
-        last_file_added = ''
-        last_file_copied = ''
+            finalized_until = None
+            num_files_to_copy = 0
+            last_file_added = ''
+            last_file_copied = ''
 
-        for f in files:
-            last_file_added = f.local_path
-            if (f.local_md5sum == f.remote_md5sum):
-                last_file_copied = f.local_path
+            for f in files:
+                last_file_added = f.local_path
+                if (f.local_md5sum == f.remote_md5sum):
+                    last_file_copied = f.local_path
 
-            if (not f.ignore) and (f.local_md5sum != f.remote_md5sum):
-                num_files_to_copy += 1
+                if (not f.ignore) and (f.local_md5sum != f.remote_md5sum):
+                    num_files_to_copy += 1
 
-            if finalized_until is None and not (f.ignore):
-                if f.local_md5sum != f.remote_md5sum:
-                    finalized_until = f.timestamp - 1
+                if finalized_until is None and not (f.ignore):
+                    if f.local_md5sum != f.remote_md5sum:
+                        finalized_until = f.timestamp - 1
 
-        # There are no more uncopied files that aren't ignored
-        if finalized_until is None:
-            finalized_until = time.time()
+            # There are no more uncopied files that aren't ignored
+            if finalized_until is None:
+                finalized_until = time.time()
 
-        stats = {
-            'finalized_until': finalized_until,
-            'num_files': len(files),
-            'uncopied_files': num_files_to_copy,
-            'last_file_added': last_file_added,
-            'last_file_copied': last_file_copied,
-        }
+            stats = {
+                'finalized_until': finalized_until,
+                'num_files': len(files),
+                'uncopied_files': num_files_to_copy,
+                'last_file_added': last_file_added,
+                'last_file_copied': last_file_copied,
+            }
 
-        return stats
+            return stats
 
     def get_finalized_until(self, archive_name, session=None):
         """
@@ -271,19 +275,22 @@ class SupRsyncFilesManager:
                 session
         """
         if session is None:
-            session = self.Session()
-
-        query = session.query(SupRsyncFile).filter(
-            SupRsyncFile.archive_name == archive_name,
-        ).order_by(asc(SupRsyncFile.timestamp))
-
-        for file in query.all():
-            if file.ignore:
-                continue
-            if file.local_md5sum != file.remote_md5sum:
-                return file.timestamp - 1
+            cm = self.Session.begin()
         else:
-            return time.time()
+            cm = nullcontext(session)
+
+        with cm as session:
+            query = session.query(SupRsyncFile).filter(
+                SupRsyncFile.archive_name == archive_name,
+            ).order_by(asc(SupRsyncFile.timestamp))
+
+            for file in query.all():
+                if file.ignore:
+                    continue
+                if file.local_md5sum != file.remote_md5sum:
+                    return file.timestamp - 1
+            else:
+                return time.time()
 
     def add_file(self, local_path, remote_path, archive_name,
                  local_md5sum=None, timestamp=None, session=None,
@@ -315,10 +322,11 @@ class SupRsyncFilesManager:
                            local_md5sum=local_md5sum, timestamp=timestamp,
                            deletable=deletable)
         if session is None:
-            with self.Session.begin() as session:
-                self._add_file_tcdir(file, session)
-                session.add(file)
+            cm = self.Session.begin()
         else:
+            cm = nullcontext(session)
+
+        with cm as session:
             self._add_file_tcdir(file, session)
             session.add(file)
 
@@ -345,27 +353,30 @@ class SupRsyncFilesManager:
                 Number of files to return
         """
         if session is None:
-            session = self.Session()
+            cm = self.Session.begin()
+        else:
+            cm = nullcontext(session)
 
-        if max_copy_attempts is None:
-            max_copy_attempts = 2**10
+        with cm as session:
+            if max_copy_attempts is None:
+                max_copy_attempts = 2**10
 
-        query = session.query(SupRsyncFile).filter(
-            SupRsyncFile.removed == None,  # noqa: E711
-            SupRsyncFile.archive_name == archive_name,
-            SupRsyncFile.failed_copy_attempts < max_copy_attempts,
-            SupRsyncFile.ignore == False,  # noqa: E712
-        )
+            query = session.query(SupRsyncFile).filter(
+                SupRsyncFile.removed == None,  # noqa: E711
+                SupRsyncFile.archive_name == archive_name,
+                SupRsyncFile.failed_copy_attempts < max_copy_attempts,
+                SupRsyncFile.ignore == False,  # noqa: E712
+            )
 
-        files = []
-        for f in query.all():
-            if f.local_md5sum != f.remote_md5sum:
-                files.append(f)
-            if num_files is not None:
-                if len(files) >= num_files:
-                    break
+            files = []
+            for f in query.all():
+                if f.local_md5sum != f.remote_md5sum:
+                    files.append(f)
+                if num_files is not None:
+                    if len(files) >= num_files:
+                        break
 
-        return files
+            return files
 
     def get_deletable_files(self, archive_name, delete_after, session=None):
         """
@@ -384,22 +395,25 @@ class SupRsyncFilesManager:
                 Session to use to query files.
         """
         if session is None:
-            session = self.Session()
+            cm = self.Session.begin()
+        else:
+            cm = nullcontext(session)
 
-        query = session.query(SupRsyncFile).filter(
-            SupRsyncFile.removed == None,  # noqa: E711
-            SupRsyncFile.archive_name == archive_name,
-            SupRsyncFile.deletable,
-        )
+        with cm as session:
+            query = session.query(SupRsyncFile).filter(
+                SupRsyncFile.removed == None,  # noqa: E711
+                SupRsyncFile.archive_name == archive_name,
+                SupRsyncFile.deletable,
+            )
 
-        files = []
-        now = time.time()
-        for f in query.all():
-            if f.local_md5sum == f.remote_md5sum:
-                if now > f.timestamp + delete_after:
-                    files.append(f)
+            files = []
+            now = time.time()
+            for f in query.all():
+                if f.local_md5sum == f.remote_md5sum:
+                    if now > f.timestamp + delete_after:
+                        files.append(f)
 
-        return files
+            return files
 
     def get_known_files(self, archive_name, session=None, min_ctime=None):
         """Gets all files.  This can be used to help avoid
@@ -416,17 +430,20 @@ class SupRsyncFilesManager:
 
         """
         if session is None:
-            session = self.Session()
+            cm = self.Session.begin()
+        else:
+            cm = nullcontext(session)
 
-        if min_ctime is None:
-            min_ctime = 0
+        with cm as session:
+            if min_ctime is None:
+                min_ctime = 0
 
-        query = session.query(SupRsyncFile).filter(
-            SupRsyncFile.archive_name == archive_name,
-            SupRsyncFile.timestamp > min_ctime,
-        ).order_by(asc(SupRsyncFile.timestamp))
+            query = session.query(SupRsyncFile).filter(
+                SupRsyncFile.archive_name == archive_name,
+                SupRsyncFile.timestamp > min_ctime,
+            ).order_by(asc(SupRsyncFile.timestamp))
 
-        return list(query.all())
+            return list(query.all())
 
     def _add_file_tcdir(self, file: SupRsyncFile, session):
         """
