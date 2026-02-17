@@ -49,8 +49,10 @@ def add_local_files_func(args):
 
     args.local_root = os.path.abspath(args.local_root)
 
-    known_files = srfm.get_known_files(args.archive_name)
-    known_paths = [f.local_path for f in known_files]
+    # Needs access to a session to build `known_paths`.
+    with srfm.Session.begin() as session:
+        known_files = srfm.get_known_files(args.archive_name, session=session)
+        known_paths = [f.local_path for f in known_files]
     local_paths = []
     remote_paths = []
     now = time.time()
