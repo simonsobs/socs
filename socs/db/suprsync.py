@@ -188,6 +188,28 @@ def create_file(local_path, remote_path, archive_name, local_md5sum=None,
     return file
 
 
+def beginsession(f):
+    """A decorator to wrap instance methods with a context manager for
+    beginning and properly closing SQLAlchemy sessions within the
+    SupRsyncFilesManager.
+
+    This is to facilitate automatic clean up of sessions in methods that
+    interact with the database.
+
+    """
+    @wraps(f)
+    def wrapper(self, *args, session=None, **kwargs):
+        if session is None:
+            cm = self.Session.begin()
+        else:
+            cm = nullcontext(session)
+
+        with cm as context_session:
+            kwargs.update({'session': context_session})
+            return f(self, *args, **kwargs)
+    return wrapper
+
+
 class SupRsyncFilesManager:
     """
     Helper class for accessing and adding entries to the SupRsync
@@ -219,27 +241,6 @@ class SupRsyncFilesManager:
 
         if create_all:
             Base.metadata.create_all(self._engine)
-
-    @staticmethod
-    def beginsession(f):
-        """A decorator to wrap instance methods with a context manager for
-        beginning and properly closing SQLAlchemy sessions.
-
-        This is to facilitate automatic clean up of sessions in functions that
-        interact with the database.
-
-        """
-        @wraps(f)
-        def wrapper(self, *args, session=None, **kwargs):
-            if session is None:
-                cm = self.Session.begin()
-            else:
-                cm = nullcontext(session)
-
-            with cm as context_session:
-                kwargs.update({'session': context_session})
-                return f(self, *args, **kwargs)
-        return wrapper
 
     @beginsession
     def get_archive_stats(self, archive_name, session=None):
