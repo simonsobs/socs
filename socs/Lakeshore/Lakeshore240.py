@@ -291,6 +291,48 @@ class Channel:
                                                                  int(self._enabled)]])
         self.ls.msg(input_type_message)
 
+    def _get_readable_sensor(self):
+        """
+        Returns a human-readable sensor value (str) for the channel.
+        """
+
+        sensor = ["Diode", "PlatRTC", "NTC RTD"]
+        return sensor[self._sensor - 1]
+
+    def _get_readable_range(self):
+        """
+        Returns a human-readable range value (int) for the channels current range.
+
+        Units are in Ohms.
+        """
+
+        ranges = [10, 30, 100, 300, 1e3, 3e3, 1e4, 3e4, 1e5]
+        return ranges[self._range]
+
+    def _get_readable_unit(self):
+        """
+        Returns a human-readable unit value (str) for the channel.
+        """
+
+        units = ["Kelvin", "Celsius", "Sensor", "Fahrenheit"]
+        return units[self._unit - 1]
+
+    def get_values(self):
+        """
+        Returns the values set for this channel.
+
+        See set_values for value meanings/interpretations.
+        """
+
+        data = {"sensor": self._get_readable_sensor(),
+                "auto_range": bool(self._auto_range),
+                "range": self._get_readable_range(),
+                "current_reversal": bool(self._current_reversal),
+                "unit": self._get_readable_unit(),
+                "enabled": bool(self._enabled)}
+
+        return data
+
     def read_curve(self):
         # Reads curve
         breakpoints = []

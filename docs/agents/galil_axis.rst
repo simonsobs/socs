@@ -53,36 +53,56 @@ Galil Axis Config
 A Galil axis configuration file defines the motion settings, motor
 parameters, and brake mappings for each controlled axis. This allows the user
 to easily adapt to different hardware configurations or coordinate multiple
-axes (e.g., E and F) during operation::
+axes (e.g., A, B, C, D) during operation::
 
-   galil:
-      motorsettings:
-        countspermm: 4000
-        countsperdeg: 2000
-      brakes:
-        output_map:
-          E: '5'
-          F: '6'
-      motorconfigparams:
-        E:
-          MT: '1'
-          OE: '1'
-          AG: '0'
-          TL: '2'
-          AU: '0'
-        F:
-          MT: '1'
-          OE: '1'
-          AG: '0'
-          TL: '2'
-          AU: '0'
-      initaxisparams:
-        BA: 'True'
-        BM: '3276.8'
-        BZ: '3'
-      dwell_times:
-        low: '1000'
-        high: '1500'
+
+        galil:
+          motorsettings:
+            countspermm: 4000
+            countsperdeg: 2000
+          limitsetting:
+            polarity: '1'
+            disable_limits:
+              B: '3'
+              D: '3'
+          brakes:
+            output_map:
+              A: '1'
+              B: '2'
+              C: '3'
+              D: '4'
+          motorconfigparams:
+            A:              # linear axis
+              MT: '1'
+              OE: '1'
+              AG: '2'
+              TL: '5'
+              AU: '9'
+            B:              # linear axis
+              MT: '1'
+              OE: '1'
+              AG: '2'
+              TL: '5'
+              AU: '9'
+            C:              # rotary axis
+              MT: '1'
+              OE: '1'
+              AG: '2'
+              TL: '5'
+              AU: '9'
+            D:              # rotary axis
+              MT: '1'
+              OE: '1'
+              AG: '2'
+              TL: '5'
+              AU: '9'
+          initaxisparams:
+            BA: 'True'          # if True, will drive motors for each axis at 3V (BZ) for prepping for servo'd motion
+            BM: '3276.8'
+            BZ: '3'
+          dwell_times:
+            first_ms: '1000'
+            second_ms: '1500'
 
 
 
@@ -142,7 +162,7 @@ that raw encoder position should then be defined as :code:`0`.
 To continuously move an axis, we use :code:`set_jog_speed` to define the speed at
 which the axis will jog::
 
-  client.set_jog_speed(speed=5000.0)
+  client.set_jog_speed(axis='A', speed=5000.0)
 
 Here, :code:`5000.0` is in units of counts/sec. Note that the speed set through :code:`set_jog_speed`
 is always specified in counts/sec, unlike other tasks that alow motion in physical units
@@ -187,7 +207,7 @@ Example usage of defining leader/follower axes and the gearing ratio::
 
 Here, the second field corresponds to B and the fourth field corresponds to D.
 
-Another example using axes E and F as defined by the example OCS Site Configuration File::
+Another example using axes E and F for a 6-axis Galil motor controller system::
 
   # using axes E and F
   client.set_gearing(order=',,,,,E')

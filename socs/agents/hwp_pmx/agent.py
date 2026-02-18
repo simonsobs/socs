@@ -467,12 +467,12 @@ class HWPPMXAgent:
             elif action == 'no_data':
                 if (time.time() - last_ok_time) > self.no_data_timeout:
                     if not self.shutdown_mode:
-                        self.agent.start('initiate_shutdown', params=None)
+                        self.agent.start('initiate_shutdown', params={})
 
             # If action is 'shutdown', trigger shutdown
             elif action == 'stop':
                 if not self.shutdown_mode:
-                    self.agent.start('initiate_shutdown', params=None)
+                    self.agent.start('initiate_shutdown', params={})
 
             data = {
                 'data': {'rotation_action': action},
