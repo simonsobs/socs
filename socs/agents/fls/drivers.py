@@ -13,11 +13,12 @@ class DLCSmart():
         self.timeout = timeout
     
     # basic read and write functionality    
-    def read_all(self):
+    def read_all(self, decode=True):
         """
         Handles decoding anything read out from the DLC Smart.
         """
         data = b""
+        expect_prompt = False
         while True:
             try:
                 chunk = self.sock.recv(1024)
@@ -25,14 +26,15 @@ class DLCSmart():
                 break
             data += chunk
             if expect_prompt and data.endswith(b">"):
-                print('>')
                 break
             if not expect_prompt and b"\n" in chunk:
-                print('newline')
                 break
-        return data.decode().strip()
+        if decode:
+            return data.decode('ascii', errors='ignore').replace('\r', '').strip('\n> ')
+        else:
+            return data
     
-    def send_msg(self, cmd):
+    def send_msg(self, cmd, read_response=True, decode=True):
         """
         Encode the message, send to the DLC Smart, and read
         back the response.
@@ -41,8 +43,11 @@ class DLCSmart():
             raise ConnectionError("Not connected to device")
         self.sock.sendall((cmd + "\n").encode())
         time.sleep(0.01)
-        response = self.read_all()
-        return response
+        if read_response:
+            response = self.read_all(decode=decode)
+            return response
+        else:
+            return True
 
     # connect and disconnect
     def connect(self):
@@ -52,10 +57,9 @@ class DLCSmart():
         """
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.settimeout(self.timeout)
-        self.sock.connect((self.host, self.command_port))
+        self.sock.connect((self.ip_addr, self.tcp_port))
         welcome = self.read_all()
-        print(welcome)
-        return True
+        return True, welcome
     
     def close_connection(self):
         """
@@ -63,14 +67,14 @@ class DLCSmart():
         """
         if self.sock:
             try:
-                self.send_msg("(quit)")
+                self.send_msg("(quit)", read_response=False)
             except Exception:
                 pass
             self.sock.close()
             self.sock = None
    
     # formatting for requests, param setting, and commands
-    def param_ref(self, param):
+    def param_ref(self, param, printout=False):
         """
         Request a parameter from the DLC Smart and read in the
         response.
@@ -85,7 +89,8 @@ class DLCSmart():
         """
         msg = f"(param-ref '{param})"
         resp = self.send_msg(msg)
-        print(f"{param}: ", resp)
+        if printout:
+            print(f"{param}: ", resp)
         return resp
     
     def param_set(self, param, val):
@@ -105,7 +110,7 @@ class DLCSmart():
         resp = self.send_msg(msg)
         return resp
     
-    def command(self, param, *vals):
+    def command(self, param, decode=False, vals=[]):
         """
         Execute a command to the DLC Smart.
         
@@ -124,7 +129,7 @@ class DLCSmart():
             for val in vals:
                 msg += " " + str(val)
         msg += ")"
-        resp = self.send_msg(msg)
+        resp = self.send_msg(msg, decode=decode)
         return resp
     
 
@@ -134,8 +139,11 @@ class DLCSmart():
         self.ip_address = resp
         return resp
 
-    def set_dhcp(self):
+    def set_dhcp(self, apply=False):
         resp = self.command("net-conf:set-dhcp")
+        if apply:
+            apply_dhcp = self.command("net-conf:apply")
+            return
         return resp
     
     def get_system_label(self):
@@ -293,20 +301,20 @@ class DLCSmart():
                 'scan_set_frequency': [],
                 'scan_actual_frequency': [],
                 'scan_photocurrent': []}
-        get_point_num = self.command("frequency:fast-scan-get-data", [0, start_ix, 1024])
+        get_point_num = self.command("frequency:fast-scan-get-data", decode=False, [0, start_ix, 1024])
         pointnum_raw = base64.b64decode(get_point_num)
         pointnum_readable = np.frombuffer(pointnum_raw, dtype=np.float64)
 
         while len(get_point_num):
-            get_set_freq = self.command("frequency:fast-scan-get-data", [1, start_ix, 1024])
+            get_set_freq = self.command("frequency:fast-scan-get-data", decode=False, [1, start_ix, 1024])
             fset_raw = base64.b64decode(get_set_freq)
             fset_readable = np.frombuffer(fset_raw, dtype=np.float64)
 
-            get_act_freq = self.command("frequency:fast-scan-get-data", [6, start_ix, 1024])
+            get_act_freq = self.command("frequency:fast-scan-get-data", decode=False, [6, start_ix, 1024])
             fact_raw = base64.b64decode(get_act_freq)
             fact_readable = np.frombuffer(fact_raw, dtype=np.float64)
 
-            get_photocurrent = self.command("frequency:fast-scan-get-data", [2, start_ix, 1024])
+            get_photocurrent = self.command("frequency:fast-scan-get-data", decode=False, [2, start_ix, 1024])
             pcur_raw = base64.b64decode(get_photocurrent)
             pcur_readable = np.frombuffer(pcur_raw, dtype=np.float64)
 
@@ -317,7 +325,7 @@ class DLCSmart():
                 data['scan_photocurrent'].append(pcur_readable[i])
             
             start_ix += 1024
-            get_point_num = self.command("frequency:fast-scan-get-data", [0, start_ix, 1024])
+            get_point_num = self.command("frequency:fast-scan-get-data", decode=False, [0, start_ix, 1024])
             pointnum_raw = base64.b64decode(get_point_num)
             pointnum_readable = np.frombuffer(pointnum_raw, dtype=np.float64)
 

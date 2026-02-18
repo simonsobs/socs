@@ -119,7 +119,7 @@ class FLSAgent:
                 pm.sleep()
                 if time.time() - last_time > 1:
                 last_time = time.time()
-                if not self.lock.release_and_acquire(timeout=5): #do we need this part?
+                if not self.lock.release_and_acquire(timeout=5):
                     self.log.warn(f"Failed to re-acquire sampling lock, "
                                   "currently held by {self.lock.job}.")
                     continue
