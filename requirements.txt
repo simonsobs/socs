@@ -42,7 +42,7 @@ pfeiffer-vacuum-protocol==0.4
 
 # pysmurf controller
 pyepics
-pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
+pysmurf-slac @ git+https://github.com/slaclab/pysmurf.git@main
 sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
 # pin to just before 3.8 support dropped
 sotodlib @ git+https://github.com/simonsobs/sotodlib.git@5d613d5915b1716c401abecb5446088bce5fc1a4
