@@ -15,7 +15,16 @@ See source code or contact simont@princeton.edu for support.
 Building the tauHK Agent
 ------------------------
 
-This agent relies on protobuf definitions that contain the experiment configurations.
-These are shared between the tauHK daemon and the OCS agent.
+This agent relies on `protobuf <https://protobuf.dev/>` definitions that contain the experiment specific channel mappings.
+These definitions are shared between the tauHK daemon and the OCS agent.
 
-The agent also expects to communicate with a running instance of the tauHK daemon.
+To build these specific definitions, obtain a copy of the tauHK protobuf definitions and generator scripts.
+The experiment config yaml file is parsed by the python `build_protos.py` generator to produce a `system.proto`.
+
+The `system.proto`, along with it's dependants, is used to generate two build artifacts, one consumed by the deamon and one by the OCS agent.
+
+These are generated with:
+`protoc --descriptor_set_out=tauhk_descriptor_set.bin --include_imports -I protos -I protos/include protos/system.proto`
+`protoc --python_out=. -I protos -I protos/include protos/system.proto` (note that line 14 must be modified due to a quirk to be `from .include import ...`)
+
+Once these are copied to their correct locations then the agent must be restarted and the configuration will have taken effect.
