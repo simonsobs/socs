@@ -37,8 +37,8 @@ from google.protobuf.json_format import MessageToDict
 from ocs import ocs_agent, ocs_feed, site_config
 # The linter may tell you that these are unused but they are needed for the protobuf validation
 # The linter may tell you that these are unused but they are needed for the protobuf validation
-from pb2 import meta_pb2, validate_pb2
-from pb2.system_pb2 import HKdata, HKsystem
+from socs.agents.tauhk.pb2 import meta_pb2, validate_pb2
+from socs.agents.tauhk.pb2.system_pb2 import HKdata, HKsystem
 from protoc_gen_validate.validator import ValidationFailed, validate_all
 
 
