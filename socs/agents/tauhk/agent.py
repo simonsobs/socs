@@ -70,6 +70,7 @@ class TauHKAgent:
 
         self.agent.register_feed('tauhk_data_full', record=True, agg_params={'frame_length': 10, 'exclude_influx': True, }, buffer_time=1.0)
         self.agent.register_feed('tauhk_data_influx', record=True, agg_params={'frame_length': 10, }, buffer_time=1.0)
+        self.agent.register_feed('tauhk_logs', record=True, agg_params={'frame_length': 10}, buffer_time=1.0)
 
     @ocs_agent.param('include_pattern', default='(.*_temperature$)|(.*_voltage$)|(.*_resistance$)|(.*_logdac$)|(.*_enabled_dc$)|(.*_enabled_chop$)', type=str)
     @ocs_agent.param('exclude_pattern', default=None, type=str)
@@ -204,7 +205,7 @@ class TauHKAgent:
 
         Notes:
             This process will start the tauHK crate daemon and listen for log messages from it.
-            The logs will be logged to stdout and placed in session['data']['latest_log'].
+            The logs will be published to the tauhk_logs feed and placed in session['data']['latest_log'].
             TODO: There is currently a bug with stderr buffering and logs arriving out of order
         """
 
@@ -254,8 +255,10 @@ class TauHKAgent:
         while True:
             try:
                 name, line = q.get(timeout=1.0)
+                feed_message = {'block_name': f'tauhk_logs_{name}', 'timestamp': time.time(), 'data': {f'tauhk_logs_{name}': line}}
                 session.data = {'latest_log': line, 'timestamp': time.time(), "is_alive": True}
-                print(line)
+                # self.log.info(str(line))
+                self.agent.publish_to_feed('tauhk_logs', feed_message)
             except queue.Empty:
                 # When exiting cleanly the process will be None
                 if self.process is None:
@@ -268,6 +271,7 @@ class TauHKAgent:
                     retval = (False, 'tauHK crate daemon stopped unexpectedly.')
                     break
 
+        self.agent.feeds['tauhk_logs'].flush_buffer()
         return retval
 
     def _stop_crate(self, session, params):
