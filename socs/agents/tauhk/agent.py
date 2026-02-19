@@ -549,7 +549,7 @@ def main(args=None):
 
     txaio.start_logging(level=os.environ.get('LOGLEVEL', 'info'))
 
-    args = site_config.parse_args(agent_class='tauHKAgent', args=args)
+    args = site_config.parse_args(agent_class='TauHKAgent', args=args)
     agent, runner = ocs_agent.init_site_agent(args)
 
     # instantiate the system
