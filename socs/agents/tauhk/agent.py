@@ -20,6 +20,7 @@ from ..meta_pb2 import *
 
 import atexit
 import os
+import pathlib
 import queue
 import re
 import socket
@@ -218,6 +219,7 @@ class TauHKAgent:
 
         # Call the crate interface binary
         # There are problems with buffering and logs arriving out of order
+        agent_path = pathlib.Path(__file__).parent.resolve()
         self.process = subprocess.Popen(
             ['./tauhk-agent'],
             stdout=subprocess.PIPE,
@@ -229,7 +231,8 @@ class TauHKAgent:
                 "TAUHK_IP_CMD_RECV": "10.1.0.77",
                 "TAUHK_IP_DATA": "10.1.0.77"
             },
-            bufsize=1
+            bufsize=1,
+            cwd=agent_path,
         )
         self.log.info(f"Started tauHK crate daemon with PID {self.process.pid}")
 
@@ -438,7 +441,8 @@ class TauHKAgent:
         """
         if 'config_file' not in params:
             return False, 'No config file provided.'
-        with open(params['config_file'], 'r') as f:
+        agent_path = pathlib.Path(__file__).parent.resolve()
+        with open(os.path.join(agent_path, params['config_file']), 'r') as f:
             config = yaml.safe_load(f)
 
         message = HKsystem()
