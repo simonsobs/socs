@@ -18,6 +18,7 @@ for n, f in [
         ('CryomechCPAAgent', 'cryomech_cpa/agent.py'),
         ('dS378Agent', 'devantech_dS378/agent.py'),
         ('FlowmeterAgent', 'ifm_sbn246_flowmeter/agent.py'),
+        ('FLSAgent', 'fls/agent.py'),
         ('FPGAAgent', 'holo_fpga/agent.py'),
         ('FTSAerotechAgent', 'fts_aerotech/agent.py'),
         ('GalilAxisAgent', 'galil_axis/agent.py'),
