@@ -6,8 +6,8 @@ import numpy as np
 class DLCSmart():
     def __init__(self, ip_addr, tcp_port=1998, upd_port=1999, buffer_size=1024, timeout=5):
         self.ip_addr = ip_addr
-        self.command_port = command_port # TCP
-        self.monitor_port = monitor_port # UDP
+        self.tcp_port = tcp_port # TCP
+        self.tcp_port = tcp_port # UDP
         self.buffer_size = buffer_size
         self.sock = None
         self.timeout = timeout
@@ -58,8 +58,9 @@ class DLCSmart():
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.settimeout(self.timeout)
         self.sock.connect((self.ip_addr, self.tcp_port))
-        welcome = self.read_all()
-        return True, welcome
+        time.sleep(0.1)
+        welcome_req = self.read_all()
+        return True, welcome_req
     
     def close_connection(self):
         """
@@ -177,14 +178,15 @@ class DLCSmart():
         return resp
     
     # voltage bias
-    def check_bias(self):
+    def check_bias(self, printall=False):
         """
         Request the bias amplitude and offset (ints or floats).
         """
         amp = self.param_ref("lockin:mod-out-amplitude")
         offset = self.param_ref("lockin:mod-out-offset")
-        print(f"Tx Bias Amplitude: {amp} V")
-        print(f"Tx Bias Offset: {offset} V")
+        if printall:
+            print(f"Tx Bias Amplitude: {amp} V")
+            print(f"Tx Bias Offset: {offset} V")
         return float(amp), float(offset)
     
     def set_bias_to_zero(self):
@@ -236,7 +238,7 @@ class DLCSmart():
         smax = self.param_ref("frequency:frequency-max")
         sstep = self.param_ref("frequency:frequency-step")
 
-        data = (fast, smin, smax, sstep)
+        data = (fast, float(smin), float(smax), float(sstep))
         return data
 
     def stop_scan(self):
@@ -267,19 +269,25 @@ class DLCSmart():
         setting a new frequency.
         """
         act_frequency = self.param_ref("frequency:frequency-act")
-        return act_frequency
+        return float(act_frequency)
 
     def sampling(self):
         """
         Query the set frequency (GHz), actual frequency (GHz), and photocurrent (nA).
         For general monitoring purposes.
         """
+        reset = self.command("lockin:lock-in-reset")
+        time.sleep(0.3)
         photocurrent = self.param_ref("lockin:lock-in-value-nanoamp")
+        if '#t' in photocurrent:
+            photocurrent = photocurrent.strip('(').strip(' #t)')
+        else:
+            photocurrent = 'nan'
         set_frequency = self.param_ref("frequency:frequency-set")
         act_frequency = self.param_ref("frequency:frequency-act")
-        value_dict = {'set_frequency': set_frequency,
-                      'actual_frequency': act_frequency,
-                      'photocurrent': photocurrent,
+        value_dict = {'set_frequency': float(set_frequency),
+                      'actual_frequency': float(act_frequency),
+                      'photocurrent': float(photocurrent),
                       }
         return value_dict
 
@@ -301,20 +309,20 @@ class DLCSmart():
                 'scan_set_frequency': [],
                 'scan_actual_frequency': [],
                 'scan_photocurrent': []}
-        get_point_num = self.command("frequency:fast-scan-get-data", decode=False, [0, start_ix, 1024])
+        get_point_num = self.command("frequency:fast-scan-get-data", decode=False, vals=[0, start_ix, 1024])
         pointnum_raw = base64.b64decode(get_point_num)
         pointnum_readable = np.frombuffer(pointnum_raw, dtype=np.float64)
 
         while len(get_point_num):
-            get_set_freq = self.command("frequency:fast-scan-get-data", decode=False, [1, start_ix, 1024])
+            get_set_freq = self.command("frequency:fast-scan-get-data", decode=False, vals=[1, start_ix, 1024])
             fset_raw = base64.b64decode(get_set_freq)
             fset_readable = np.frombuffer(fset_raw, dtype=np.float64)
 
-            get_act_freq = self.command("frequency:fast-scan-get-data", decode=False, [6, start_ix, 1024])
+            get_act_freq = self.command("frequency:fast-scan-get-data", decode=False, vals=[6, start_ix, 1024])
             fact_raw = base64.b64decode(get_act_freq)
             fact_readable = np.frombuffer(fact_raw, dtype=np.float64)
 
-            get_photocurrent = self.command("frequency:fast-scan-get-data", decode=False, [2, start_ix, 1024])
+            get_photocurrent = self.command("frequency:fast-scan-get-data", decode=False, vals=[2, start_ix, 1024])
             pcur_raw = base64.b64decode(get_photocurrent)
             pcur_readable = np.frombuffer(pcur_raw, dtype=np.float64)
 
@@ -325,7 +333,7 @@ class DLCSmart():
                 data['scan_photocurrent'].append(pcur_readable[i])
             
             start_ix += 1024
-            get_point_num = self.command("frequency:fast-scan-get-data", decode=False, [0, start_ix, 1024])
+            get_point_num = self.command("frequency:fast-scan-get-data", decode=False, vals=[0, start_ix, 1024])
             pointnum_raw = base64.b64decode(get_point_num)
             pointnum_readable = np.frombuffer(pointnum_raw, dtype=np.float64)
 
