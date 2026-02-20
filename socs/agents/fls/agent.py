@@ -7,6 +7,7 @@ from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
 from socs.agents.fls.drivers import DLCSmart
 
+# TODO: put these in a .yaml file
 BYTE_END = "\n>"
 MAX_FREQ = 880.
 MIN_FREQ = 20.
@@ -44,12 +45,6 @@ class FLSAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-        self.agent.register_feed('sampling_data',
-                                 record=True,
-                                 agg_params=agg_params,
-                                 buffer_time=1)
-
-        
     def initialize(self, session, params=None):
         """
         initialize()
@@ -67,7 +62,8 @@ class FLSAgent:
             self.dlcsmart = DLCSmart(ip_addr=self.ip, command_port=self.port)
 
             try:
-                self.dlcsmart.connect()
+                welcome = self.dlcsmart.connect()
+                self.log.info(welcome)
             except ConnectionError:
                 self.log.error("could not establish connection to DLC Smart")
                 return False, "FLS agent initialization failed"
@@ -118,7 +114,7 @@ class FLSAgent:
             while self.take_sampling:
                 pm.sleep()
                 if time.time() - last_time > 1:
-                last_time = time.time()
+                    last_time = time.time()
                 if not self.lock.release_and_acquire(timeout=5):
                     self.log.warn(f"Failed to re-acquire sampling lock, "
                                   "currently held by {self.lock.job}.")
@@ -175,12 +171,8 @@ class FLSAgent:
         
             laser_status = self.dlcsmart.check_laser_emission()
             if laser_status == "#t" + BYTE_END:
-                self.lasers_on = True
-            elif laser_status == "#f" + BYTE_END:
-                self.lasers_on = False
-            if self.lasers_on == True:
                 return True, "Lasers already on"
-            else:
+            elif laser_status == "#f" + BYTE_END:
                 turn_on = self.dlcsmart.laser_emission_on()
                 time.sleep(0.01)
                 laser_status = self.dlcsmart.check_laser_emission()
@@ -254,8 +246,8 @@ class FLSAgent:
             elif bias_to_set == 'default' and check_bias == (1., -0.5):
                 self.log.info('Bias successfully set to default.')
             else:
-                self.log.info('Bias not successfully set.')
-                return False, "Bias not successfully set.')
+                self.log.info("Bias not successfully set.")
+                return False, "Bias not successfully set."
         return True, f"Bias successfully set to {bias_to_set}."
 
     @ocs_agent.param('frequency', type=float)
@@ -271,8 +263,9 @@ class FLSAgent:
             frequency (float): The frequency to set the laser to.
         """
         set_frequency = params['frequency']
-        assert set_frequency >= MIN_FREQ, "Frequency must be above 20 GHz!"
-        assert set_frequency < MAX_FREQ, "Frequency must be below 880 GHz!"
+        precision = 0.01
+        assert set_frequency >= MIN_FREQ, f"Frequency must be above {MIN_FREQ} GHz!"
+        assert set_frequency < MAX_FREQ, f"Frequency must be below {MAX_FREQ} GHz!"
 
         with self.lock.acquire_timeout(timeout=5, job='set_frequency') as acquired:
             if not acquired:
@@ -287,18 +280,18 @@ class FLSAgent:
             set_the_freq = self.dlcsmart.set_frequency(set_frequency)
 
             # Check to see when the actual frequency gets 'close enough' to the set frequency
-            while round(actual_frequency, 2) != set_frequency:
+            while round(actual_frequency) != round(set_frequency):
                 time.sleep(1)
                 actual_frequency = self.dlcsmart.get_actual_frequency()
-                self.log.info(f"Frequency is {actual_frequency} GHz")
-            if round(actual_frequency, 2) == set_frequency:
+                self.log.info(f"Frequency is {round(actual_frequency, 2)} GHz")
+            if actual_frequency >= (set_frequency - precision) and actual_frequency <= (set_frequency + precision):
                 time.sleep(2)
                 actual_frequency = self.dlcsmart.get_actual_frequency()
-                self.log.info(f"Frequency is {actual_frequency} GHz")
-                while round(actual_frequency, 2) != set_frequency:
+                self.log.info(f"Frequency is {round(actual_frequency, 2)} GHz")
+                while actual_frequency < (set_frequency - precision) or actual_frequency > (set_frequency + precision):
                     time.sleep(1)
                     actual_frequency = self.dlcsmart.get_actual_frequency()
-                    self.log.info(f"Frequency is {actual_frequency} GHz")
+                    self.log.info(f"Frequency is {round(actual_frequency, 2)}, GHz")
 
         return True, f"Set frequency to {set_frequency} GHz"
 
@@ -309,24 +302,24 @@ class FLSAgent:
         scan_param_check = self.dlcsmart.check_scan_params()
         if scan_param_check[0] == "#t" + BYTE_END:
             self.log.info("Scan mode set to fast")
-            elif scan_param_check[0] == "#f" + BYTE_END:
-                self.log.info("Scan mode set to precise")
-                return False, "Scan mode must be set to fast"
+        elif scan_param_check[0] == "#f" + BYTE_END:
+            self.log.info("Scan mode set to precise")
+            return False, "Scan mode must be set to fast"
 
             if scan_param_check[1] == min_freq and scan_param_check[2] == max_freq \
             and scan_param_check[3] == start_dir * freq_step:
-                self.log.info(f"Scan parameters set: {min_freq} GHz to {max_freq} GHz "}
+                self.log.info(f"Scan parameters set: {min_freq} GHz to {max_freq} GHz " \
                               f"with step size {start_dir * freq_step}")
             else:
                 if scan_param_check[1] != min_freq:
-                    self.log.info(f"Minimum frequency set to {scan_param_check[1]}, not {min_freq}")
+                    self.log.warn(f"Minimum frequency set to {scan_param_check[1]}, not {min_freq}")
                 if scan_param_check[2] != max_freq:
-                    self.log.info(f"Maximum frequency set to {scan_param_check[2]}, not {max_freq}")
+                    self.log.warn(f"Maximum frequency set to {scan_param_check[2]}, not {max_freq}")
                 if scan_param_check[3] != start_dir * freq_step:
                     if abs(scan_param_check[3]) != freq_step:
-                        self.log.info(f"Frequency step set to {abs(scan_param_check[3])}, not {freq_step})
+                        self.log.warn(f"Frequency step set to {abs(scan_param_check[3])}, not {freq_step}")
                     if np.sign(scan_param_check[3]) != start_dir:
-                        self.log.info(f"Scan direction is incorrect")
+                        self.log.warn(f"Scan direction is incorrect")
                 return False, "Could not correctly set scan parameters"
         return True
 
@@ -386,46 +379,14 @@ class FLSAgent:
                 if not csp:
                     return False, "Could not correctly set scan params"
                 self.dlcsmart.start_scan()
-                time.sleep(1)
-                scan_data = self.dlcsmart.get_scan_data()
-                session.data = {"scan_data": scan_data,
-                                "timestamp": time.time()}
-
-                pub_data = {'timestamp': time.time(),
-                            'block_name': 'scan_data',
-                            'data': scan_data}
-
-                self.agent.publish_to_feed('scan_data', pub_data)
-                act_freq = self.dlcsmart.get_actual_frequency()
                 while act_freq > min_freq and act_freq < max_freq:
                     time.sleep(1)
-                    scan_data = self.dlcsmart.get_scan_data()
-                    session.data = {"scan_data": scan_data,
-                                    "timestamp": time.time()}
-
-                    pub_data = {'timestamp': time.time(),
-                                'block_name': 'scan_data',
-                                'data': scan_data}
-
-                    self.agent.publish_to_feed('scan_data', pub_data)
-
                     act_freq = self.dlcsmart.get_actual_frequency()
                 self.dlcsmart.stop_scan()
                 time.sleep(1)
                 start_dir = -1 * start_dir
                 i += 1
             self.log.info("Frequency sweeps completed")
-            while len(scan_data['scan_point_number']):
-                scan_data = self.dlcsmart.get_scan_data()
-                session.data = {"scan_data": scan_data,
-                                "timestamp": time.time()}
-
-                pub_data = {'timestamp': time.time(),
-                            'block_name': 'scan_data',
-                            'data': scan_data}
-
-                self.agent.publish_to_feed('scan_data', pub_data)
-            self.log.info("Finished getting scan data")
             return True, f"Completed {i} frequency sweeps"
 
 
