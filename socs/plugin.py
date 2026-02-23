@@ -48,6 +48,7 @@ agents = {
     'SupRsync': {'module': 'socs.agents.suprsync.agent', 'entry_point': 'main'},
     'SynaccessAgent': {'module': 'socs.agents.synacc.agent', 'entry_point': 'main'},
     'SynthAgent': {'module': 'socs.agents.holo_synth.agent', 'entry_point': 'main'},
+    'TauHKAgent': {'module': 'socs.agents.tauhk.agent', 'entry_point': 'main'},
     'TektronixAWGAgent': {'module': 'socs.agents.tektronix3021c.agent', 'entry_point': 'main'},
     'ThorlabsMC2000BAgent': {'module': 'socs.agents.thorlabs_mc2000b.agent', 'entry_point': 'main'},
     'UCSCRadiometerAgent': {'module': 'socs.agents.ucsc_radiometer.agent', 'entry_point': 'main'},
