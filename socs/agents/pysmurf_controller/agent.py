@@ -319,7 +319,7 @@ class PysmurfController:
         S, cfg = self._get_smurf_control(load_tune=False, no_dir=True)
         reg = sdl.Registers(S)
 
-        kw = {'retry_on_fail': False}
+        kw = {}
         while session.status in ['starting', 'running']:
             try:
 
@@ -328,7 +328,7 @@ class PysmurfController:
                     num_active_channels += len(S.which_on(band))
 
                 d = dict(
-                    channel_mask=S.get_channel_mask(**kw).tolist(),
+                    channel_mask=S.get_channel_mask(**kw),
                     downsample_factor=S.get_downsample_factor(**kw),
                     agg_time=reg.agg_time.get(**kw),
                     open_g3stream=reg.open_g3stream.get(**kw),
@@ -349,7 +349,7 @@ class PysmurfController:
                 }
                 self.agent.publish_to_feed('state_results', data)
             except Exception:  # TODO can we make this more specific?
-                self.log.warn("Could not connect to epics server! Waiting and "
+                self.log.warn("Failed to reach streamer! Waiting and "
                               "then trying again")
 
             time.sleep(params['poll_interval'])
