@@ -22,13 +22,13 @@ The hardware for the LAT has been configured to a static IP ``10.1.0.74`` and ex
 
 ``amun`` has been outfitted with a usb to ethernet device, this device can be configured with::
 
-    $ sudo ip addr add 10.1.0.77/24 dev enx14ebb6850591 # set the IP 
+    $ sudo ip addr add 10.1.0.77/24 dev enx14ebb6850591 # set the IP
     $ sudo ip link set enx14ebb6850591 up #bring up the dev if it is down (does not show up in ifconfig without -a flag)
 
 The direct interaction with the hardware is handled by a percompiled binnary, please contact a member of the taurus cmb collaboration to obtain a copy.
 This binary must be named ``tauhk-agent`` and placed in the same directoy as the ``agent.py``.
 
-Finally, channel mappings must be provided in the form of a `protobuf <https://protobuf.dev/>`_ file descriptor. 
+Finally, channel mappings must be provided in the form of a `protobuf <https://protobuf.dev/>`_ file descriptor.
 This file descriptor is generated from a experiment configuration yaml with the following syntax::
 
   - rtd: # RTD card type
