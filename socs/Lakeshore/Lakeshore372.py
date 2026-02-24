@@ -236,6 +236,11 @@ class LS372:
         self.sample_heater = Heater(self, 0)
         self.still_heater = Heater(self, 2)
 
+        self.curves = []
+        for i in range(21, 60):
+            curve = Curve(self, i)
+            self.curves.append(curve)
+
     def msg(self, message):
         """Send message to the Lakeshore 372 over ethernet.
 

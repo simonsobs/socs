@@ -41,10 +41,10 @@ opencv-python
 pfeiffer-vacuum-protocol==0.4
 
 # pysmurf controller
-pyepics
-pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
-sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
-sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
+#pyepics
+#pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
+#sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
+#sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
 
 # timing master monitor
 pyepics
@@ -53,9 +53,9 @@ pyepics
 xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main
 
 # pysmurf controller
-pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
-sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
-sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
+#pysmurf @ git+https://github.com/slaclab/pysmurf.git@main
+#sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
+#sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
 
 # modbus
 pyModbusTCP

@@ -1,6 +1,6 @@
 import argparse
 import os
-import time
+import time, datetime
 
 import numpy as np
 import txaio
@@ -10,6 +10,7 @@ from ocs.ocs_twisted import Pacemaker, TimeoutLock
 from twisted.internet import reactor
 
 from socs.Lakeshore.Lakeshore372 import LS372
+from socs.Lakeshore.Lakeshore372 import Curve
 
 
 def still_power_to_perc(power, res, lead, max_volts):
@@ -768,6 +769,30 @@ class LS372_Agent:
             self.module.channels[channel].set_calibration_curve(curve_number)
 
         return True, f"Assigned channel {channel} to curve number {curve_number}."
+    
+    @ocs_agent.param('channel', type=int, check=lambda x: 0 <= x <= 16)
+    def get_calibration_curve(self, session, params):
+        """get_calibration_curve(channel, curve_number)
+
+        **Task** - Gets the calibration curve number for a particular channel.
+
+        Parameters:
+            channel (int): Channel number to set calibration curve to. Channel
+                ranges are 1 to 16, and 0 for control channel A.
+        """
+
+        with self._lock.acquire_timeout(job='set_calibration_curve') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            channel = params['channel']
+            curve_number = self.module.channels[channel].get_calibration_curve()
+            session.data = {"assigned_curve": curve_number}
+            #session.add_message(f'Channel {channel} is assigned curve number {curve_number}.')
+
+        return True, f"Channel {channel} is assigned curve number {curve_number}."
 
     @ocs_agent.param('channel', type=int)
     def get_input_setup(self, session, params):
@@ -1291,6 +1316,85 @@ class LS372_Agent:
 
         return True, "Uploaded {}".format(configfile)
 
+    #function to return the list (curve numbers and serial numbers) of all user-uploaded curves on an LS372
+    #@ocs_agent.param('curve_number', type = int, check=lambda x: 0 <= x <= 59)
+    def get_curve_list(self, session, params):
+
+        """get_curve_list()
+
+        **Task** - Ouputs the list of uploaded curves with their curve number to the logs 
+
+        """
+
+        with self._lock.acquire_timeout(job='get_curve_list') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            #curve_number = params['curve_number']
+
+            #serial_number = self.module.curves[curve_number].get_serial_number()
+
+            #makes an array of 21-59 to align with slots on LS372 curve input
+            curve_numbers = np.linspace(21, 59, 38, dtype=int)
+
+            #empty array for serial numbers
+            serial_numbers = []
+            
+            #loop over all curve slots on LS372 to get serial numbers
+            for curve_num in range(0, 38):
+                serial_number = self.module.curves[curve_num].get_serial_number()
+                serial_numbers = np.append(serial_numbers, serial_number)
+
+            #combine curve slot numbers with uploaded serial numbers
+            curve_list = np.column_stack((curve_numbers, serial_numbers))
+
+            #session.data = {"curves": {"slot": curve_numbers,
+                                       #"serial": serial_numbers}}
+
+            session.data = {}
+
+            for slot in range(len(curve_numbers)):
+
+                session.data[slot + 21] = {"serial": serial_numbers[slot]}
+
+            #session.data ={"curves": curve_list}
+            print(session.data)
+
+        #return serial_number
+        return True, f"{curve_list}"
+
+    @ocs_agent.param('curve_slot', type = int, check=lambda x: 21 <= x <= 59) #user input curve slots range 21-59
+    @ocs_agent.param('file_path', type = str, default=None)
+    def upload_cal_curve(self, session, params):
+
+        """upload_cal_curve(curve_slot, file_path)
+
+        **Task** - Uploads a thermometer calibration curve to the specified curve number.
+
+        Parameters:
+            curve_slot (int): Curve number to upload calibration curve to. Usable curve 
+                slots range from 21-59
+
+            file_path (str): Path to the curve to upload to the curve slot.
+        """
+
+        with self._lock.acquire_timeout(job='get_curve_list') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self._lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            curve_slot = params['curve_slot'] - 21 #get the position of the curve slot so the curve gets uploaded to the right one
+            curve = self.module.curves[curve_slot]
+
+            print('Start:', datetime.datetime.utcfromtimestamp(time.time()))
+            print(curve.set_curve(params['file_path'])) #upload curve
+            print('End:', datetime.datetime.utcfromtimestamp(time.time()))
+
+        return True, f"Uploaded curve {params['file_path']} to slot {params['curve_slot']}."
+
 
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
@@ -1388,6 +1492,9 @@ def main(args=None):
     agent.register_task('enable_control_chan', lake_agent.enable_control_chan)
     agent.register_task('disable_control_chan', lake_agent.disable_control_chan)
     agent.register_task('input_configfile', lake_agent.input_configfile)
+    agent.register_task('get_curve_list', lake_agent.get_curve_list)
+    agent.register_task('upload_cal_curve', lake_agent.upload_cal_curve)
+    agent.register_task('get_calibration_curve', lake_agent.get_calibration_curve)
 
     runner.run(agent, auto_reconnect=True)
 
