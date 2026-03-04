@@ -3,7 +3,7 @@ import struct
 import time
 
 import numpy as np
-from serial import Serial
+from serial import Serial, SerialException
 
 # some commands require a CRC code (cyclic redundancy check) -
 # these require the provided CRC table
@@ -75,25 +75,83 @@ def wind_chill(temp, wind):
     return chill
 
 
-class VantagePro2:
+class SerialInterface:
+    """Interface class for connecting to devices using serial.
+
+    Parameters
+    ----------
+    port: str
+        Path to device.
+    baudrate: int
+        Baud rate such as 9600 or 115200.
+    timeout : float
+        Duration in seconds that operations wait before giving up.
+
+    Attributes
+    ----------
+    port: str
+        Path to device.
+    baudrate: int
+        Baud rate such as 9600 or 115200.
+    timeout : float
+        Duration in seconds that operations wait before giving up.
+    comm : serial.Serial
+        Serial object that forms the connection to the device.
+
+    """
+
+    def __init__(self, port, baudrate, timeout):
+        self.port = port
+        self.baudrate = baudrate
+        self.timeout = timeout
+        self.comm = self._connect(self.port)
+
+    def _connect(self, port, baudrate):
+        try:
+            comm = Serial(port=port,
+                          baudrate=baudrate,
+                          timeout=self.timeout)
+        except SerialException as e:
+            print(f"Unable to connect. {e}")
+            return
+        except ValueError:
+            print("Connection parameter out of range.")
+            return
+        except Exception as e:
+            print(f"Caught unexpected {type(e).__name__} while connecting:")
+            print(f"  {e}")
+            return
+        return comm
+
+    def close(self):
+        if self.comm:
+            self.comm.close()
+
+    def __del__(self):
+        if self.comm:
+            self.comm.close()
+
+
+class VantagePro2(SerialInterface):
     """Allows communication to Vantage Pro 2 Weather Monitor Module.
     Contains commands to be issued and member variables that store
     collected data.
     """
 
-    def __init__(self, path, baud=19200, timeout=1):
+    def __init__(self, path, baudrate=19200, timeout=1):
         """Establish serial connection and initialize member variables."""
 
         if not path:
             path = '/dev/ttyUSB0'
-        self.com = Serial(port=path, baudrate=baud, timeout=timeout)
+        # Set up the Serial Interface
+        super().__init__(path, baudrate, timeout)
         self.startup()
 
     def startup(self):
         """Wakeup vantage pro 2 console."""
-        self.com.write(b"\n")
+        self.comm.write(b"\n")
         for i in range(0, 3):
-            response = self.com.read(2)
+            response = self.comm.read(2)
             if response == b'\n\r':
                 break
             time.sleep(1.2)
@@ -110,13 +168,10 @@ class VantagePro2:
         if crc != 0:
             print('Failed CRC. Errors in data received')
 
-    def close(self):
-        self.com.close()
-
     # closing serial if agent goes out of scope
 
     def __exit__(self):
-        self.com.close()
+        self.comm.close()
 
     def conditions_screen(self):
         """Move console to conditions screen (where loop command can
@@ -125,12 +180,12 @@ class VantagePro2:
         """
 
         self.startup()
-        self.com.write(b'RXTEST\n')
+        self.comm.write(b'RXTEST\n')
         time.sleep(2)
 
         # reads response from console
         for i in range(0, 3):
-            ok = self.com.read(6)
+            ok = self.comm.read(6)
             if ok == b'\n\rOK\n\r':
                 break
         else:
@@ -145,11 +200,11 @@ class VantagePro2:
         attempt = 0
         while attempt < 3:
             self.startup()
-            self.com.write(bytes(msg, 'ascii'))
+            self.comm.write(bytes(msg, 'ascii'))
             time.sleep(0.1)
             ack = 0
             for i in range(0, 3):
-                ack = self.com.read(1)
+                ack = self.comm.read(1)
                 if ack == b'\x06':
                     return True
             attempt += 1
@@ -160,9 +215,9 @@ class VantagePro2:
         """Interrupts loop command...if sent before loop command finishes."""
 
         self.startup()
-        self.com.write(b'\n')
+        self.comm.write(b'\n')
         for i in range(0, 3):
-            response = self.com.read(2)
+            response = self.comm.read(2)
             if response == b'\n\r':
                 print("Data Acquisition succesfully interrupted")
                 break
@@ -250,7 +305,7 @@ class VantagePro2:
 
         # Give device multiple chances to send its data
         for i in range(0, 3):
-            info = self.com.read(99)
+            info = self.comm.read(99)
             if info:
                 break
             else:
