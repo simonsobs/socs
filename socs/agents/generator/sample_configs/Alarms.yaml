@@ -1,0 +1,121 @@
+read_len: 17
+page: 154
+registers:
+  Alarm_emergency_stop:
+    offset: 1
+    read_as: bin 13-16
+    units: None
+  Alarm_low_oil_pressure:
+    offset: 1
+    read_as: bin 9-12
+    units: None
+  Alarm_high_coolant_temperature:
+    offset: 1
+    read_as: bin 5-8
+    units: None
+  Alarm_low_coolant_temperature:
+    offset: 1
+    read_as: bin 1-4
+    units: None
+  Alarm_under_speed:
+    offset: 2
+    read_as: bin 13-16
+    units: None
+  Alarm_over_speed:
+    offset: 2
+    read_as: bin 9-12
+    units: None
+  Alarm_generator_under_frequency:
+    offset: 2
+    read_as: bin 5-8
+    units: None
+  Alarm_generator_over_frequency:
+    offset: 2
+    read_as: bin 1-4
+    units: None
+  Alarm_generator_low_voltage:
+    offset: 3
+    read_as: bin 13-16
+    units: None
+  Alarm_generator_high_voltage:
+    offset: 3
+    read_as: bin 9-12
+    units: None
+  Alarm_battery_low_voltage:
+    offset: 3
+    read_as: bin 5-8
+    units: None
+  Alarm_battery_high_voltage:
+    offset: 3
+    read_as: bin 1-4
+    units: None
+  Alarm_charge_alternator_failure:
+    offset: 4
+    read_as: bin 13-16
+    units: None
+  Alarm_generator_fail_to_start:
+    offset: 4
+    read_as: bin 9-12
+    units: None
+  Alarm_generator_fail_to_stop:
+    offset: 4
+    read_as: bin 5-8
+    units: None
+  Alarm_generator_fail_to_close:
+    offset: 4
+    read_as: bin 1-4
+    units: None
+  Alarm_oil_pressure_sender:
+    offset: 5
+    read_as: bin 9-12
+    units: None
+  Alarm_loss_of_magnetic_pick_up:
+    offset: 5
+    read_as: bin 5-8
+    units: None
+  Alarm_magnetic_pick_up_open_circuit:
+    offset: 5
+    read_as: bin 1-4
+    units: None
+  Alarm_generator_high_current:
+    offset: 6
+    read_as: bin 13-16
+    units: None
+  Alarm_low_fuel_level:
+    offset: 6
+    read_as: bin 5-8
+    units: None
+  Alarm_CAN_ECU_Warning:
+    offset: 6
+    read_as: bin 1-4
+    units: None
+  Alarm_CAN_ECU_Shutdown:
+    offset: 7
+    read_as: bin 13-16
+    units: None
+  Alarm_CAN_ECU_data_fail:
+    offset: 7
+    read_as: bin 9-12
+    units: None
+  Alarm_low_oil_level_switch:
+    offset: 7
+    read_as: bin 5-8
+    units: None
+  Alarm_high_temperature_switch:
+    offset: 7
+    read_as: bin 1-4
+    units: None
+  Alarm_low_fuel_level_switch:
+    offset: 8
+    read_as: bin 13-16
+    units: None
+  Alarm_MSC_data_error:
+    offset: 14
+    read_as: bin 5-8
+    units: None
+  Alarm_MSC_failure:
+    offset: 16
+    read_as: bin 13-16
+    units: None
+
+block_name: Alarms

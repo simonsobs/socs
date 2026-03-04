@@ -1,3 +1,4 @@
+import os
 from unittest import mock
 
 import numpy as np
@@ -7,6 +8,8 @@ from ocs.ocs_agent import OpSession
 
 from socs.agents.pysmurf_controller.agent import PysmurfController, make_parser
 
+os.environ['SLOT'] = '2'
+
 txaio.use_twisted()
 
 # Number of channels in mock pysmurf system
@@ -14,7 +17,7 @@ NCHANS = 1000
 
 
 # Mocks and fixures
-def mock_pysmurf(self, session=None, load_tune=False, **kwargs):
+def mock_pysmurf(*args, **kwargs):
     """mock_pysmurf()
 
     **Mock** - Mock a pysmurf instance. Used to patch _get_smurf_control() in the PysmurfController.
@@ -60,6 +63,8 @@ def mock_pysmurf(self, session=None, load_tune=False, **kwargs):
     exp_defaults = {
         # General stuff
         'downsample_factor': 20, 'coupling_mode': 'dc', 'synthesis_scale': 1,
+        'active_bands': [0, 1, 2, 3, 4, 5, 6, 7],
+        'active_bgs': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
 
         # Amp stuff
         "amps_to_bias": ['hemt', 'hemt1', 'hemt2', '50k', '50k1', '50k2'],
@@ -96,6 +101,9 @@ def mock_pysmurf(self, session=None, load_tune=False, **kwargs):
         # Misc files
         "tunefile": None, "bgmap_file": None, "iv_file": None,
         "res_fit_file": None,
+
+        # Biasing
+        'rfrac': [0.3, 0.6],
     }
     cfg.dev.exp.__getitem__.side_effect = exp_defaults.__getitem__
 
@@ -124,7 +132,7 @@ def mock_take_noise(S, cfg, acq_time, **kwargs):
     **Mock** - Mock take_noise() in sodetlib.
     """
     am = mock.MagicMock()
-    outdict = {'noise_pars': 0,
+    outdict = {'noise_pars': np.zeros((10, 3), dtype=float),
                'bands': 0,
                'channels': 0,
                'band_medians': 0,
@@ -143,7 +151,7 @@ def mock_ivanalysis(**kwargs):
     """
     iva = mock.MagicMock()
     # iva.load.return_value = iva
-    iva.R = np.full((2, 12), 1)
+    iva.R = np.full((NCHANS, 12), 1)
     iva.R_n = np.full(NCHANS, 7e-3)
     iva.bgmap = np.zeros(NCHANS)
     iva.v_bias = np.full((12, ), 2)
@@ -222,6 +230,7 @@ def mock_uxm_setup(S, cfg, bands, **kwargs):
 
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('socs.agents.pysmurf_controller.smurf_subprocess_util.get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.operations.uxm_setup.uxm_setup', mock_uxm_setup)
 def test_uxm_setup(agent):
     """test_uxm_setup()
@@ -229,7 +238,10 @@ def test_uxm_setup(agent):
     **Test** - Tests uxm_setup task.
     """
     session = create_session('uxm_setup')
-    res = agent.uxm_setup(session, {'bands': [0], 'kwargs': None})
+    params = {
+        'bands': [0], 'kwargs': None, 'run_in_main_process': True
+    }
+    res = agent.uxm_setup(session, params)
     assert res[0] is True
 
 
@@ -258,6 +270,7 @@ def mock_uxm_relock(S, cfg, bands, **kwargs):
 
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('socs.agents.pysmurf_controller.smurf_subprocess_util.get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.operations.uxm_relock.uxm_relock', mock_uxm_relock)
 def test_uxm_relock(agent):
     """test_uxm_relock()
@@ -265,7 +278,7 @@ def test_uxm_relock(agent):
     **Test** - Tests uxm_relock task.
     """
     session = create_session('uxm_relock')
-    res = agent.uxm_relock(session, {'bands': [0], 'kwargs': None})
+    res = agent.uxm_relock(session, {'bands': [0], 'kwargs': None, 'run_in_main_process': True})
     assert res[0] is True
 
 
@@ -276,6 +289,7 @@ def mock_take_bgmap(S, cfg, **kwargs):
 
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('socs.agents.pysmurf_controller.smurf_subprocess_util.get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.operations.bias_steps.take_bgmap', mock_take_bgmap)
 def test_take_bgmap(agent):
     """test_take_bgmap()
@@ -283,7 +297,12 @@ def test_take_bgmap(agent):
     **Test** - Tests take_bgmap task.
     """
     session = create_session('take_bgmap')
-    res = agent.take_bgmap(session, {'kwargs': {'high_current_mode': False}})
+    params = {
+        'kwargs': {'high_current_mode': False}, 'tag': None,
+        'run_in_main_process': True,
+    }
+    res = agent.take_bgmap(session, params)
+    print(session.data)
     assert res[0] is True
     assert session.data['nchans_per_bg'] == [NCHANS, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     assert session.data['filepath'] == 'bias_step_analysis.npy'
@@ -300,6 +319,7 @@ def mock_take_iv(S, cfg, **kwargs):
 
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('socs.agents.pysmurf_controller.smurf_subprocess_util.get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.operations.iv.take_iv', mock_take_iv)
 def test_take_iv(agent):
     """test_take_iv()
@@ -307,12 +327,12 @@ def test_take_iv(agent):
     **Test** - Tests take_iv task.
     """
     session = create_session('take_iv')
-    res = agent.take_iv(session, {'kwargs': {'run_analysis': False}})
+    params = {
+        'run_analysis': False, 'kwargs': {'run_analysis': False}, 'tag': None,
+        'run_in_main_process': True
+    }
+    res = agent.take_iv(session, params)
     assert res[0] is True
-    assert session.data['bands'] == np.zeros(NCHANS).tolist()
-    assert session.data['channels'] == np.arange(NCHANS).tolist()
-    assert session.data['bgmap'] == np.zeros(NCHANS).tolist()
-    assert session.data['R_n'] == np.full(NCHANS, 7e-3).tolist()
     assert session.data['filepath'] == 'test_file.npy'
 
 
@@ -323,6 +343,7 @@ def mock_take_bias_steps(S, cfg, **kwargs):
 
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
+@mock.patch('socs.agents.pysmurf_controller.smurf_subprocess_util.get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.operations.bias_steps.take_bias_steps', mock_take_bias_steps)
 def test_take_bias_steps(agent):
     """test_take_bias_steps()
@@ -330,13 +351,18 @@ def test_take_bias_steps(agent):
     **Test** - Tests take_bias_steps task.
     """
     session = create_session('take_bias_steps')
-    res = agent.take_bias_steps(session, {'kwargs': None, 'rfrac_range': (0.3, 0.9)})
+    params = {
+        'kwargs': None, 'rfrac_range': (0.3, 0.9), 'tag': None,
+        'run_in_main_process': True
+    }
+    res = agent.take_bias_steps(session, params)
     assert res[0] is True
     assert session.data['filepath'] == 'bias_step_analysis.npy'
 
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
 @mock.patch('sodetlib.noise.take_noise', mock_take_noise)
+@mock.patch('socs.agents.pysmurf_controller.smurf_subprocess_util.get_smurf_control', mock_pysmurf)
 @mock.patch('time.sleep', mock.MagicMock())
 def test_take_noise(agent):
     """test_take_noise()
@@ -344,17 +370,21 @@ def test_take_noise(agent):
     **Test** - Tests take_noise task.
     """
     session = create_session('take_noise')
-    res = agent.take_noise(session, {'duration': 30, 'kwargs': None})
+    params = {
+        'duration': 30, 'kwargs': None, 'tag': None,
+        'run_in_main_process': True
+    }
+    res = agent.take_noise(session, params)
     assert res[0] is True
 
 
-def mock_bias_to_rfrac_range(*args, **kwargs):
+def mock_bias_to_rfrac(*args, **kwargs):
     biases = np.full((12,), 10.)
     return biases
 
 
 @mock.patch('socs.agents.pysmurf_controller.agent.PysmurfController._get_smurf_control', mock_pysmurf)
-@mock.patch('sodetlib.operations.bias_dets.bias_to_rfrac_range', mock_bias_to_rfrac_range)
+@mock.patch('sodetlib.operations.bias_dets.bias_to_rfrac', mock_bias_to_rfrac)
 def test_bias_dets(agent):
     """test_bias_dets()
 
@@ -362,7 +392,7 @@ def test_bias_dets(agent):
     """
     session = create_session('bias_dets')
     mm = mock.MagicMock()
-    res = agent.bias_dets(session, {'rfrac': (0.3, 0.6),
+    res = agent.bias_dets(session, {'rfrac': None,
                                     'kwargs': {'iva': mock_ivanalysis(S=mm, cfg=mm, run_kwargs=mm,
                                                                       sid=mm, start_times=mm, stop_times=mm)}})
     assert res[0] is True
@@ -377,7 +407,9 @@ def test_stream(agent):
     **Test** - Tests stream process.
     """
     session = create_session('stream')
-    res = agent.stream(session, {'duration': None, 'load_tune': False, 'kwargs': None, 'test_mode': True})
+    res = agent.stream(session, {'duration': None, 'load_tune': False,
+                                 'kwargs': None, 'test_mode': True, 'tag': None,
+                                 'stream_type': 'obs', 'subtype': None})
     assert res[0] is True
 
 

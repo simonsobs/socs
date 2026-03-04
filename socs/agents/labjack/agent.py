@@ -3,6 +3,7 @@ import csv
 import os
 import struct
 import time
+import traceback
 
 import numexpr
 import numpy as np
@@ -13,6 +14,7 @@ from labjack.ljm.ljm import LJMError
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 from scipy.interpolate import interp1d
+from twisted.internet import reactor
 
 txaio.use_twisted()
 
@@ -133,7 +135,9 @@ class LabJackFunctions:
 
         # Import the Ohms to Celsius cal curve and apply cubic
         # interpolation to find the temperature
-        reader = csv.reader(open('cal_curves/GA10K4D25_cal_curve.txt'),
+        cal_curves = os.path.join(os.path.dirname(__file__),
+                                  'cal_curves/GA10K4D25_cal_curve.txt')
+        reader = csv.reader(open(cal_curves),
                             delimiter=' ')
         lists = [el for el in [row for row in reader]]
         T_cal = np.array([float(RT[0]) for RT in lists[1:]])
@@ -244,10 +248,23 @@ class LabJackAgent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('starting')
             # Connect with the labjack
-            self.handle = ljm.openS("ANY", "ANY", self.ip_address)
-            info = ljm.getHandleInfo(self.handle)
+            try:
+                self.handle = ljm.openS("ANY", "ANY", self.ip_address)
+                info = ljm.getHandleInfo(self.handle)
+            except LJMError as e:
+                self.log.error(f"Failed to connect to device: {e}")
+                self.log.error("{e}", e=traceback.format_exc())
+                self.log.critical("Stopping reactor.")
+                reactor.callFromThread(reactor.stop)
+                return False, 'Initialization failed.'
+            except Exception as e:
+                self.log.error(f"Caught unexpected {type(e).__name__} during init:")
+                self.log.error("{e}", e=traceback.format_exc())
+                self.log.critical("Stopping reactor.")
+                reactor.callFromThread(reactor.stop)
+                return False, 'Initialization failed.'
+
             self.log.info("\nOpened LabJack of type: %i, Connection type: %i,\n"
                           "Serial number: %i, IP address: %s, Port: %i" %
                           (info[0], info[1], info[2],
@@ -276,6 +293,24 @@ class LabJackAgent:
             sampling_frequency (float):
                 Sampling frequency for data collection. Defaults to 2.5 Hz.
 
+        Notes:
+            An example of the session data is shown below. The keys in the
+            'data' dictionary correspond with configured channels from the
+            ``active_channels`` attribute::
+
+                >>> response.session['data']
+                {
+                  "block_name": "sens",
+                  "data": {
+                    "AIN0V": 0.0015984050696715713,
+                    "FIO0V": 1,
+                    "FIO1V": 1,
+                    "AIN55V": 0.00033546771737746894,
+                    "AIN116V": 0.000019733395674847998,
+                  },
+                  "timestamp": 1698439453.8471205
+                }
+
         """
         if params is None:
             params = {}
@@ -294,7 +329,6 @@ class LabJackAgent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('running')
             self.take_data = True
 
             # Start the data stream. Use the scan rate returned by the stream,
@@ -318,7 +352,22 @@ class LabJackAgent:
                 }
 
                 # Query the labjack
-                raw_output = ljm.eStreamRead(self.handle)
+                try:
+                    raw_output = ljm.eStreamRead(self.handle)
+                except LJMError as e:
+                    session.degraded = True
+                    self.log.error(f"Failed to read stream: {e}")
+                    self.log.error("{e}", e=traceback.format_exc())
+                    self.log.critical("Stopping reactor.")
+                    reactor.callFromThread(reactor.stop)
+                    return False, 'Acquisition failed.'
+                except Exception as e:
+                    session.degraded = True
+                    self.log.error(f"Caught unexpected {type(e).__name__} while streaming:")
+                    self.log.error("{e}", e=traceback.format_exc())
+                    self.log.critical("Stopping reactor.")
+                    reactor.callFromThread(reactor.stop)
+                    return False, 'Acquisition failed.'
                 output = raw_output[0]
 
                 # Data comes in form ['AIN0_1', 'AIN1_1', 'AIN0_2', ...]
@@ -422,7 +471,6 @@ class LabJackAgent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('running')
             self.take_data = True
 
             while self.take_data:

@@ -2,11 +2,10 @@ import ocs
 import pytest
 from flask import request
 from http_server_mock import HttpServerMock
+from integration.util import docker_compose_file  # noqa: F401
 from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
 from ocs.testing import create_agent_runner_fixture, create_client_fixture
-
-pytest_plugins = "docker_compose"
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
@@ -58,7 +57,7 @@ def test_synacc_startup(wait_for_crossbar, http_mock, run_agent, client):
     with http_mock:
         resp = client.get_status.wait()  # get_status runs on startup
         check_resp_state(resp)
-        resp = client.status_acq.status()
+        resp = client.acq.status()
         check_resp_state(resp, OpCode.RUNNING.value)
 
 

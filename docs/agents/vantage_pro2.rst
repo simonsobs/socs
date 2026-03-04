@@ -59,7 +59,7 @@ Docker Compose
 ``````````````
 
 The Vantage Pro2 Agent should be configured to run in a Docker container. An
-example docker-compose service configuration is shown here::
+example docker compose service configuration is shown here::
 
   ocs-vantage-pro2:
     image: simonsobs/socs:latest

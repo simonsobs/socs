@@ -38,7 +38,7 @@ If you would like to chanege the setting or check the status of the lakeshore 42
 Docker Compose
 ``````````````
 The ocs-lakeshore425-agent can be run via a Docker container. The following is an
-example of what to insert into your institution's docker-compose file.::
+example of what to insert into your institution's docker compose file.::
 
   ocs-lakeshore425-agent:
     image: simonsobs/socs:latest

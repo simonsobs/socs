@@ -1,0 +1,193 @@
+read_len: 94
+read_start: 1024
+registers:
+  Engine_oil_pressure:
+    max_val: 10000.0
+    min_val: 0.0
+    offset: 0
+    read_as: 16U
+    scale: 1.0
+    units: Kpa
+  Engine_coolant_temperature:
+    max_val: 200.0
+    min_val: -50.0
+    read_as: 16S
+    offset: 1
+    scale: 1.0
+    units: Degrees C
+  Engine_oil_temperature:
+    max_val: 200.0
+    min_val: -50.0
+    read_as: 16S
+    offset: 2
+    scale: 1.0
+    units: Degrees C
+  Engine_fuel_level:
+    max_val: 130.0
+    min_val: 0.0
+    offset: 3
+    read_as: 16U
+    scale: 1.0
+    units: '%'
+  Engine_battery_voltage:
+    max_val: 40.0
+    min_val: 0.0
+    offset: 5
+    read_as: 16U
+    scale: 0.1
+    units: V
+  Engine_speed:
+    max_val: 6000.0
+    min_val: 0.0
+    offset: 6
+    read_as: 16U
+    scale: 1.0
+    units: RPM
+  Generator_frequency:
+    max_val: 70.0
+    min_val: 0.0
+    offset: 7
+    read_as: 16U
+    scale: 0.1
+    units: Hz
+  Generator_L1_N_voltage:
+    max_val: 18000.0
+    min_val: 0.0
+    offset: 8
+    read_as: 32U
+    scale: 0.1
+    units: V
+  Generator_L2_N_voltage:
+    max_val: 18000.0
+    min_val: 0.0
+    offset: 10
+    read_as: 32U
+    scale: 0.1
+    units: V
+  Generator_L3_N_voltage:
+    max_val: 18000.0
+    min_val: 0.0
+    read_as: 32U
+    offset: 12
+    scale: 0.1
+    units: V
+  Generator_L1_L2_voltage:
+    max_val: 30000.0
+    min_val: 0.0
+    offset: 14
+    read_as: 32U
+    scale: 0.1
+    units: V
+  Generator_L2_L3_voltage:
+    max_val: 30000.0
+    min_val: 0.0
+    offset: 16
+    read_as: 32U
+    scale: 0.1
+    units: V
+  Generator_L3_L1_voltage:
+    max_val: 30000.0
+    min_val: 0.0
+    offset: 18
+    read_as: 32U
+    scale: 0.1
+    units: V
+  Generator_L1_current:
+    max_val: 99999.9
+    min_val: 0.0
+    offset: 20
+    read_as: 32U
+    scale: 0.1
+    units: A
+  Generator_L2_current:
+    max_val: 99999.9
+    min_val: 0.0
+    offset: 22
+    read_as: 32U
+    scale: 0.1
+    units: A
+  Generator_L3_current:
+    max_val: 99999.9
+    min_val: 0.0
+    offset: 24
+    read_as: 32U
+    scale: 0.1
+    units: A
+  Generator_earth_current:
+    max_val: 99999.9
+    min_val: 0.0
+    offset: 26
+    read_as: 32U
+    scale: 0.1
+    units: A
+  Generator_L1_watts:
+    max_val: 99999999.0
+    min_val: -99999999.0
+    offset: 28
+    read_as: 32S
+    scale: 1.0
+    units: W
+  Generator_L2_watts:
+    max_val: 99999999.0
+    min_val: -99999999.0
+    offset: 30
+    read_as: 32S
+    scale: 1.0
+    units: W
+  Generator_L3_watts:
+    max_val: 99999999.0
+    min_val: -99999999.0
+    offset: 32
+    read_as: 32S
+    scale: 1.0
+    units: W
+  Bus_frequency:
+    max_val: 70.0
+    min_val: 0.0
+    offset: 67
+    read_as: 16U
+    scale: 0.1
+    units: Hz
+  Bus_L1_N_voltage:
+    max_val: 18000.0
+    min_val: 0.0
+    offset: 68
+    read_as: 32U
+    scale: 0.1
+    units: V
+  Bus_L2_N_voltage:
+    max_val: 18000.0
+    min_val: 0.0
+    offset: 70
+    read_as: 32U
+    scale: 0.1
+    units: V
+  Bus_L3_N_voltage:
+    max_val: 18000.0
+    min_val: 0.0
+    read_as: 32U
+    offset: 72
+    scale: 0.1
+    units: V
+  Bus_L1_L2_voltage:
+    max_val: 30000.0
+    min_val: 0.0
+    offset: 74
+    read_as: 32U
+    scale: 0.1
+    units: V
+  Bus_L2_L3_voltage:
+    max_val: 30000.0
+    min_val: 0.0
+    offset: 76
+    read_as: 32U
+    scale: 0.1
+    units: V
+  Bus_L3_L1_voltage:
+    max_val: 30000.0
+    min_val: 0.0
+    offset: 78
+    read_as: 32U
+    scale: 0.1
+    units: V
+block_name: Engine Data

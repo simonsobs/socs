@@ -8,6 +8,8 @@ on:
       - '**.md'
       - '.flake8'
       - '.pre-commit-config.yaml'
+      - '.readthedocs.yaml'
+      - '.github/dependabot.yml'
 
 jobs:
   build:

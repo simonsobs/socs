@@ -96,7 +96,7 @@ class Lakeshore240_Simulator:
                 else:
                     raise e
         else:
-            print(f"Could not connect to ports in {range(self.port, self.port+5)}")
+            print(f"Could not connect to ports in {range(self.port, self.port + 5)}")
 
         sock.listen(1)
 

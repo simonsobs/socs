@@ -59,6 +59,7 @@ Lakeshore 372 configuration file::
              excitation_mode: 'voltage'
              excitation_value: 2.0e-6
              autorange: 'on'
+             resistance_range: 2e3
              dwell: 15 # seconds
              pause: 10 # seconds
              calibration_curve_num: 23
@@ -68,9 +69,10 @@ Lakeshore 372 configuration file::
              excitation_mode: 'voltage'
              excitation_value: 2.0e-6
              autorange: 'off'
+             resistance_range: 2.0e+3
              dwell: 10 # seconds
              pause: 3 # seconds
-             calibruation_curve_num: 28
+             calibration_curve_num: 28
              temperature_coeff: 'negative'
     LSA2761:
         device_settings:
@@ -81,6 +83,7 @@ Lakeshore 372 configuration file::
              excitation_mode: 'voltage'
              excitation_value: 2.0e-6
              autorange: 'on'
+             resistance_range: 2.0e+3
              dwell: 15 # seconds
              pause: 10 # seconds
              calibration_curve_num: 33
@@ -90,15 +93,17 @@ Lakeshore 372 configuration file::
              excitation_mode: 'voltage'
              excitation_value: 2.0e-6
              autorange: 'off'
+             resistance_range: 2.0e+3
              dwell: 10 # seconds
              pause: 3 # seconds
-             calibruation_curve_num: 36
+             calibration_curve_num: 36
              temperature_coeff: 'negative'
           3:
              enable: 'on'
              excitation_mode: 'voltage'
              excitation_value: 2.0e-6
              autorange: 'on'
+             resistance_range: 2.0e+3
              dwell: 15 # seconds
              pause: 10 # seconds
              calibration_curve_num: 34
@@ -108,11 +113,20 @@ Lakeshore 372 configuration file::
              excitation_mode: 'voltage'
              excitation_value: 2.0e-6
              autorange: 'off'
+             resistance_range: 2.0e+3
              dwell: 10 # seconds
              pause: 3 # seconds
-             calibruation_curve_num: 35
+             calibration_curve_num: 35
              temperature_coeff: 'negative'
 
+.. note::
+   For setting a 372 channel to a specific resistance range, be sure to check
+   that autorange is set to 'off'. Else, the autorange setting will persist
+   over your desired resistance range.
+
+.. note::
+   Make sure values like excitation and resistance are in float form as shown
+   in the example. Ex: always 2.0e+3, never 2e3
 
 Docker Compose
 ``````````````

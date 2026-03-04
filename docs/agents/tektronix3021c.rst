@@ -45,7 +45,7 @@ Docker Compose
 ``````````````
 
 The Tektronix AWG Agent should be configured to run in a Docker container.
-An example docker-compose service configuration is shown here::
+An example docker compose service configuration is shown here::
 
   ocs-psuK:
     image: simonsobs/socs:latest

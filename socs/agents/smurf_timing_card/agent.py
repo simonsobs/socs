@@ -55,7 +55,6 @@ class SmurfTimingCardAgent:
 
         """
         pacemaker = Pacemaker(1. / self.sleep_time)
-        session.set_status('running')
         while session.status in ['starting', 'running']:
             data = {}
             for name, pv in self.pvs.items():

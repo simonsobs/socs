@@ -820,7 +820,6 @@ class MagpieAgent:
         """
 
         self._running = True
-        session.set_status('running')
 
         src_idx = 0
         if isinstance(params['src'], str):
@@ -950,7 +949,6 @@ class MagpieAgent:
         )
 
         sender.Process(self.fp.config_frame())
-        session.set_status('running')
         while session.status in ['starting', 'running']:
             f = self.out_queue.get(block=True)
             t = f['timestamp'].time / core.G3Units.s

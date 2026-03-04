@@ -54,7 +54,7 @@ block using all of the available arguments::
 Docker Compose
 ``````````````
 The agent should be configured to run in a Docker container. An
-example docker-compose service configuration is shown here::
+example docker compose service configuration is shown here::
 
   ocs-pfeiffer-turboA:
     image: simonsobs/socs:latest

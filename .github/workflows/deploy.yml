@@ -22,17 +22,26 @@ jobs:
     steps:
     # Fetch all history for all tags and branches
     - name: clone socs
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
     # Dockerize
-    - name: Build docker images
+    - name: Check docker version
       run: |
-        docker-compose build
+        docker --version
+        docker compose version
+
+    - name: Build base docker image
+      run: |
+        docker build -t socs:latest .
+
+    - name: Build additional docker images
+      run: |
+        docker compose build
 
     - name: Login to Docker Hub
-      uses: docker/login-action@v2
+      uses: docker/login-action@v3
       with:
         username: ${{ secrets.REGISTRY_USER }}
         password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -44,13 +53,13 @@ jobs:
         export DOCKER_TAG=`git describe --tags --always`
 
         # Tag all images for upload to the registry
-        docker-compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} docker tag {}:latest ${DOCKERHUB_ORG}/{}:latest
-        docker-compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} docker tag {}:latest ${DOCKERHUB_ORG}/{}:${DOCKER_TAG}
+        docker compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} docker tag {}:latest ${DOCKERHUB_ORG}/{}:latest
+        docker compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} docker tag {}:latest ${DOCKERHUB_ORG}/{}:${DOCKER_TAG}
 
         # Upload to docker registry
-        docker-compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} docker push ${DOCKERHUB_ORG}/{}:latest
-        docker-compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} docker push ${DOCKERHUB_ORG}/{}:${DOCKER_TAG}
-        docker-compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} echo ${DOCKERHUB_ORG}/{}:${DOCKER_TAG} pushed
+        docker compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} docker push ${DOCKERHUB_ORG}/{}:latest
+        docker compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} docker push ${DOCKERHUB_ORG}/{}:${DOCKER_TAG}
+        docker compose config | grep 'image: ' | awk -F ': ' '{ print $2 }' | xargs -I {} echo ${DOCKERHUB_ORG}/{}:${DOCKER_TAG} pushed
 
   wheel:
     name: build and deploy to PyPI
@@ -62,12 +71,12 @@ jobs:
 
     steps:
     - name: Set up Python 3.8
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: 3.8
 
     - name: clone socs
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: install build dependencies
       run: |

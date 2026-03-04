@@ -2,6 +2,7 @@ import argparse
 import os
 import time
 
+import serial
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
@@ -68,8 +69,6 @@ class LS425Agent:
                               "{} is already running".format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('starting')
-
             self.dev = ls.LakeShore425(self.port)
             self.log.info(self.dev.get_id())
             print("Initialized Lakeshore module: {!s}".format(self.dev))
@@ -119,21 +118,48 @@ class LS425Agent:
                               .format(self.lock.job))
                 return False, "Could not acquire lock."
 
-            session.set_status('running')
-
             self.take_data = True
 
             session.data = {"fields": {}}
 
             last_release = time.time()
             while self.take_data:
+                if self.dev is None:
+                    try:
+                        self.dev = ls.LakeShore425(self.port)
+                        self.log.info('Connected to LS425')
+                    except (ConnectionRefusedError, serial.serialutil.SerialException):
+                        self.log.error(
+                            "Could not connect to LS425. "
+                            "Retrying after 30 sec..."
+                        )
+                        time.sleep(30)
+                        continue
                 if time.time() - last_release > 1.:
                     last_release = time.time()
                     if not self.lock.release_and_acquire(timeout=10):
                         self.log.warn(f"Failed to re-acquire lock, currently held by {self.lock.job}.")
                         continue
 
-                Bfield = self.dev.get_field()
+                try:
+                    Bfield = self.dev.get_field()
+                except serial.serialutil.SerialException:
+                    self.log.error(
+                        "Decive reports readiness to read but returned no data. "
+                        "Reconnect to LS425."
+                    )
+                    self.dev.close()
+                    self.dev = None
+                    session.degraded = True
+                    continue
+                except Exception as e:
+                    self.log.error(f"Caught unexpected {type(e).__name__} during get_field:")
+                    self.log.error(f"  {e}")
+                    self.dev.close()
+                    self.dev = None
+                    session.degraded = True
+                    continue
+
                 current_time = time.time()
                 data = {
                     'timestamp': current_time,
@@ -145,6 +171,7 @@ class LS425Agent:
                 session.data.update({'timestamp': current_time})
                 self.agent.feeds['mag_field'].flush_buffer()
 
+                session.degraded = False
                 time.sleep(sleep_time)
 
         return True, 'Acquisition exited cleanly.'

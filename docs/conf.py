@@ -16,7 +16,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.abspath('..'))
-from socs_version import get_versions
+from socs import __version__ as socs_version
 
 # -- Project information -----------------------------------------------------
 
@@ -25,9 +25,9 @@ copyright = '2018-2019, Simons Observatory DAQ Group'
 author = 'Simons Observatory DAQ Group'
 
 # The short X.Y version.
-version = get_versions()['version']
+version = socs_version
 # The full version, including alpha/beta/rc tags.
-release = version
+release = socs_version
 
 
 # -- General configuration ---------------------------------------------------
@@ -90,6 +90,7 @@ autodoc_mock_imports = ['spt3g',
                         'labjack.ljm.ljm',
                         'ocs',
                         'ocs.agent',
+                        'ocs.client_http',
                         'ocs.ocs_twisted',
                         'ocs.ocs_agent',
                         'ocs.ocs_client',
@@ -98,6 +99,7 @@ autodoc_mock_imports = ['spt3g',
                         'xy_agent.xy_connect',
                         'soaculib',
                         'scan_helpers',
+                        'soaculib.retwisted_backend',
                         'soaculib.twisted_backend',
                         'soaculib.status_keys',
                         'pfeiffer_vacuum_protocol',
@@ -108,6 +110,8 @@ autodoc_mock_imports = ['spt3g',
                         'sodetlib.det_config',
                         'src',
                         'src.pid_controller',
+                        'cv2',
+                        'imutils',
                         ]
 from unittest import mock
 

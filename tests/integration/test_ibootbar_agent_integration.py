@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import ocs
 import pytest
+from integration.util import docker_compose_file  # noqa: F401
 from integration.util import create_crossbar_fixture
 from ocs.base import OpCode
 from ocs.testing import create_agent_runner_fixture, create_client_fixture
@@ -13,8 +14,6 @@ from snmpsim.commands import responder
 from twisted.internet.defer import inlineCallbacks
 
 from socs.snmp import SNMPTwister
-
-pytest_plugins = "docker_compose"
 
 wait_for_crossbar = create_crossbar_fixture()
 run_agent = create_agent_runner_fixture(
@@ -92,4 +91,31 @@ def test_ibootbar_set_initial_state(
 @pytest.mark.integtest
 def test_ibootbar_cycle_outlet(wait_for_crossbar, start_responder, run_agent, client):
     resp = client.cycle_outlet(outlet=7, cycle_time=5)
+    check_resp_success(resp)
+
+
+@pytest.mark.integtest
+def test_ibootbar_set_locked_outlet(wait_for_crossbar, start_responder, run_agent, client):
+    resp = client.lock_outlet(outlet=2, lock=True)
+    check_resp_success(resp)
+
+    resp = client.set_outlet(outlet=2, state="off")
+    assert resp.session["op_code"] == OpCode.FAILED.value
+
+
+@pytest.mark.integtest
+def test_ibootbar_cycle_locked_outlet(wait_for_crossbar, start_responder, run_agent, client):
+    resp = client.lock_outlet(outlet=2, lock=True)
+    check_resp_success(resp)
+
+    resp = client.cycle_outlet(outlet=2, cycle_time=5)
+    assert resp.session["op_code"] == OpCode.FAILED.value
+
+
+@pytest.mark.integtest
+def test_ibootbar_unlock_outlet(wait_for_crossbar, start_responder, run_agent, client):
+    resp = client.set_outlet(outlet=1, state="off")
+    assert resp.session["op_code"] == OpCode.FAILED.value
+
+    resp = client.lock_outlet(outlet=1, lock=False)
     check_resp_success(resp)
