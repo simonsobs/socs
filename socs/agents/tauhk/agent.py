@@ -236,6 +236,11 @@ class TauHKAgent:
         )
         self.log.info(f"Started tauHK crate daemon with PID {self.process.pid}")
 
+        # Load excitation values
+        self.log.info("Waiting for daemon to start before loading excitation values.")
+        time.sleep(5)
+        self.agent.start('load_config', params={'config_file': 'so_latr_excitations.yml'})
+
         # Create a function that listens to the stdout and stderr streams and sends one line at a time
         # Use a queue here since the self.agent.publish_to_feed is not thread safe
         def send_from_stream(stream, name='', q=None):
@@ -566,10 +571,10 @@ def main(args=None):
     agent.register_process('advertise', system.advertise, stop_func=dummy_stop, startup=True)
 
     # register the data receiving process
-    agent.register_process('receive_data', system.receive_data, system._stop_receive)
+    agent.register_process('receive_data', system.receive_data, system._stop_receive, startup=True)
 
     # register the crate start/stop commands
-    agent.register_process('start_crate', system.start_crate, system._stop_crate)
+    agent.register_process('start_crate', system.start_crate, system._stop_crate, startup=True)
 
     # and start!
     runner.run(agent, auto_reconnect=True)
