@@ -53,22 +53,6 @@ and install using pip:
     pip3 install -r requirements.txt
     pip3 install .
 
-In order for OCS tools to find these agents, you must add the full
-path to the agents directory, e.g. ``/home/simons/code/socs/agents/``,
-to your OCS site config file. Do so by adding the following under your
-configured host if it does not already exist:
-
-.. code-block:: yaml
-
-  # List of additional paths to Agent plugin modules.
-  'agent-paths': [
-    '/path/to/socs/agents/',
-  ],
-
-See the `ocs docs`_ for more details.
-
-.. _`ocs docs`: https://ocs.readthedocs.io/en/main/developer/site_config.html
-
 Docker Images
 -------------
 Docker images for SOCS and each Agent are available on `Docker Hub`_. Official
