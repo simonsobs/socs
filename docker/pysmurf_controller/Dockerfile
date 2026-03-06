@@ -14,7 +14,7 @@ RUN pip3 install -U pip
 RUN pip3 install -e .
 RUN pip3 install -r requirements.txt
 
-ENV OCS_CONFIG_DIR /config
+ENV OCS_CONFIG_DIR=/config
 
 ENV PYTHONUNBUFFERED=1
 
