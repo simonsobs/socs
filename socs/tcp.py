@@ -148,7 +148,15 @@ class TCPInterface:
 
         """
         self._check_ready()
-        data = self.comm.recv(bufsize)
+        try:
+            data = self.comm.recv(bufsize)
+        except OSError as e:
+            print(f"Connection error: {e}")
+            raise ConnectionError
+        except Exception as e:
+            print(f"Caught unexpected {type(e).__name__} during recv:")
+            print(f"  {e}")
+            raise ConnectionError
         return data
 
     def __del__(self):
