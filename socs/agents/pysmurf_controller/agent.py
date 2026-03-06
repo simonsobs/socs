@@ -1177,7 +1177,7 @@ class PysmurfController:
 
             # if the system is locked up, spawning a SmurfControl instance will hang
             # so we use a rogue client
-            server_port = 9000 + 3 * self.slot
+            server_port = 9000 + 3 * int(self.slot)
             server_addr = "localhost"
             with VirtualClient(addr=server_addr, port=server_port) as client:
                 try:
