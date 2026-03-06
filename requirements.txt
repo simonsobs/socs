@@ -1,6 +1,6 @@
 # core dependencies
 autobahn[serialization]
-ocs
+ocs>=0.10.0
 sqlalchemy>=1.4
 twisted
 
