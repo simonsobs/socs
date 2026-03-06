@@ -486,7 +486,7 @@ class PysmurfController:
 
     @ocs_agent.param('bands', default=None)
     @ocs_agent.param('kwargs', default=None)
-    @ocs_agent.param('run_in_main_procsess', default=False)
+    @ocs_agent.param('run_in_main_process', default=False)
     def uxm_setup(self, session, params):
         """uxm_setup(bands=None, kwargs=None, run_in_main_process=False)
 
