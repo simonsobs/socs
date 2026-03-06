@@ -26,7 +26,7 @@ classifiers = [
 dependencies = [
     "autobahn[serialization]",
     "numpy",
-    "ocs",
+    "ocs>=0.10.0",
     "pyasn1==0.4.8",
     "pyModbusTCP",
     "pyserial",
