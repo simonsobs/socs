@@ -279,8 +279,10 @@ class LS240_Agent:
                         try:
                             temp_reading = chan.get_reading(unit='K')
                             sensor_reading = chan.get_reading(unit='S')
-                        except BaseException:
-                            self.log.info('No reponse. Check your connection.')
+                        except Exception as e:
+                            self.log.warn('Caught unexpected {error} during read:', error=type(e).__name__)
+                            self.log.warn('  {err}', err=e)
+                            self.log.warn('No reponse. Check your connection.')
                             self.initialized = False
                             time.sleep(1)
                             break
