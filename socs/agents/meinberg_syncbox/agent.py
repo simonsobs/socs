@@ -468,12 +468,12 @@ class MeinbergSyncboxAgent:
                 oid_cache = update_cache(get_result, read_time)
                 oid_cache['address'] = self.address
                 session.data = oid_cache
-                self.log.info("{data}", data=session.data)
+                self.log.debug("{data}", data=session.data)
 
                 self.lastGet = time.time()
                 # Publish to feed
                 message = _build_message(get_result, read_time)
-                self.log.info("{msg}", msg=message)
+                self.log.debug("{msg}", msg=message)
                 session.app.publish_to_feed('syncbox', message)
             except Exception as e:
                 self.log.error(f'{e}')
