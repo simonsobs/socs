@@ -1,9 +1,9 @@
+http-server-mock
 pytest
 pytest-cov
 pytest-docker
 pytest-dependency
 pytest-order
+pytest-twisted
 so3g
 thola-snmpsim
-pytest-twisted
-http-server-mock

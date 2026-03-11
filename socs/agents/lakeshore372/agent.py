@@ -1,9 +1,6 @@
 import argparse
 import os
-import random
-import threading
 import time
-from contextlib import contextmanager
 
 import numpy as np
 import txaio
@@ -21,68 +18,12 @@ def still_power_to_perc(power, res, lead, max_volts):
     return 100 * volt / max_volts
 
 
-class YieldingLock:
-    """A lock protected by a lock.  This braided arrangement guarantees
-    that a thread waiting on the lock will get priority over a thread
-    that has just released the lock and wants to reacquire it.
-
-    The typical use case is a Process that wants to hold the lock as
-    much as possible, but occasionally release the lock (without
-    sleeping for long) so another thread can access a resource.  The
-    method release_and_acquire() is provided to make this a one-liner.
-
-    """
-
-    def __init__(self, default_timeout=None):
-        self.job = None
-        self._next = threading.Lock()
-        self._active = threading.Lock()
-        self._default_timeout = default_timeout
-
-    def acquire(self, timeout=None, job=None):
-        if timeout is None:
-            timeout = self._default_timeout
-        if timeout is None or timeout == 0.:
-            kw = {'blocking': False}
-        else:
-            kw = {'blocking': True, 'timeout': timeout}
-        result = False
-        if self._next.acquire(**kw):
-            if self._active.acquire(**kw):
-                self.job = job
-                result = True
-            self._next.release()
-        return result
-
-    def release(self):
-        self.job = None
-        return self._active.release()
-
-    def release_and_acquire(self, timeout=None):
-        job = self.job
-        self.release()
-        return self.acquire(timeout=timeout, job=job)
-
-    @contextmanager
-    def acquire_timeout(self, timeout=None, job='unnamed'):
-        result = self.acquire(timeout=timeout, job=job)
-        if result:
-            try:
-                yield result
-            finally:
-                self.release()
-        else:
-            yield result
-
-
 class LS372_Agent:
     """Agent to connect to a single Lakeshore 372 device.
 
     Args:
         name (ApplicationSession): ApplicationSession for the Agent.
         ip (str): IP Address for the 372 device.
-        fake_data (bool, optional): generates random numbers without connecting
-            to LS if True.
         dwell_time_delay (int, optional): Amount of time, in seconds, to
             delay data collection after switching channels. Note this time
             should not include the change pause time, which is automatically
@@ -97,7 +38,7 @@ class LS372_Agent:
             input_configfile by default
     """
 
-    def __init__(self, agent, name, ip, fake_data=False, dwell_time_delay=0,
+    def __init__(self, agent, name, ip, dwell_time_delay=0,
                  enable_control_chan=False, configfile=None):
 
         # self._acq_proc_lock is held for the duration of the acq Process.
@@ -107,14 +48,13 @@ class LS372_Agent:
 
         # self._lock is held by the acq Process only when accessing
         # the hardware but released occasionally so that (short) Tasks
-        # may run.  Use a YieldingLock to guarantee that a waiting
+        # may run. Use a TimeoutLock to guarantee that a waiting
         # Task gets activated preferentially, even if the acq thread
         # immediately tries to reacquire.
-        self._lock = YieldingLock(default_timeout=5)
+        self._lock = TimeoutLock(default_timeout=5)
 
         self.name = name
         self.ip = ip
-        self.fake_data = fake_data
         self.dwell_time_delay = dwell_time_delay
         self.module = None
         self.thermometers = []
@@ -194,26 +134,21 @@ class LS372_Agent:
                               f"{self._acq_proc_lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            if self.fake_data:
-                self.res = random.randrange(1, 1000)
-                session.add_message("No initialization since faking data")
-                self.thermometers = ["thermA", "thermB"]
-            else:
-                try:
-                    self.module = LS372(self.ip)
-                except ConnectionError:
-                    self.log.error("Could not connect to the LS372. Exiting.")
-                    reactor.callFromThread(reactor.stop)
-                    return False, 'Lakeshore initialization failed'
-                except Exception as e:
-                    self.log.error(f"Unhandled exception encountered: {e}")
-                    reactor.callFromThread(reactor.stop)
-                    return False, 'Lakeshore initialization failed'
+            try:
+                self.module = LS372(self.ip)
+            except ConnectionError:
+                self.log.error("Could not connect to the LS372. Exiting.")
+                reactor.callFromThread(reactor.stop)
+                return False, 'Lakeshore initialization failed'
+            except Exception as e:
+                self.log.error(f"Unhandled exception encountered: {e}")
+                reactor.callFromThread(reactor.stop)
+                return False, 'Lakeshore initialization failed'
 
-                print("Initialized Lakeshore module: {!s}".format(self.module))
-                session.add_message("Lakeshore initilized with ID: %s" % self.module.id)
+            print("Initialized Lakeshore module: {!s}".format(self.module))
+            session.add_message("Lakeshore initilized with ID: %s" % self.module.id)
 
-                self.thermometers = [channel.name for channel in self.module.channels]
+            self.thermometers = [channel.name for channel in self.module.channels]
 
             self.initialized = True
 
@@ -287,107 +222,95 @@ class LS372_Agent:
                                       f"currently held by {self._lock.job}.")
                         continue
 
-                if self.fake_data:
+                active_channel = self.module.get_active_channel()
+
+                # The 372 reports the last updated measurement repeatedly
+                # during the "pause change time", this results in several
+                # stale datapoints being recorded. To get around this we
+                # query the pause time and skip data collection during it
+                # if the channel has changed (as it would if autoscan is
+                # enabled.)
+                if previous_channel != active_channel:
+                    if previous_channel is not None:
+                        pause_time = active_channel.get_pause()
+                        self.log.debug("Pause time for {c}: {p}",
+                                       c=active_channel.channel_num,
+                                       p=pause_time)
+
+                        dwell_time = active_channel.get_dwell()
+                        self.log.debug("User set dwell_time_delay: {p}",
+                                       p=self.dwell_time_delay)
+
+                        # Check user set dwell time isn't too long
+                        if self.dwell_time_delay > dwell_time:
+                            self.log.warn("WARNING: User set dwell_time_delay of "
+                                          + "{delay} s is larger than channel "
+                                          + "dwell time of {chan_time} s. If "
+                                          + "you are autoscanning this will "
+                                          + "cause no data to be collected. "
+                                          + "Reducing dwell time delay to {s} s.",
+                                          delay=self.dwell_time_delay,
+                                          chan_time=dwell_time,
+                                          s=dwell_time - 1)
+                            total_time = pause_time + dwell_time - 1
+                        else:
+                            total_time = pause_time + self.dwell_time_delay
+
+                        for i in range(total_time):
+                            self.log.debug("Sleeping for {t} more seconds...",
+                                           t=total_time - i)
+                            time.sleep(1)
+
+                    # Track the last channel we measured
+                    previous_channel = self.module.get_active_channel()
+
+                current_time = time.time()
+                data = {
+                    'timestamp': current_time,
+                    'block_name': active_channel.name,
+                    'data': {}
+                }
+
+                # Collect both temperature and resistance values from each Channel
+                channel_str = active_channel.name.replace(' ', '_')
+                temp_reading = self.module.get_temp(unit='kelvin',
+                                                    chan=active_channel.channel_num)
+                res_reading = self.module.get_temp(unit='ohms',
+                                                   chan=active_channel.channel_num)
+
+                # For data feed
+                data['data'][channel_str + '_T'] = temp_reading
+                data['data'][channel_str + '_R'] = res_reading
+                session.app.publish_to_feed('temperatures', data)
+                self.log.debug("{data}", data=session.data)
+
+                # For session.data
+                field_dict = {channel_str: {"T": temp_reading,
+                                            "R": res_reading,
+                                            "timestamp": current_time}}
+                session.data['fields'].update(field_dict)
+
+                # Also queries control channel if enabled
+                if self.control_chan_enabled:
+                    temp = self.module.get_temp(unit='kelvin', chan=0)
+                    res = self.module.get_temp(unit='ohms', chan=0)
+                    cur_time = time.time()
                     data = {
                         'timestamp': time.time(),
-                        'block_name': 'fake-data',
-                        'data': {}
+                        'block_name': 'control_chan',
+                        'data': {
+                            'control_T': temp,
+                            'control_R': res
+                        }
                     }
-                    for therm in self.thermometers:
-                        reading = np.random.normal(self.res, 20)
-                        data['data'][therm] = reading
-                    time.sleep(.1)
-
-                else:
-                    active_channel = self.module.get_active_channel()
-
-                    # The 372 reports the last updated measurement repeatedly
-                    # during the "pause change time", this results in several
-                    # stale datapoints being recorded. To get around this we
-                    # query the pause time and skip data collection during it
-                    # if the channel has changed (as it would if autoscan is
-                    # enabled.)
-                    if previous_channel != active_channel:
-                        if previous_channel is not None:
-                            pause_time = active_channel.get_pause()
-                            self.log.debug("Pause time for {c}: {p}",
-                                           c=active_channel.channel_num,
-                                           p=pause_time)
-
-                            dwell_time = active_channel.get_dwell()
-                            self.log.debug("User set dwell_time_delay: {p}",
-                                           p=self.dwell_time_delay)
-
-                            # Check user set dwell time isn't too long
-                            if self.dwell_time_delay > dwell_time:
-                                self.log.warn("WARNING: User set dwell_time_delay of "
-                                              + "{delay} s is larger than channel "
-                                              + "dwell time of {chan_time} s. If "
-                                              + "you are autoscanning this will "
-                                              + "cause no data to be collected. "
-                                              + "Reducing dwell time delay to {s} s.",
-                                              delay=self.dwell_time_delay,
-                                              chan_time=dwell_time,
-                                              s=dwell_time - 1)
-                                total_time = pause_time + dwell_time - 1
-                            else:
-                                total_time = pause_time + self.dwell_time_delay
-
-                            for i in range(total_time):
-                                self.log.debug("Sleeping for {t} more seconds...",
-                                               t=total_time - i)
-                                time.sleep(1)
-
-                        # Track the last channel we measured
-                        previous_channel = self.module.get_active_channel()
-
-                    current_time = time.time()
-                    data = {
-                        'timestamp': current_time,
-                        'block_name': active_channel.name,
-                        'data': {}
-                    }
-
-                    # Collect both temperature and resistance values from each Channel
-                    channel_str = active_channel.name.replace(' ', '_')
-                    temp_reading = self.module.get_temp(unit='kelvin',
-                                                        chan=active_channel.channel_num)
-                    res_reading = self.module.get_temp(unit='ohms',
-                                                       chan=active_channel.channel_num)
-
-                    # For data feed
-                    data['data'][channel_str + '_T'] = temp_reading
-                    data['data'][channel_str + '_R'] = res_reading
                     session.app.publish_to_feed('temperatures', data)
                     self.log.debug("{data}", data=session.data)
-
-                    # For session.data
-                    field_dict = {channel_str: {"T": temp_reading,
-                                                "R": res_reading,
-                                                "timestamp": current_time}}
-                    session.data['fields'].update(field_dict)
-
-                    # Also queries control channel if enabled
-                    if self.control_chan_enabled:
-                        temp = self.module.get_temp(unit='kelvin', chan=0)
-                        res = self.module.get_temp(unit='ohms', chan=0)
-                        cur_time = time.time()
-                        data = {
-                            'timestamp': time.time(),
-                            'block_name': 'control_chan',
-                            'data': {
-                                'control_T': temp,
-                                'control_R': res
-                            }
+                    # Updates session data w/ control field
+                    session.data['fields'].update({
+                        'control': {
+                            'T': temp, 'R': res, 'timestamp': cur_time
                         }
-                        session.app.publish_to_feed('temperatures', data)
-                        self.log.debug("{data}", data=session.data)
-                        # Updates session data w/ control field
-                        session.data['fields'].update({
-                            'control': {
-                                'T': temp, 'R': res, 'timestamp': cur_time
-                            }
-                        })
+                    })
 
                 if params.get("sample_heater", False):
                     # Sample Heater
@@ -891,187 +814,6 @@ class LS372_Agent:
         return True, f"Channel {channel} has measurement inputs {input_setup} = [mode," \
             "excitation, auto range, range, cs_shunt, units]"
 
-    @ocs_agent.param('setpoint', type=float)
-    @ocs_agent.param('heater', type=str)
-    @ocs_agent.param('channel', type=int)
-    @ocs_agent.param('P', type=float)
-    @ocs_agent.param('I', type=float)
-    @ocs_agent.param('update_time', type=float)
-    @ocs_agent.param('sample_heater_range', type=float, default=10e-3)
-    @ocs_agent.param('test_mode', type=bool, default=False)
-    def custom_pid(self, session, params):
-        """custom_pid(setpoint, heater, channel, P, \
-                      I, update_time, sample_heater_range=10e-3, \
-                      test_mode=False)
-
-        **Process** - Set custom software PID parameters for servo control of fridge
-        using still or sample heater. Currently only P and I implemented.
-
-        Parameters:
-            setpoint (float): Setpoint in Kelvin
-            heater (str): 'still' or 'sample'
-            channel (int): LS372 Channel to PID off of
-            P (float): Proportional value in Watts/Kelvin
-            I (float): Integral Value in Hz
-            update_time (float): Time between PID updates in seconds
-            sample_heater_range (float): Range for sample heater in Amps.
-                                         Default is 10e-3.
-            test_mode (bool, optional): Run the Process loop only once.
-                                        This is meant only for testing.
-                                        Default is False.
-
-        Notes:
-            The most recent data collected is stored in session data in the structure.
-            The channel number noted below depends upon which channel is being used
-            to servo::
-
-                >>> response.session['data']
-                {"fields":
-                    {"Channel_02": {"T": 293.644, "R": 33.752, "timestamps": 1601924482.722671}}
-                }
-        """
-
-        with self._acq_proc_lock.acquire_timeout(timeout=0, job='custom_pid') \
-                as acq_acquired, \
-                self._lock.acquire_timeout(job='custom_pid') as acquired:
-            if not acq_acquired:
-                self.log.warn(f"Could not start Process because "
-                              f"{self._acq_proc_lock.job} is already running")
-                return False, "Could not acquire lock"
-            if not acquired:
-                self.log.warn(f"Could not start Process because "
-                              f"{self._lock.job} is holding the lock")
-                return False, "Could not acquire lock"
-
-            session.data = {"fields": {}}
-
-            setpoint = params['setpoint']
-            heater = params['heater']
-            ch = params['channel']
-            P_val = params['P']
-            I_val = params['I']
-            update_time = params['update_time']
-            sample_heater_range = params['sample_heater_range']
-
-            # Constants
-            still_heater_R = 120  # [ohms]
-            still_lead_R = 14.679  # [ohms]
-            delta_t = 0.32  # rough intrinsic sampling period of the LS372 (s)
-            max_voltage = 10  # [V]
-
-            # Get heaters in the correct configuration
-            if heater == 'sample':
-                # Set heater range
-                if sample_heater_range == self.module.sample_heater.get_heater_range():
-                    self.log.info(f"Heater range already set to {sample_heater_range} amps")
-                else:
-                    self.module.sample_heater.set_heater_range(sample_heater_range)
-
-                # Check we're in correct control mode for servo.
-                if self.module.sample_heater.mode != 'Open Loop':
-                    session.add_message('Changing control to Open Loop mode for sample PID.')
-                    self.module.sample_heater.set_mode("Open Loop")
-
-            if heater == 'still':
-                # Check we're in correct control mode for servo.
-                if self.module.still_heater.mode != 'Open Loop':
-                    session.add_message('Changing control to Open Loop mode for still PID.')
-                    self.module.still_heater.set_mode("Open Loop")
-
-            # Check we aren't autoscanning.
-            if self.module.get_autoscan() is True:
-                session.add_message('Autoscan is enabled, disabling for still PID control on dedicated channel.')
-                self.module.disable_autoscan()
-
-            # Check we're scanning same channel expected by heater for control.
-            if self.module.get_active_channel().channel_num != ch:
-                session.add_message(f'Changing active channel to {ch} for still PID')
-                self.module.set_active_channel(ch)
-
-            # Start the PID
-            self.custom_pid = True
-            active_channel = self.module.get_active_channel()
-            channel_str = active_channel.name.replace(' ', '_')
-            last_pid = time.time()
-            heater_I = 0
-            temps, resistances, times = [], [], []
-            self.log.info(f"Starting PID on heater {heater}, ch {ch} to setpoint {setpoint} K")
-
-            while self.custom_pid:
-                # Get a list of T and R at the maximum sample frequency
-                temps.append(self.module.get_temp(unit='kelvin', chan=ch))
-                resistances.append(self.module.get_temp(unit='ohms', chan=ch))
-                times.append(time.time())
-
-                # Calculate and apply the PID based on the most recent temperature set
-                if times[-1] - last_pid > update_time:
-                    heater_P = P_val * (setpoint - np.mean(np.array(temps)))
-                    heater_I += P_val * I_val * (delta_t * np.sum(setpoint - np.array(temps)))
-                    heater_pow = max(0.0, heater_P + heater_I)
-                    if heater == 'still':
-                        heater_frac = still_power_to_perc(heater_pow, still_heater_R, still_lead_R, max_voltage)
-                        self.module.still_heater.set_heater_output(heater_frac)
-                    if heater == 'sample':
-                        self.module.sample_heater.set_heater_output(heater_pow)
-
-                    # Publish heater values
-                    if heater == 'still':
-                        heater_data = {
-                            'timestamp': last_pid,
-                            'block_name': 'still_heater_out',
-                            'data': {'still_heater_out': heater_frac}
-                        }
-                        session.app.publish_to_feed('temperatures', heater_data)
-
-                    if heater == 'sample':
-                        heater_data = {
-                            'timestamp': last_pid,
-                            'block_name': 'sample_heater_out',
-                            'data': {'sample_heater_out': heater_pow}
-                        }
-                        session.app.publish_to_feed('temperatures', heater_data)
-
-                    # Publish T and R values
-                    temp_data = {
-                        'timestamps': times,
-                        'block_name': active_channel.name,
-                        'data': {channel_str + '_T': temps,
-                                 channel_str + '_R': resistances}
-                    }
-                    session.app.publish_to_feed('temperatures', temp_data)
-
-                    # For session.data
-                    field_dict = {channel_str: {"T": temps,
-                                                "R": resistances,
-                                                "timestamps": times}}
-                    session.data['fields'].update(field_dict)
-                    self.log.debug("{data}", data=session.data)
-
-                    # Reset for the next PID iteration
-                    temps, resistances, times = [], [], []
-                    last_pid = time.time()
-
-                    # Relinquish sampling lock temporarily
-                    if not self._lock.release_and_acquire(timeout=10):
-                        self.log.warn(f"Failed to re-acquire sampling lock, "
-                                      f"currently held by {self._lock.job}.")
-                        continue
-
-                if params['test_mode']:
-                    break
-
-        return True, 'PID exited cleanly.'
-
-    def _stop_custom_pid(self, session, params=None):
-        """
-        Stops acq process.
-        """
-        if self.custom_pid:
-            self.custom_pid = False
-            return True, 'Stopping the custom PID'
-        else:
-            return False, 'PID is not currently running'
-
     @ocs_agent.param('measurements', type=int)
     @ocs_agent.param('threshold', type=float)
     def check_temperature_stability(self, session, params):
@@ -1260,9 +1002,9 @@ class LS372_Agent:
 
         return True, "Current still output is {}".format(still_output)
 
-    @ocs_agent.param('configfile', type=str)
+    @ocs_agent.param('configfile', type=str, default=None)
     def input_configfile(self, session, params=None):
-        """input_configfile(configfile)
+        """input_configfile(configfile=None)
 
         **Task** - Upload 372 configuration file to initialize channel/device
         settings.
@@ -1414,7 +1156,6 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
 
     lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address,
-                             fake_data=args.fake_data,
                              dwell_time_delay=args.dwell_time_delay,
                              enable_control_chan=args.enable_control_chan,
                              configfile=args.configfile)
@@ -1443,7 +1184,6 @@ def main(args=None):
     agent.register_task('set_still_output', lake_agent.set_still_output)
     agent.register_task('get_still_output', lake_agent.get_still_output)
     agent.register_process('acq', lake_agent.acq, lake_agent._stop_acq)
-    agent.register_process('custom_pid', lake_agent.custom_pid, lake_agent._stop_custom_pid)
     agent.register_task('enable_control_chan', lake_agent.enable_control_chan)
     agent.register_task('disable_control_chan', lake_agent.disable_control_chan)
     agent.register_task('input_configfile', lake_agent.input_configfile)

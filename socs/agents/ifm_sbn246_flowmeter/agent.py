@@ -26,7 +26,7 @@ def extract(value):
     """
     binary = bin(int(value, 16))[2:].zfill(32)
     _b_flow = binary[0:16]
-    _b_temp = binary[17:30]
+    _b_temp = binary[16:30]
 
     flow = int(_b_flow, 2) / 10
     temp = int(_b_temp, 2)

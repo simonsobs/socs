@@ -35,7 +35,7 @@ class Sherborne:
 
     def __del__(self):
         print(f"Disconnecting from TCP IP {self.tcp_ip} at port {self.tcp_port}")
-        self.ser.close()
+        self.ser.sock.close()
         return
 
     def get_angle(self):
@@ -79,7 +79,7 @@ class Sherborne:
                 "Aborted Sherborne._conn() due to no TCP IP or "
                 "TCP port specified")
         elif tcp_ip is not None and tcp_port is not None:
-            self.ser = mx.Serial_TCPServer((tcp_ip, tcp_port), timeout)
+            self.ser = mx.Serial_TCPServer((tcp_ip, tcp_port), timeout, encoded=False)
             self.tcp_ip = tcp_ip
             self.tcp_port = int(tcp_port)
             self.using_tcp = True

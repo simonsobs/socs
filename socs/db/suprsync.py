@@ -2,6 +2,8 @@ import os
 import subprocess
 import tempfile
 import time
+from contextlib import nullcontext
+from functools import wraps
 
 import txaio
 import yaml
@@ -186,6 +188,28 @@ def create_file(local_path, remote_path, archive_name, local_md5sum=None,
     return file
 
 
+def beginsession(f):
+    """A decorator to wrap instance methods with a context manager for
+    beginning and properly closing SQLAlchemy sessions within the
+    SupRsyncFilesManager.
+
+    This is to facilitate automatic clean up of sessions in methods that
+    interact with the database.
+
+    """
+    @wraps(f)
+    def wrapper(self, *args, session=None, **kwargs):
+        if session is None:
+            cm = self.Session.begin()
+        else:
+            cm = nullcontext(session)
+
+        with cm as context_session:
+            kwargs.update({'session': context_session})
+            return f(self, *args, **kwargs)
+    return wrapper
+
+
 class SupRsyncFilesManager:
     """
     Helper class for accessing and adding entries to the SupRsync
@@ -201,21 +225,25 @@ class SupRsyncFilesManager:
             If true, writes sql statements to stdout
     """
 
-    def __init__(self, db_path, create_all=True, echo=False):
+    def __init__(
+        self, db_path: str, create_all: bool = True, echo: bool = False,
+        pool_size: int = 5, max_overflow: int = 10
+    ) -> None:
         db_path = os.path.abspath(db_path)
         if not os.path.exists(os.path.dirname(db_path)):
             os.makedirs(os.path.dirname(db_path))
 
-        self._engine = create_engine(f'sqlite:///{db_path}', echo=echo)
+        self._engine = create_engine(
+            f'sqlite:///{db_path}', echo=echo,
+            pool_size=pool_size, max_overflow=max_overflow,
+        )
         self.Session = sessionmaker(bind=self._engine)
 
         if create_all:
             Base.metadata.create_all(self._engine)
 
+    @beginsession
     def get_archive_stats(self, archive_name, session=None):
-        if session is None:
-            session = self.Session()
-
         files = session.query(SupRsyncFile).filter(
             SupRsyncFile.archive_name == archive_name,
         ).order_by(asc(SupRsyncFile.timestamp)).all()
@@ -251,6 +279,7 @@ class SupRsyncFilesManager:
 
         return stats
 
+    @beginsession
     def get_finalized_until(self, archive_name, session=None):
         """
         Returns a timetamp for which all files preceding are either successfully
@@ -264,9 +293,6 @@ class SupRsyncFilesManager:
                 SQLAlchemy session to use. If none is passed, will create a new
                 session
         """
-        if session is None:
-            session = self.Session()
-
         query = session.query(SupRsyncFile).filter(
             SupRsyncFile.archive_name == archive_name,
         ).order_by(asc(SupRsyncFile.timestamp))
@@ -279,6 +305,7 @@ class SupRsyncFilesManager:
         else:
             return time.time()
 
+    @beginsession
     def add_file(self, local_path, remote_path, archive_name,
                  local_md5sum=None, timestamp=None, session=None,
                  deletable=True):
@@ -308,16 +335,12 @@ class SupRsyncFilesManager:
         file = create_file(local_path, remote_path, archive_name,
                            local_md5sum=local_md5sum, timestamp=timestamp,
                            deletable=deletable)
-        if session is None:
-            with self.Session.begin() as session:
-                self._add_file_tcdir(file, session)
-                session.add(file)
-        else:
-            self._add_file_tcdir(file, session)
-            session.add(file)
+        self._add_file_tcdir(file, session)
+        session.add(file)
 
         return file
 
+    @beginsession
     def get_copyable_files(self, archive_name, session=None,
                            max_copy_attempts=None, num_files=None):
         """
@@ -338,9 +361,6 @@ class SupRsyncFilesManager:
             num_files : int
                 Number of files to return
         """
-        if session is None:
-            session = self.Session()
-
         if max_copy_attempts is None:
             max_copy_attempts = 2**10
 
@@ -361,6 +381,7 @@ class SupRsyncFilesManager:
 
         return files
 
+    @beginsession
     def get_deletable_files(self, archive_name, delete_after, session=None):
         """
         Gets all files that are deletable, meaning that the local and remote
@@ -377,9 +398,6 @@ class SupRsyncFilesManager:
             session : sqlalchemy session
                 Session to use to query files.
         """
-        if session is None:
-            session = self.Session()
-
         query = session.query(SupRsyncFile).filter(
             SupRsyncFile.removed == None,  # noqa: E711
             SupRsyncFile.archive_name == archive_name,
@@ -395,6 +413,7 @@ class SupRsyncFilesManager:
 
         return files
 
+    @beginsession
     def get_known_files(self, archive_name, session=None, min_ctime=None):
         """Gets all files.  This can be used to help avoid
         double-registering files.
@@ -409,9 +428,6 @@ class SupRsyncFilesManager:
                 minimum ctime to use when querying files.
 
         """
-        if session is None:
-            session = self.Session()
-
         if min_ctime is None:
             min_ctime = 0
 
@@ -549,7 +565,8 @@ class SupRsyncFileHandler:
 
     def __init__(self, file_manager, archive_name, remote_basedir,
                  ssh_host=None, ssh_key=None, cmd_timeout=None,
-                 copy_timeout=None, compression=None, bwlimit=None):
+                 copy_timeout=None, compression=None, bwlimit=None,
+                 chmod=None):
         self.srfm = file_manager
         self.archive_name = archive_name
         self.ssh_host = ssh_host
@@ -560,6 +577,7 @@ class SupRsyncFileHandler:
         self.copy_timeout = copy_timeout
         self.compression = compression
         self.bwlimit = bwlimit
+        self.chmod = chmod
 
     def run_on_remote(self, cmd, timeout=None):
         """
@@ -649,6 +667,8 @@ class SupRsyncFileHandler:
                     file_map[remote_path] = file
 
                 cmd = ['rsync', '-Lrt']
+                if self.chmod:
+                    cmd += ['-p', f'--chmod={self.chmod}']
                 if self.compression:
                     cmd.append('-z')
                 if self.bwlimit:
@@ -657,8 +677,10 @@ class SupRsyncFileHandler:
                     cmd.extend(['--rsh', f'ssh -i {self.ssh_key}'])
                 cmd.extend([tmp_dir + '/', dest])
 
+                self.log.debug(f"Running: {' '.join(cmd)}")
                 subprocess.run(cmd, check=True, timeout=self.copy_timeout)
 
+            # Mark all files as 'copied' to remote.
             for file in files:
                 file.copied = time.time()
 

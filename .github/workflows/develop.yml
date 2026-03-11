@@ -24,17 +24,26 @@ jobs:
     steps:
     # Fetch all history for all tags and branches
     - name: clone socs
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0
 
     # Dockerize
-    - name: Build docker images
+    - name: Check docker version
+      run: |
+        docker --version
+        docker compose version
+
+    - name: Build base docker image
+      run: |
+        docker build -t socs:latest .
+
+    - name: Build additional docker images
       run: |
         docker compose build
 
     - name: Login to Docker Hub
-      uses: docker/login-action@v3
+      uses: docker/login-action@v4
       with:
         username: ${{ secrets.REGISTRY_USER }}
         password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -62,12 +71,12 @@ jobs:
 
     steps:
     - name: Set up Python 3.8
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: 3.8
 
     - name: clone socs
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: install build dependencies
       run: |

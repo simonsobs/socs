@@ -342,10 +342,10 @@ class LogParser:
                       'heater': '(heaters)'}
 
         for k, v in file_types.items():
-            if re.search(v, filename):
+            if re.search(v, filename, flags=re.I):
                 _type = k
 
-                m = re.search(file_types[_type], filename)
+                m = re.search(file_types[_type], filename, flags=re.I)
                 if _type == 'lakeshore':
                     return _type, "{}_{}".format(_type, m.group(0).lower().replace(' ', '_'))
                 else:

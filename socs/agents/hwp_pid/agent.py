@@ -29,11 +29,18 @@ def parse_action_result(res):
 
 
 def get_pid_state(pid: pd.PID):
-    return {
-        "current_freq": pid.get_freq(),
-        "target_freq": pid.get_target(),
-        "direction": pid.get_direction(),
-    }
+    state_func = {'current_freq': pid.get_freq,
+                  'target_freq': pid.get_target,
+                  'direction': pid.get_direction}
+
+    return_dict = {'healthy': True}
+    for name, func in state_func.items():
+        resp = func()
+        if resp.msg_type == 'error':
+            return_dict['healthy'] = False
+        else:
+            return_dict[name] = resp.measure
+    return return_dict
 
 
 class Actions:
@@ -88,7 +95,12 @@ class Actions:
     @dataclass
     class GetState(BaseAction):
         def process(self, pid: pd.PID):
-            return get_pid_state(pid)
+            pid_state = get_pid_state(pid)
+            if pid_state['healthy']:
+                return pid_state
+            else:
+                print('Error getting state')
+                raise ValueError
 
 
 class HWPPIDAgent:
@@ -119,6 +131,12 @@ class HWPPIDAgent:
         data = {"timestamp": time.time(), "block_name": "HWPPID", "data": {}}
 
         pid_state = get_pid_state(pid)
+        if pid_state['healthy']:
+            session.degraded = False
+        else:
+            print('Warning: state monitor degraded')
+            session.degraded = True
+
         data['data'].update(pid_state)
         session.data.update(pid_state)
         session.data['last_updated'] = time.time()

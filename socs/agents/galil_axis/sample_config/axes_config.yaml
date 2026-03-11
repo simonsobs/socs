@@ -1,0 +1,47 @@
+galil:
+  motorsettings:
+    countspermm: 4000
+    countsperdeg: 2000
+  limitsetting:
+    polarity: '1'
+    disable_limits:
+      B: '3'
+      D: '3'
+  brakes:
+    output_map:
+      A: '1'
+      B: '2'
+      C: '3'
+      D: '4'
+  motorconfigparams:
+    A:              # linear axis
+      MT: '1' # motor type
+      OE: '1' #
+      AG: '2'
+      TL: '5'
+      AU: '9'
+    B:              # linear axis
+      MT: '1'
+      OE: '1'
+      AG: '2'
+      TL: '5'
+      AU: '9'
+    C:              # rotary axis
+      MT: '1'
+      OE: '1'
+      AG: '2'
+      TL: '5'
+      AU: '9'
+    D:              # rotary axis
+      MT: '1'
+      OE: '1'
+      AG: '2'
+      TL: '5'
+      AU: '9'
+  initaxisparams:
+    BA: 'True'          # if True command will run as BAE / BAF / BAA / BAB
+    BM: '3276.8'
+    BZ: '3'
+  dwell_times:
+    first_ms: '1000'
+    second_ms: '1500'

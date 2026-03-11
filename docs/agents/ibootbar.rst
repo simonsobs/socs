@@ -6,8 +6,9 @@
 iBootbar Agent
 ====================
 
-The iBootbar Agent is an OCS Agent which monitors and sends commands to the iBoot PDU.
-Monitoring and commanding is performed via SNMP.
+The iBootbar Agent is an OCS Agent which monitors and sends commands to the dataprobe
+iBoot PDU or iBoot Bar. iBoot Bar is an older device. Monitoring and commanding is
+performed via SNMP.
 
 .. argparse::
     :filename: ../socs/agents/ibootbar/agent.py
@@ -25,17 +26,29 @@ OCS Site Config
 
 To configure the iBootbar Agent we need to add a ibootbarAgent
 block to our ocs configuration file. Here is an example configuration block
-using all of the available arguments::
+for IBoot PDU using all of the available arguments::
 
       {'agent-class': 'ibootbarAgent',
        'instance-id': 'ibootbar',
        'arguments': [['--address', '10.10.10.50'],
                      ['--port', 161],
                      ['--mode', 'acq'],
+                     ['--ibootbar-type', 'IBOOTPDU'],
                      ['--snmp-version', 2]]},
 
+Here is an example configuration block for IBoot Bar using all of the available
+arguments::
+
+      {'agent-class': 'ibootbarAgent',
+       'instance-id': 'ibootbar',
+       'arguments': [['--address', '10.10.10.50'],
+                     ['--port', 161],
+                     ['--mode', 'acq'],
+                     ['--ibootbar-type', 'IBOOTBAR'],
+                     ['--snmp-version', 1]]},
+
 .. note::
-    The ``--address`` argument should be the address of the iBoot PDU on the network.
+    The ``--address`` argument should be the address of the iBootbar on the network.
 
 Docker Compose
 ``````````````
@@ -61,8 +74,8 @@ debugging. The default level is "info".
 Description
 -----------
 
-The iBootbar, or iBoot PDU, will be used to power various components on the SO
-site. The iBootbar Agent allows the monitoring and commanding of the iBoot PDU.
+The iBootbar will be used to power various components on the SO site.
+The iBootbar Agent allows the monitoring and commanding of the iBoot PDU.
 It monitors the state of each outlet, can set the state of each outlet, can
 cycle each outlet, and reboot the system. The iBootbar has an Simple Network
 Management Protocol (SNMP) interface.
