@@ -32,7 +32,7 @@ class FLSAgent:
         self.port = port
         self.dlcsmart = None
 
-        self.connected = False
+        self.initialized = False
         self.take_data = False
         self.lasers_on = False
         self.tx_bias_amp = None
@@ -45,6 +45,7 @@ class FLSAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
+    @ocs_agent.param('auto_acquire', type=bool, default=False)
     def initialize(self, session, params=None):
         """
         initialize()
@@ -59,7 +60,7 @@ class FLSAgent:
                               "is already running")
                 return False, "Could not acquire lock."
 
-            self.dlcsmart = DLCSmart(ip_addr=self.ip, command_port=self.port)
+            self.dlcsmart = DLCSmart(ip_addr=self.ip, port=self.port)
 
             try:
                 welcome = self.dlcsmart.connect()
@@ -80,13 +81,18 @@ class FLSAgent:
             else:
                 self.log.warn("Could not determine if lasers are on!")
 
-        self.connected = True
+        self.initialized = True
+
+        if params['auto_acquire']:
+            resp = self.agent.start('acq', params={})
+            self.log.info(f'Response from acq.start(): {resp[1]}')
 
         return True, "FLS agent initialized"
 
-    def sampling(self, session, params):
+    @ocs_agent.param('test_mode', default=False, type=bool)
+    def acq(self, session, params):
         """
-        sampling()
+        acq()
 
         ***Process*** - Starts the 'sampling' data acquisiton from the DLC Smart.
 
@@ -100,7 +106,7 @@ class FLSAgent:
                      'photocurrent': 0.1124,
                      'timestamp': 1771277799.562098}
         """
-        with self.lock.acquire_timeout(0, job='sampling') as acquired:
+        with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start sampling because {self.lock.job}"
                               "is already running")
@@ -143,6 +149,9 @@ class FLSAgent:
                             'data': sampling_data}
 
                 self.agent.publish_to_feed('sampling_data', pub_data)
+
+                if params['test_mode']:
+                    break
 
         self.agent.feeds['fls_sampling'].flush_buffer()
         return True, 'Acquisition exited cleanly.'
@@ -325,9 +334,9 @@ class FLSAgent:
 
     @ocs_agent.param('min_frequency', type=float)
     @ocs_agent.param('max_frequency', type=float)
-    @ocs_agent_param('start_direction', type=int)
+    @ocs_agent.param('start_direction', type=int)
     @ocs_agent.param('frequency_step', type=float, default=0.05)
-    @ocs_agent_param('num_of_sweeps', type=int, default=1)
+    @ocs_agent.param('num_of_sweeps', type=int, default=1)
     def run_frequency_sweeps(self, session, params):
         """
         run_frequency_sweeps(min_frequency, max_frequency, start_direction,
@@ -402,6 +411,7 @@ def make_parser(parser=None):
     pgroup = parser.add_argument_group('Agent Options')
     pgroup.add_argument('--ip')
     pgroup.add_argument('--port', default=1998)
+    pgroup.add_argument('--mode', choices=['init', 'acq'])
 
     return parser
 
@@ -412,6 +422,12 @@ def main(args=None):
                                   parser=parser,
                                   args=args)
 
+    init_params = False
+    if args.mode == 'init':
+        init_params = {'auto_acquire': False}
+    elif args.mode == 'acq':
+        init_params = {'auto_acquire': True}
+
     agent, runner = ocs_agent.init_site_agent(args)
 
     fls_agent = FLSAgent(agent, args.ip, args.port)
@@ -421,4 +437,9 @@ def main(args=None):
     agent.register_task('set_bias', fls_agent.set_bias)
     agent.register_task('set_frequency', fls_agent.set_frequency)
     agent.register_task('run_frequency_sweeps', fls_agent.run_frequency_sweeps)
-    agent.register_process('sampling', fls_agent.sampling, fls_agent._stop_acq)
+    agent.register_process('acq', fls_agent.acq, fls_agent._stop_acq)
+
+    runner.run(agent, auto_reconnect=True)
+
+if __name__== '__main__':
+    main()

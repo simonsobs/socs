@@ -4,10 +4,9 @@ import base64
 import numpy as np
 
 class DLCSmart():
-    def __init__(self, ip_addr, tcp_port=1998, upd_port=1999, buffer_size=1024, timeout=5):
+    def __init__(self, ip_addr, port=1998, buffer_size=1024, timeout=5):
         self.ip_addr = ip_addr
-        self.tcp_port = tcp_port # TCP
-        self.tcp_port = tcp_port # UDP
+        self.port = port # TCP
         self.buffer_size = buffer_size
         self.sock = None
         self.timeout = timeout
@@ -57,7 +56,7 @@ class DLCSmart():
         """
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.settimeout(self.timeout)
-        self.sock.connect((self.ip_addr, self.tcp_port))
+        self.sock.connect((self.ip_addr, self.port))
         time.sleep(0.1)
         welcome_req = self.read_all()
         return True, welcome_req
