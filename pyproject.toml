@@ -28,7 +28,7 @@ dependencies = [
     "autobahn[serialization]",
     "numpy",
     "ocs>=0.10.0",
-    "pyasn1==0.4.8",
+    "pyasn1==0.6.3",
     "pyModbusTCP",
     "pyserial",
     "pysmi",
