@@ -552,7 +552,9 @@ class HWPState:
                 ups_oid = k.split('_')[1]
                 break
         else:
-            raise ValueError('Could not find upsOutputSource OID')
+            for k in ups_keymap:
+                setattr(self, k, None)
+            return
 
         for k, f in ups_keymap.items():
             setattr(self, k, data[f'{f[0]}_{ups_oid}'][f[1]])
