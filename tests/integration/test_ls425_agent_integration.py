@@ -27,7 +27,8 @@ def test_testing(wait_for_crossbar):
 
 @pytest.mark.integtest
 def test_ls425_init_lakeshore(wait_for_crossbar, emulator, run_agent, client):
-    resp = client.init_lakeshore()
+    # init_lakeshore runs at startup
+    resp = client.init_lakeshore.wait()
     # print(resp)
     assert resp.status == ocs.OK
     # print(resp.session)
@@ -36,6 +37,8 @@ def test_ls425_init_lakeshore(wait_for_crossbar, emulator, run_agent, client):
 
 @pytest.mark.integtest
 def test_ls425_auto_start_acq(wait_for_crossbar, emulator, run_agent_acq, client):
+    # init_lakeshore runs at startup
+    client.init_lakeshore.wait()
     resp = client.init_lakeshore.status()
     # print(resp)
     assert resp.status == ocs.OK

@@ -21,12 +21,13 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Astronomy",
 ]
 dependencies = [
     "autobahn[serialization]",
     "numpy",
-    "ocs",
+    "ocs>=0.10.0",
     "pyasn1==0.4.8",
     "pyModbusTCP",
     "pyserial",
@@ -92,7 +93,7 @@ pfeiffer = [
 # Pysmurf Controller Agent
 pysmurf = [
     "pyepics",
-    # "pysmurf @ git+https://github.com/slaclab/pysmurf.git@main",
+    # "pysmurf-slac @ git+https://github.com/slaclab/pysmurf.git@main",
     # "sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master",
     # "sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master",
 ]
@@ -135,4 +136,4 @@ include = [
 ]
 
 [tool.isort]
-skip = ["versioneer.py", "socs/_version.py"]
+skip = ["socs/_version.py"]

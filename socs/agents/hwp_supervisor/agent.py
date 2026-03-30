@@ -353,6 +353,7 @@ class HWPState:
     pmx_last_updated: Optional[float] = None
 
     enc_freq: Optional[float] = None
+    encoder_last_updated: Optional[float] = None
     last_quad: Optional[float] = None
     last_quad_time: Optional[float] = None
 
@@ -404,8 +405,8 @@ class HWPState:
         if not args.no_acu:
             self.acu = ACUState(
                 instance_id=args.acu_instance_id,
-                min_el=args.acu_min_el,
-                max_el=args.acu_max_el,
+                min_el=args.acu_min_el - args.acu_tol_el,
+                max_el=args.acu_max_el + args.acu_tol_el,
                 max_time_since_update=args.acu_max_time_since_update,
                 mount_velocity_grip_thresh=args.mount_velocity_grip_thresh,
                 grip_max_boresight_angle=args.grip_max_boresight_angle,
@@ -551,7 +552,9 @@ class HWPState:
                 ups_oid = k.split('_')[1]
                 break
         else:
-            raise ValueError('Could not find upsOutputSource OID')
+            for k in ups_keymap:
+                setattr(self, k, None)
+            return
 
         for k, f in ups_keymap.items():
             setattr(self, k, data[f'{f[0]}_{ups_oid}'][f[1]])
@@ -911,6 +914,28 @@ class ControlState:
             if self.driver_power_agent_type not in ['iboot', 'synaccess']:
                 raise ValueError(
                     f"Invalid driver_power_agent_type: {self.driver_power_agent_type}. "
+                    "Must be in ['iboot', 'synaccess']"
+                )
+
+    @dataclass
+    class PowerCycleGripper:
+        """
+        Power Cycle Gripper electronics.
+
+        Attributes
+        -----------
+        driver_power_agent_type: Literal['iboot, synaccess']
+            Type of agent used for controlling the gripper power
+        outlets: List[int]
+            List of outlets to power cycle in this order
+        """
+        gripper_power_agent_type: Literal['iboot, synaccess']
+        outlets: List[int]
+
+        def __post_init__(self):
+            if self.gripper_power_agent_type not in ['iboot', 'synaccess']:
+                raise ValueError(
+                    f"Invalid gripper_power_agent_type: {self.gripper_power_agent_type}. "
                     "Must be in ['iboot', 'synaccess']"
                 )
 
@@ -1382,9 +1407,24 @@ class ControlStateMachine:
                     else:
                         kw = {'outlet': outlet, 'on': outlet_state}
                     self.run_and_validate(clients.driver_iboot.set_outlet, kwargs=kw)
-
                 for outlet in state.outlets:
                     set_outlet_state(outlet, False)
+                self.action.set_state(ControlState.Done(success=True))
+                return
+
+            elif isinstance(state, ControlState.PowerCycleGripper):
+                def set_outlet_state(outlet: int, outlet_state: bool):
+                    if state.gripper_power_agent_type == 'iboot':
+                        kw = {'outlet': outlet, 'state': 'on' if outlet_state else 'off'}
+                    else:
+                        kw = {'outlet': outlet, 'on': outlet_state}
+                    self.run_and_validate(clients.gripper_iboot.set_outlet, kwargs=kw)
+                for outlet in state.outlets:
+                    set_outlet_state(outlet, False)
+                    time.sleep(2)
+                for outlet in state.outlets:
+                    set_outlet_state(outlet, True)
+                    time.sleep(2)
                 self.action.set_state(ControlState.Done(success=True))
                 return
 
@@ -1459,6 +1499,12 @@ class HWPSupervisor:
         self.driver_iboot_outlets = args.driver_iboot_outlets
         self.driver_power_cycle_twice = args.driver_power_cycle_twice
         self.driver_power_cycle_wait_time = args.driver_power_cycle_wait_time
+        self.gripper_power_agent_type = args.gripper_power_agent_type
+        self.gripper_iboot_outlets = args.gripper_iboot_outlets
+
+        self.shutdown_no_data_timeout = args.shutdown_no_data_timeout
+        self.shutdown_delay = args.shutdown_delay
+        self.shutdown_mode = False
 
     def _get_hwp_clients(self):
         def get_client(id):
@@ -1539,6 +1585,7 @@ class HWPSupervisor:
                     'driver_iboot': None,
                     'enc_freq': None,
                     'enc_instance_id': 'hwp-enc',
+                    'encoder_last_updated': None,
                     'gripper': {
                         'brake': [0, 0, 0],
                         'emg': [0, 0, 0],
@@ -1592,6 +1639,7 @@ class HWPSupervisor:
         """
         pm = Pacemaker(1. / self.sleep_time)
         test_mode = params.get('test_mode', False)
+        last_okay_time = time.time()
 
         session.data = {
             'timestamp': time.time(),
@@ -1616,6 +1664,21 @@ class HWPSupervisor:
                 'pmx': self.hwp_state.pmx_action,
                 'gripper': self.hwp_state.gripper_action,
             }
+
+            action = self.hwp_state.pmx_action
+            if action == 'ok':
+                last_okay_time = time.time()
+            elif action == 'no_data' and self.shutdown_no_data_timeout >= 0:
+                if (time.time() - last_okay_time) > \
+                        self.shutdown_no_data_timeout + self.shutdown_delay:
+                    if not self.shutdown_mode:
+                        self.agent.start('disable_driver_board', params={})
+                        self.shutdown_mode = True
+            elif action == 'stop':
+                if (time.time() - last_okay_time) > self.shutdown_delay:
+                    if not self.shutdown_mode:
+                        self.agent.start('disable_driver_board', params={})
+                        self.shutdown_mode = True
 
             if test_mode:
                 break
@@ -1985,6 +2048,41 @@ class HWPSupervisor:
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
+    def power_cycle_gripper(self, session, params):
+        """power_cycle_gripper()
+
+        **Task** - Power cycle gripper electronics
+
+        Notes
+        --------
+
+        Example of ``session.data``::
+
+            >>> session['data']
+            {'action':
+                {'action_id': 3,
+                'completed': True,
+                'cur_state': {'class': 'Done', 'msg': None, 'success': True},
+                'state_history': List[ConrolState],
+                'success': False}
+            }
+        """
+        kw = {
+            'gripper_power_agent_type': self.gripper_power_agent_type,
+            'outlets': self.gripper_iboot_outlets,
+        }
+        state = ControlState.PowerCycleGripper(**kw)
+        action = self.control_state_machine.request_new_action(state)
+        action.sleep_until_complete(session=session)
+        return action.success, f"Completed with state: {action.cur_state_info.state}"
+
+    def cancel_shutdown(self, session, params):
+        """cancel_shutdown()
+        **Task** - Cancels shutdown mode
+        """
+        self.shutdown_mode = False
+        return True, "Cancelled shutdown mode"
+
 
 def make_parser(parser=None):
     if parser is None:
@@ -2061,6 +2159,10 @@ def make_parser(parser=None):
         help="Max elevation that HWP spin up is allowed",
     )
     pgroup.add_argument(
+        '--acu-tol-el', type=float, default=0.1,
+        help="Amount of tolerance in elevation allowed when HWP spin up",
+    )
+    pgroup.add_argument(
         '--acu-max-time-since-update', type=float, default=30.0,
         help="Max amount of time since last ACU update before allowing HWP spin up",
     )
@@ -2085,6 +2187,15 @@ def make_parser(parser=None):
         '--forward-dir', choices=['cw', 'ccw'], default='cw',
         help="Whether the PID 'forward' direction is cw or ccw. "
              "cw or ccw is defined when hwp is viewed from the sky side."
+    )
+    pgroup.add_argument(
+        '--shutdown-no-data-timeout', type=float, default=15 * 60,
+        help="Time(sec) after which a 'no_data' action should trigger a shutdown"
+    )
+    pgroup.add_argument(
+        '--shutdown-delay', type=float, default=15 * 60,
+        help="Time(sec) to delay the supervisor shutdown to let "
+             "other hwp shutdown protocols finish"
     )
     return parser
 
@@ -2111,7 +2222,9 @@ def main(args=None):
     agent.register_task('ungrip_hwp', hwp.ungrip_hwp)
     agent.register_task('enable_driver_board', hwp.enable_driver_board)
     agent.register_task('disable_driver_board', hwp.disable_driver_board)
+    agent.register_task('power_cycle_gripper', hwp.power_cycle_gripper)
     agent.register_task('abort_action', hwp.abort_action)
+    agent.register_task('cancel_shutdown', hwp.cancel_shutdown)
 
     runner.run(agent, auto_reconnect=True)
 

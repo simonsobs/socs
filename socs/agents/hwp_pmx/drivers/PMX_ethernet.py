@@ -1,5 +1,9 @@
-import socket
 import time
+
+from socs.tcp import TCPInterface
+
+WAIT_TIME = 0.01
+BUFFSIZE = 128
 
 protection_status_key = [
     'Over voltage',
@@ -13,61 +17,39 @@ protection_status_key = [
 ]
 
 
-class PMX:
+class PMX(TCPInterface):
     """The PMX object for communicating with the Kikusui PMX power supplies.
+
     Args:
-        tcp_ip (str): TCP IP address
-        tcp_port (int): TCP port
+        ip_address (str): IP address of the device.
+        port (int): Associated port for TCP communication.
+        timeout (float): Duration in seconds that operations wait before giving
+            up.
+
     """
 
-    def __init__(self, ip, port):
-        self.ip = ip
-        self.port = port
-        self.wait_time = 0.01
-        self.buffer_size = 128
-        self.conn = self._establish_connection(self.ip, int(self.port))
-
-    def _establish_connection(self, ip, port, timeout=2):
-        conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        conn.settimeout(timeout)
-        attempts = 3
-        for attempt in range(attempts):
-            try:
-                conn.connect((ip, port))
-                break
-            except (ConnectionRefusedError, OSError):
-                print(f"Failed to connect to device at {ip}:{port}")
-        else:
-            raise RuntimeError('Could not connect to PMX.')
-        return conn
+    def __init__(self, ip_address, port=5025, timeout=10):
+        # Setup the TCP Interface
+        super().__init__(ip_address, port, timeout)
 
     def close(self):
-        self.conn.close()
+        self.comm.close()
 
     def send_message(self, msg, read=True):
-        for attempt in range(2):
-            try:
-                self.conn.sendall(msg)
-                time.sleep(0.5)
-                if read:
-                    data = self.conn.recv(self.buffer_size).strip().decode('utf-8')
-                    return data
-                return
-            except (socket.timeout, OSError):
-                print("Caught timeout waiting for responce from PMX. Trying again...")
-                time.sleep(1)
-                if attempt == 1:
-                    print("Resetting connection")
-                    self.conn.close()
-                    self.conn = self._establish_connection(self.ip, int(self.port))
-                    return self.send_message(msg, read=read)
+        if not msg[-1] == '\n':
+            msg += '\n'
+        self.send(msg.encode())
+        time.sleep(0.5)
+        if read:
+            data = self.recv(BUFFSIZE).strip().decode('utf-8')
+            return data
 
-    def wait(self):
-        time.sleep(self.wait_time)
+    def _wait(self):
+        time.sleep(WAIT_TIME)
 
     def check_output(self):
         """ Return the output status """
-        val = int(self.send_message(b'output?\n'))
+        val = int(self.send_message('output?'))
         msg = "Measured output state = "
         states = {0: 'OFF', 1: 'ON'}
         if val in states:
@@ -78,7 +60,7 @@ class PMX:
 
     def check_error(self):
         """ Check oldest error from error queues. Error queues store up to 255 errors """
-        val = self.send_message(b':system:error?\n')
+        val = self.send_message(':system:error?')
         code, msg = val.split(',')
         code = int(code)
         msg = msg[1:-2]
@@ -86,96 +68,96 @@ class PMX:
 
     def clear_alarm(self):
         """ Clear alarm """
-        self.send_message(b'output:protection:clear\n', read=False)
+        self.send_message('output:protection:clear', read=False)
 
     def turn_on(self):
         """ Turn the PMX on """
-        self.send_message(b'output 1\n', read=False)
-        self.wait()
+        self.send_message('output 1', read=False)
+        self._wait()
         return self.check_output()
 
     def turn_off(self):
         """ Turn the PMX off """
-        self.send_message(b'output 0\n', read=False)
-        self.wait()
+        self.send_message('output 0', read=False)
+        self._wait()
         return self.check_output()
 
     def check_current(self):
         """ Check the current setting """
-        val = float(self.send_message(b'curr?\n'))
+        val = float(self.send_message('curr?'))
         msg = "Current setting = {:.3f} A".format(val)
         return msg, val
 
     def check_voltage(self):
         """ Check the voltage setting """
-        val = float(self.send_message(b'volt?\n'))
+        val = float(self.send_message('volt?'))
         msg = "Voltage setting = {:.3f} V".format(val)
         return msg, val
 
     def meas_current(self):
         """ Measure the current """
-        val = float(self.send_message(b'meas:curr?\n'))
+        val = float(self.send_message('meas:curr?'))
         msg = "Measured current = {:.3f} A".format(val)
         return msg, val
 
     def meas_voltage(self):
         """ Measure the voltage """
-        val = float(self.send_message(b'meas:volt?\n'))
+        val = float(self.send_message('meas:volt?'))
         msg = "Measured voltage = {:.3f} V".format(val)
         return msg, val
 
     def set_current(self, curr):
         """ Set the current """
-        self.send_message(b'curr %a\n' % curr, read=False)
-        self.wait()
+        self.send_message('curr %a' % curr, read=False)
+        self._wait()
         return self.check_current()
 
     def set_voltage(self, vol):
         """ Set the voltage """
-        self.send_message(b'volt %a\n' % vol, read=False)
-        self.wait()
+        self.send_message('volt %a' % vol, read=False)
+        self._wait()
         return self.check_voltage()
 
     def check_source(self):
         """ Check the source of PMX """
-        val = self.send_message(b'volt:ext:sour?\n')
+        val = self.send_message('volt:ext:sour?')
         msg = "Source: " + val
         return msg, val
 
     def use_external_voltage(self):
         """ Set PMX to use external voltage """
-        self.send_message(b'volt:ext:sour volt\n', read=False)
-        self.wait()
+        self.send_message('volt:ext:sour volt', read=False)
+        self._wait()
         return self.check_source()
 
     def ign_external_voltage(self):
         """ Set PMX to ignore external voltage """
-        self.send_message(b'volt:ext:sour none\n', read=False)
-        self.wait()
+        self.send_message('volt:ext:sour none', read=False)
+        self._wait()
         return self.check_source()
 
     def check_current_limit(self):
         """ Check the PMX current protection limit """
-        val = float(self.send_message(b'curr:prot?\n'))
+        val = float(self.send_message('curr:prot?'))
         msg = "Current protection limit = {:.3f} A".format(val)
         return msg, val
 
     def check_voltage_limit(self):
         """ Check the PMX voltage protection limit """
-        val = float(self.send_message(b'volt:prot?\n'))
+        val = float(self.send_message('volt:prot?'))
         msg = "Voltage protection limit = {:.3f} V".format(val)
         return msg, val
 
     def set_current_limit(self, curr_lim):
         """ Set the PMX current protection limit """
-        self.send_message(b'curr:prot %a\n' % curr_lim, read=False)
-        self.wait()
+        self.send_message('curr:prot %a' % curr_lim, read=False)
+        self._wait()
         return self.check_current_limit()
 
     def set_voltage_limit(self, vol_lim):
         """ Set the PMX voltage protection limit """
-        self.send_message(b'volt:prot %a\n' % vol_lim, read=False)
-        self.wait()
+        self.send_message('volt:prot %a' % vol_lim, read=False)
+        self._wait()
         return self.check_voltage_limit()
 
     def check_prot(self):
@@ -183,7 +165,7 @@ class PMX:
         Return:
             val (int): protection status code
         """
-        val = int(self.send_message(b'stat:ques?\n'))
+        val = int(self.send_message('stat:ques?'))
         return val
 
     def get_prot_msg(self, val):

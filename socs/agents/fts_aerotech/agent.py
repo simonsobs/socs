@@ -220,14 +220,14 @@ class FTSAerotechAgent:
                 return False, "Homing Failed"
         return True, "Homing Complete"
 
-    @ocs_agent.param('position', type=float, check=lambda x: -74.8 <= x <= 74.8)
+    @ocs_agent.param('position', type=float, check=lambda x: -80.0 <= x <= 80.0)
     def move_to(self, session, params=None):
         """move_to(position)
 
         **Task** - Move to absolute position relative to stage center (in mm).
 
         Parameters:
-            position (float): Position in mm, must be between -74.8 and 74.8.
+            position (float): Position in mm, must be between -80.0 and 80.0.
 
         """
         with self.lock.acquire_timeout(timeout=3, job='move') as acquired:

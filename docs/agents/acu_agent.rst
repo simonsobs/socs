@@ -76,9 +76,6 @@ Here is an example of a device definition for a SATP::
                 'active': False,
             },
         },
-        'status': {
-            'status_name': 'Datasets.StatusSATPDetailed8100',
-            },
 
         'platform': 'satp',
         'motion_limits': {
@@ -157,7 +154,8 @@ ignorance:
   of "az", "el", "third", and "none".  See further explanation in
   :class:`ACUAgent <socs.agents.acu.agent.ACUAgent>`.
 - ``scan_params``: Default scan parameters; currently ``az_speed``
-  (float, deg/s) and ``az_accel`` (float, deg/s/s).  If not specfied,
+  (float, deg/s) ``az_accel`` (float, deg/s/s), ``el_freq`` (float, Hz),
+  ``turnaround_method`` (str), and ``el_mode`` (str). If not specfied,
   these are given default values depending on the platform type.
 
 

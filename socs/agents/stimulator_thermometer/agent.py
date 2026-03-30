@@ -95,7 +95,6 @@ class StimThermometerAgent:
 
                     temp = dev.get_temp()
                     data['data'][chan_string + '_T'] = temp
-                    self.agent.publish_to_feed('temperatures', data)
 
                     if isinstance(dev, Max31856):
                         cjtemp = dev.get_temp_ambient()
@@ -104,6 +103,7 @@ class StimThermometerAgent:
                     else:
                         field_dict = {chan_string: {'T': temp}}
 
+                    self.agent.publish_to_feed('temperatures', data)
                     session.data.update(field_dict)
 
                 session.data.update({'timestamp': current_time})

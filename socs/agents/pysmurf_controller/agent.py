@@ -129,6 +129,8 @@ class PysmurfController:
                 'observatory.{}.feeds.pysmurf_session_data'.format(args.monitor_id),
             )
 
+        self.good_threshold_relock = args.good_threshold_relock
+
         self.agent.register_feed('tracking_results', record=True)
         self.agent.register_feed('bias_step_results', record=True)
         self.agent.register_feed('noise_results', record=True)
@@ -426,6 +428,8 @@ class PysmurfController:
 
             >> response.session['data']
             {
+                'stream_on': True,
+                'last_updated': 1749846521.2596238,
                 'stream_id': Stream-id for the slot,
                 'sid': Session-id for the streaming session,
             }
@@ -444,6 +448,9 @@ class PysmurfController:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
+            session.data['stream_on'] = False
+            session.data['last_updated'] = time.time()
+            init_start = time.time()
             S, cfg = self._get_smurf_control(session=session,
                                              load_tune=params['load_tune'])
 
@@ -453,7 +460,13 @@ class PysmurfController:
 
             session.data['stream_id'] = cfg.stream_id
             session.data['sid'] = sdl.stream_g3_on(S, **params['kwargs'])
+            session.data['stream_on'] = True
+            init_end = time.time()
+            init_duration = init_end - init_start
+            self.log.info("Stream initialization took {duration:.2f} seconds",
+                          duration=init_duration)
             while session.status in ['starting', 'running']:
+                session.data['last_updated'] = time.time()
                 if stop_time is not None:
                     if time.time() > stop_time:
                         break
@@ -462,6 +475,8 @@ class PysmurfController:
                 if params['test_mode']:
                     break
             sdl.stream_g3_off(S)
+            session.data['stream_on'] = False
+            session.data['last_updated'] = time.time()
 
         return True, 'Finished streaming data'
 
@@ -610,6 +625,7 @@ class PysmurfController:
                 for iband, (iall, igood) in enumerate(zip(result.return_val['all_det_num'], result.return_val['good_det_num'])):
                     block_data[f'alldet_band{iband}'] = iall
                     block_data[f'gooddet_band{iband}'] = igood
+                    block_data[f'alarm_band{iband}'] = 1 if (iall == 0 or igood / iall < self.good_threshold_relock) else 0
                 data = {
                     'timestamp': time.time(),
                     'block_name': 'tracking_results',
@@ -1061,7 +1077,7 @@ class PysmurfController:
         self.agent.wait('set_biases')
         return True, 'Finished zeroing biases'
 
-    @ocs_agent.param('rfrac', default=(0.3, 0.6))
+    @ocs_agent.param('rfrac', default=None)
     @ocs_agent.param('kwargs', default=None)
     def bias_dets(self, session, params):
         """bias_dets(rfrac=(0.3, 0.6), kwargs=None)
@@ -1081,9 +1097,7 @@ class PysmurfController:
         Args
         -------
         rfrac : float, tuple
-            Target rfrac range to aim for. If this is a float, bias voltages
-            will be chosen to get the median rfrac of each bias group as close
-            as possible to that value. If
+            Target rfrac (range) to aim for.
         kwargs : dict
             Additional kwargs to pass to the ``bias_dets`` function.
 
@@ -1104,14 +1118,9 @@ class PysmurfController:
                 return False, f"Operation failed: {self.lock.job} is running."
 
             S, cfg = self._get_smurf_control(session=session)
-            if isinstance(params['rfrac'], (int, float)):
-                biases = bias_dets.bias_to_rfrac(
-                    S, cfg, rfrac=params['rfrac'], **params['kwargs']
-                )
-            else:
-                biases = bias_dets.bias_to_rfrac_range(
-                    S, cfg, rfrac_range=params['rfrac'], **params['kwargs']
-                )
+            biases = bias_dets.bias_to_rfrac(
+                S, cfg, rfrac=params['rfrac'], **params['kwargs']
+            )
 
             session.data['biases'] = biases.tolist()
 
@@ -1148,15 +1157,48 @@ class PysmurfController:
         """restart_rssi()
 
         **Task** - Restarts the RSSI. Use to recover from lock-up.
+
+        Notes
+        ------
+        The following data will be written to the session.data object::
+
+            >> response.session['data']
+            {
+                'rssi_responsive': Boolean indicating whether queries over RSSI succeed,
+                'last_updated': The time of the update,
+            }
         """
         with self.lock.acquire_timeout(0, job='restart_rssi') as acquired:
             if not acquired:
                 return False, f"Operation failed: {self.lock.job} is running."
 
-            # if the system is locked up, spawning a SmurfControl instance will hang
-            epics.caput(f"smurf_server_s{self.slot}:AMCc:RestartRssi", 1)
+            # this register being unresponsive is a symptom of an rssi lock-up
+            slot_reg = f"smurf_server_s{self.slot}:AMCc:FpgaTopLevel:AmcCarrierCore:AmcCarrierBsi:SlotNumber"
 
-            return True, "RestartRssi sent"
+            # if the system is locked up, spawning a SmurfControl instance will hang so we use epics
+            slot = epics.caget(slot_reg, timeout=2)
+
+            # reset if RSSI is locked-up
+            success = True
+            msg = ""
+            if slot is not None:  # query suceeded
+                success, msg = True, "RSSI is not locked-up -- Doing nothing."
+            else:
+                # send the reset command
+                epics.caput(f"smurf_server_s{self.slot}:AMCc:RestartRssi", 1)
+
+                # check the system has recovered
+                slot = epics.caget(slot_reg, timeout=2)
+                success = slot is not None
+                msg = "RSSI remains locked-up" if slot is None else "RSSI has recovered"
+
+            # store state in the session data
+            session.data.update({
+                "rssi_responsive": slot is not None,
+                "last_updated": time.time()
+            })
+
+            return success, msg
 
 
 def make_parser(parser=None):
@@ -1174,6 +1216,8 @@ def make_parser(parser=None):
                         help="Smurf slot that this agent will be controlling")
     pgroup.add_argument('--poll-interval', type=float,
                         help="Time between check-state polls")
+    pgroup.add_argument('--good-threshold-relock', type=float, default=0.5,
+                        help="Alarm system threshold for relock quality check")
     return parser
 
 

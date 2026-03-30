@@ -4,6 +4,7 @@ import os
 import queue
 import time
 import traceback
+from os import environ
 from typing import Any, Dict, Optional, Tuple
 
 import sqlalchemy
@@ -216,8 +217,11 @@ class PysmurfMonitor(DatagramProtocol):
 
             if files_to_add:
                 try:
+                    start = time.time()
                     with srfm.Session.begin() as db_session:
                         db_session.add_all(files_to_add)
+                    duration = time.time() - start
+                    self.log.debug(f"Database write completed in {duration:.3f} seconds")
                     session.degraded = False
                     files_to_add = []
                 except sqlalchemy.exc.OperationalError:
@@ -265,6 +269,9 @@ def make_parser(parser: Optional[argparse.ArgumentParser] = None) -> argparse.Ar
 
 
 def main(args=None) -> None:
+    # Start logging
+    txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
+
     parser = make_parser()
     args = site_config.parse_args(agent_class='PysmurfMonitor',
                                   parser=parser,

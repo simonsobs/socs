@@ -789,7 +789,7 @@ class HWPGripperAgent:
             if bool(state['jxc']['alarm']):
                 out_value = int(state['jxc']['out']) % 16
                 if out_value in alarm_group_mapping.keys():
-                    alarm_message = self.decoded_alarm_group[alarm_group_mapping]
+                    alarm_message = self.decoded_alarm_group[alarm_group_mapping[out_value]]
                 else:
                     alarm_message = self.decoded_alarm_group['A']
             else:
@@ -879,12 +879,13 @@ class HWPGripperAgent:
                 warning_issued = True
 
             if time_since_ok > params['no_data_shutdown_time']:
-                self.log.error(
-                    f"Have not received 'ok' in "
-                    f"{params['no_data_shutdown_time'] / 60:.2f} minutes. "
-                    "Issuing shutdown"
-                )
-                self.agent.start('shutdown')
+                if not self.shutdown_mode:
+                    self.log.error(
+                        f"Have not received 'ok' in "
+                        f"{params['no_data_shutdown_time'] / 60:.2f} minutes. "
+                        "Issuing shutdown"
+                    )
+                    self.agent.start('shutdown')
 
             data = {
                 'data': {'gripper_action': action},

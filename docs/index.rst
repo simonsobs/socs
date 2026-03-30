@@ -43,6 +43,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/devantech_dS378
     agents/fts_agent
     agents/generator
+    agents/galil_axis
     agents/hi6200
     agents/http_camera
     agents/hwp_encoder
@@ -77,6 +78,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/scpi_psu
     agents/smurf_crate_monitor
     agents/smurf_timing_card
+    agents/srs_cg635
     agents/stimulator_encoder
     agents/stimulator_thermometer
     agents/suprsync

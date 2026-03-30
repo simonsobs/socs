@@ -27,7 +27,7 @@ class DWL:
 
     def __del__(self):
         print(f"Disconnecting from TCP IP {self.tcp_ip} at port {self.tcp_port}")
-        self.ser.close()
+        self.ser.sock.close()
         return
 
     def get_angle(self):
@@ -54,11 +54,7 @@ class DWL:
         # check the size of the string read
         if not len(read) == SIZE:
             msg = 'The size of the string read does not match with the expected size 12.'
-            if self.isSingle:
-                val = (-999)
-            else:
-                val = (-999, 999)
-            return msg, val
+            raise ValueError(msg)
 
         # check header matching and calculate the angles
         if self.isSingle:
@@ -103,13 +99,8 @@ class DWL:
                     print('angle X = {angleX}')
                     print('angle Y = {angleY}')
         else:
-            msg = 'header NOT matching'
-            if self.isSingle:
-                val = -999
-            else:
-                val = (-999, -999)
-        if self.verbose > 0:
-            print(msg)
+            msg = 'The header of the tilt sensor data is NOT matching.'
+            raise RuntimeError(msg)
         return msg, val
 
     # ***** Helper Methods *****
