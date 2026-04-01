@@ -1,16 +1,42 @@
-import socket
+from socs.tcp import TCPInterface
+#import socket
 import time
 import base64
 import numpy as np
+import select
 
-class DLCSmart():
+class DLCSmart(TCPInterface):
     def __init__(self, ip_addr, port=1998, buffer_size=1024, timeout=5):
         self.ip_addr = ip_addr
         self.port = port # TCP
-        self.buffer_size = buffer_size
-        self.sock = None
+#        self.buffer_size = buffer_size
+#        self.sock = None
         self.timeout = timeout
-    
+        super().__init__(self.ip_addr, self.port, self.timeout)
+
+    def read_welcome(self, decode=True):
+        drained = b""
+        rlist, _, _ = select.select([self.comm], [], [], 0.2)
+        if rlist:
+            chunk = self.recv()
+            if chunk:
+                drained += chunk
+                if drained.endswith(b"\n> ") or drained.endswith(b"> "):
+                    return True
+                else:
+                    #print(drained)
+                    print("not fully drained")
+                    return False
+        else:
+            return True
+
+    def _is_ready(self, max_attempts=3, delay=0.05):
+        for attempt in range(max_attempts):
+            if self.read_welcome():
+                return True
+            time.sleep(delay)
+
+
     # basic read and write functionality    
     def read_all(self, decode=True):
         """
@@ -20,8 +46,10 @@ class DLCSmart():
         expect_prompt = False
         while True:
             try:
-                chunk = self.sock.recv(1024)
-            except self.sock.timeout:
+#                chunk = self.sock.recv(1024)
+                chunk = self.recv(1024)
+#            except self.sock.timeout:
+            except self.timeout:
                 break
             data += chunk
             if expect_prompt and data.endswith(b">"):
@@ -38,9 +66,11 @@ class DLCSmart():
         Encode the message, send to the DLC Smart, and read
         back the response.
         """
-        if not self.sock:
-            raise ConnectionError("Not connected to device")
-        self.sock.sendall((cmd + "\n").encode())
+#        if not self.sock:
+#            raise ConnectionError("Not connected to device")
+#        self.sock.sendall((cmd + "\n").encode())
+        self._is_ready()
+        self.send((cmd + "\n").encode())
         time.sleep(0.01)
         if read_response:
             response = self.read_all(decode=decode)
@@ -48,30 +78,32 @@ class DLCSmart():
         else:
             return True
 
+
     # connect and disconnect
-    def connect(self):
-        """
-        Make the socket connection to the command port and read the
-        welcome message.
-        """
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.settimeout(self.timeout)
-        self.sock.connect((self.ip_addr, self.port))
-        time.sleep(0.1)
-        welcome_req = self.read_all()
-        return True, welcome_req
-    
-    def close_connection(self):
-        """
-        Close the socket connection.
-        """
-        if self.sock:
-            try:
-                self.send_msg("(quit)", read_response=False)
-            except Exception:
-                pass
-            self.sock.close()
-            self.sock = None
+#    def connect(self):
+#        """
+#        Make the socket connection to the command port and read the
+#        welcome message.
+#        """
+#        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#        self.sock.settimeout(self.timeout)
+#        self.sock.connect((self.ip_addr, self.port))
+#        time.sleep(0.1)
+#        welcome_req = self.read_all()
+#        return True, welcome_req
+
+
+#    def close_connection(self):
+#        """
+#        Close the socket connection.
+#        """
+#        if self.sock:
+#            try:
+#                self.send_msg("(quit)", read_response=False)
+#            except Exception:
+#                pass
+#            self.sock.close()
+#            self.sock = None
    
     # formatting for requests, param setting, and commands
     def param_ref(self, param, printout=False):

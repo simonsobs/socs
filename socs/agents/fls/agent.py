@@ -12,6 +12,9 @@ BYTE_END = "\n>"
 MAX_FREQ = 880.
 MIN_FREQ = 20.
 
+def _within(val, target, tolerance=1e-2):
+    return abs(val-target) <= tolerance
+
 
 class FLSAgent:
     """
@@ -40,7 +43,7 @@ class FLSAgent:
 
         agg_params = {'frame_length': 60} # is this correct?
 
-        self.agent.register_feed('scan_data',
+        self.agent.register_feed('sampling_data',
                                  record=True,
                                  agg_params=agg_params,
                                  buffer_time=1)
@@ -60,11 +63,15 @@ class FLSAgent:
                               "is already running")
                 return False, "Could not acquire lock."
 
-            self.dlcsmart = DLCSmart(ip_addr=self.ip, port=self.port)
+#            self.dlcsmart = DLCSmart(ip_addr=self.ip, port=self.port)
 
             try:
-                welcome = self.dlcsmart.connect()
-                self.log.info(welcome)
+#                welcome = self.dlcsmart.connect()
+                self.dlcsmart = DLCSmart(ip_addr=self.ip, port=self.port)
+                welcome = self.dlcsmart.read_welcome()
+                print('welcome='+str(welcome))
+#                self.log.info(welcome)
+#                self.log.info(welcome)
             except ConnectionError:
                 self.log.error("could not establish connection to DLC Smart")
                 return False, "FLS agent initialization failed"
@@ -72,13 +79,18 @@ class FLSAgent:
             bias_read = self.dlcsmart.check_bias()
             self.tx_bias_amp = bias_read[0]
             self.tx_bias_offset = bias_read[1]
+            self.log.info('Tx bias amplitude: ' + str(self.tx_bias_amp))
+            self.log.info('Tx bias offset: ' + str(self.tx_bias_offset))
 
             lasers_on = self.dlcsmart.check_laser_emission()
-            if lasers_on == "#t" + BYTE_END:
+            if "#t" in lasers_on:
                 self.lasers_on = True
-            elif lasers_on == "#f" + BYTE_END:
+                self.log.info('Lasers are on.')
+            elif "#f" in lasers_on:
                 self.lasers_on = False
+                self.log.info('Lasers are off.')
             else:
+                print(lasers_on)
                 self.log.warn("Could not determine if lasers are on!")
 
         self.initialized = True
@@ -116,14 +128,14 @@ class FLSAgent:
 
             self.take_sampling = True
 
-            pm = Pacemaker(1/3, quanitze=False) # what is this?
+            pm = Pacemaker(1/3, quantize=False) # what is this?
             while self.take_sampling:
                 pm.sleep()
                 if time.time() - last_time > 1:
                     last_time = time.time()
                 if not self.lock.release_and_acquire(timeout=5):
-                    self.log.warn(f"Failed to re-acquire sampling lock, "
-                                  "currently held by {self.lock.job}.")
+                    self.log.warn(f"acq: Failed to re-acquire sampling lock, "
+                                  f"currently held by {self.lock.job}.")
                     continue
 
                 try:
@@ -166,64 +178,66 @@ class FLSAgent:
         else:
             return False, 'acq is not currently running.'
 
-    def turn_lasers_on(self, session, params):
+    @ocs_agent.param('state', type=str, choices=['on','off'])
+    def toggle_laser_power(self, session, params):
         """
         turn_lasers_on()
 
         ***Task*** - Enable emission from both lasers
         """
-        with self.lock.acquire_timeout(timeout=5, job='turn_lasers_on') as acquired:
+        state = params['state']
+        with self.lock.acquire_timeout(timeout=12, job='toggle_laser_power') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
         
             laser_status = self.dlcsmart.check_laser_emission()
-            if laser_status == "#t" + BYTE_END:
-                return True, "Lasers already on"
-            elif laser_status == "#f" + BYTE_END:
-                turn_on = self.dlcsmart.laser_emission_on()
+            if "#t" in laser_status:
+                self.log.info('Current laser state is on.')
+                on_off = 'on'
+            elif "#f" in laser_status:
+                self.log.info('Current laser state is off.')
+                on_off = 'off'
+            if on_off == state:
+                return True, f"Laser is already {state}"
+
+            bias_amp, bias_offset = self.dlcsmart.check_bias()
+            if bias_amp != 0.0 or bias_offset != 0.0:
+                self.log.warn(f'Bias amplitude is {bias_amp} and bias offset '
+                              f'is {bias_offset}. Setting bias to zero, then '
+                              f'turning lasers {state}.')
+                self.dlcsmart.set_bias_to_zero()
                 time.sleep(0.01)
-                laser_status = self.dlcsmart.check_laser_emission()
-                if laser_status == "#t" + BYTE_END:
-                    self.lasers_on = True
-                    return True, "Lasers turned on"
-                elif laser_status == "#f" + BYTE_END:
-                    self.lasers_on = False
-                    return False, "Lasers did not turn on"
+                bias_amp, bias_offset = self.dlcsmart.check_bias()
+                if bias_amp != 0.0 or bias_offset != 0.0:
+                    return False, "Bias could not be set to zero so did not toggle laser power."
 
-    def turn_lasers_off(self, session, params):
-        """
-        turn_lasers_off()
 
-        ***Task*** - Disable emission from both lasers
-        """
-        with self.lock.acquire_timeout(timeout=5, job='turn_lasers_off') as acquired:
-            if not acquired:
-                self.log.warn(f"Could not start Task because "
-                              f"{self.lock.job} is already running")
-                return False, "Could not acquire lock"
-
+            countdown = 10
+            while countdown > 0:
+                self.log.warn(f'Bias amplitude and bias offset are zero. Check that U-shaped link '
+                              f'is unplugged. CANCEL TASK NOW IF NOT. Task will proceed in '
+                              f'{countdown} seconds.')
+                time.sleep(1)
+                countdown -= 1
+            self.log.info(f'Proceeding to toggle laser power {state}.')
+            if state == 'on':
+                change_state = self.dlcsmart.laser_emission_on()
+            elif state == 'off':
+                change_state = self.dlcsmart.laser_emission_off()
+            time.sleep(0.01)
             laser_status = self.dlcsmart.check_laser_emission()
-            if laser_status == "#t" + BYTE_END:
+            if "#t" in laser_status:
                 self.lasers_on = True
-            elif laser_status == "#f" + BYTE_END:
+                return True, "Lasers turned on"
+            elif "#f" in laser_status:
                 self.lasers_on = False
-            if self.lasers_on == False:
-                return True, "Lasers already off"
-            else:
-                turn_off = self.dlcsmart.laser_emission_off()
-                time.sleep(0.01)
-                laser_status = self.dlcsmart.check_laser_emission()
-                if laser_status == "#t" + BYTE_END:
-                    self.lasers_on = True
-                    return False, "Lasers did not turn off!"
-                elif laser_status == "#f" + BYTE_END:
-                    self.lasers_on = False
-                    return True, "Lasers are off"
+                return True, "Lasers turned off"
+
     
-    @ocs_agent.param('bias', type=str)
-    def set_bias(self, sesssion, params):
+    @ocs_agent.param('bias', type=str, choices=['default', 'zero'])
+    def set_bias(self, session, params):
         """
         set_bias(bias)
 
@@ -236,7 +250,7 @@ class FLSAgent:
                         default.
         """
         bias_to_set = params['bias']
-        with self.lock.acquire_timeout(timeout=5, job='turn_lasers_off') as acquired:
+        with self.lock.acquire_timeout(timeout=12, job='set_bias') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
@@ -245,14 +259,14 @@ class FLSAgent:
                 self.dlcsmart.set_bias_to_zero()
             elif bias_to_set == 'default':
                 self.dlcsmart.set_bias_to_default()
-            else:
-                self.log.warn(f"{bias_to_set} is not available. Choose 'zero' or 'default'.")
-                return False, f"Could not set bias to {bias_to_set}"
+#            else:
+#                self.log.warn(f"{bias_to_set} is not available. Choose 'zero' or 'default'.")
+#                return False, f"Could not set bias to {bias_to_set}"
             time.sleep(0.01)
-            check_bias = self.dlcsmart.check_bias
-            if bias_to_set == 'zero' and check_bias == (0., 0.):
+            check_bias_amp, check_bias_offset = self.dlcsmart.check_bias()
+            if bias_to_set == 'zero' and (check_bias_amp, check_bias_offset) == (0., 0.):
                 self.log.info('Bias successfully set to zero.')
-            elif bias_to_set == 'default' and check_bias == (1., -0.5):
+            elif bias_to_set == 'default' and round(check_bias_amp, 1) == 1.0 and round(check_bias_offset, 1) == -0.5:
                 self.log.info('Bias successfully set to default.')
             else:
                 self.log.info("Bias not successfully set.")
@@ -276,7 +290,7 @@ class FLSAgent:
         assert set_frequency >= MIN_FREQ, f"Frequency must be above {MIN_FREQ} GHz!"
         assert set_frequency < MAX_FREQ, f"Frequency must be below {MAX_FREQ} GHz!"
 
-        with self.lock.acquire_timeout(timeout=5, job='set_frequency') as acquired:
+        with self.lock.acquire_timeout(timeout=12, job='set_frequency') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
@@ -304,7 +318,7 @@ class FLSAgent:
 
         return True, f"Set frequency to {set_frequency} GHz"
 
-    def _check_scan_params(min_freq, max_freq, freq_step, start_dir):
+    def _check_scan_params(self, min_freq, max_freq, freq_step, start_dir):
         """
         Check that the scan parameters are the same as what you set them to.
         """
@@ -371,7 +385,7 @@ class FLSAgent:
         assert freq_step >= 0.01, "minimum step size is 0.01 GHz."
         assert start_dir in (-1, 1), "Choose start_dir=1 (increasing) or -1 (decreasing)"
  
-        with self.lock.acquire_timeout(timeout=5, job='set_frequency') as acquired:
+        with self.lock.acquire_timeout(timeout=12, job='run_frequency_sweeps') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
@@ -388,6 +402,9 @@ class FLSAgent:
                 if not csp:
                     return False, "Could not correctly set scan params"
                 self.dlcsmart.start_scan()
+                time.sleep(1)
+                act_freq = self.dlcsmart.get_actual_frequency()
+
                 while act_freq > min_freq and act_freq < max_freq:
                     time.sleep(1)
                     act_freq = self.dlcsmart.get_actual_frequency()
@@ -431,9 +448,9 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
 
     fls_agent = FLSAgent(agent, args.ip, args.port)
-    agent.register_task('initialize', fls_agent.initialize)
-    agent.register_task('turn_lasers_on', fls_agent.turn_lasers_on)
-    agent.register_task('turn_lasers_off', fls_agent.turn_lasers_off)
+    agent.register_task('initialize', fls_agent.initialize, startup=init_params)
+    agent.register_task('toggle_laser_power', fls_agent.toggle_laser_power)
+#    agent.register_task('turn_lasers_off', fls_agent.turn_lasers_off)
     agent.register_task('set_bias', fls_agent.set_bias)
     agent.register_task('set_frequency', fls_agent.set_frequency)
     agent.register_task('run_frequency_sweeps', fls_agent.run_frequency_sweeps)
