@@ -475,7 +475,10 @@ class HWPPMXAgent:
                     self.agent.start('initiate_shutdown', params={})
 
             data = {
-                'data': {'rotation_action': action},
+                'data': {
+                    'rotation_action': action,
+                    'shutdown_mode': int(self.shutdown_mode),
+                },
                 'block_name': 'rotation_action',
                 'timestamp': time.time()
             }

@@ -1680,6 +1680,17 @@ class HWPSupervisor:
                         self.agent.start('disable_driver_board', params={})
                         self.shutdown_mode = True
 
+            data = {
+                'data': {
+                    'pmx_action': self.hwp_state.pmx_action,
+                    'gripper_action': self.hwp_state.gripper_action,
+                    'shutdown_mode': int(self.shutdown_mode),
+                },
+                'block_name': 'actions',
+                'timestamp': time.time()
+            }
+            self.agent.publish_to_feed('actions', data)
+
             if test_mode:
                 break
 
