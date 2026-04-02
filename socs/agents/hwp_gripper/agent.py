@@ -847,7 +847,8 @@ class HWPGripperAgent:
 
                 >>> response.session
                 {'time': 1649085992.719602,
-                 'gripper_action': 'ok'}
+                 'gripper_action': 'ok',
+                 'shutdown_mode': 0}
         """
         last_ok_time = time.time()
 
@@ -888,7 +889,10 @@ class HWPGripperAgent:
                     self.agent.start('shutdown')
 
             data = {
-                'data': {'gripper_action': action},
+                'data': {
+                    'gripper_action': action,
+                    'shutdown_mode': int(self.shutdown_mode),
+                },
                 'block_name': 'gripper_action',
                 'timestamp': time.time()
             }

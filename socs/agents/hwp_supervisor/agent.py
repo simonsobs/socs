@@ -1506,6 +1506,8 @@ class HWPSupervisor:
         self.shutdown_delay = args.shutdown_delay
         self.shutdown_mode = False
 
+        self.agent.register_feed('actions', record=True)
+
     def _get_hwp_clients(self):
         def get_client(id):
             args = []
@@ -1679,6 +1681,17 @@ class HWPSupervisor:
                     if not self.shutdown_mode:
                         self.agent.start('disable_driver_board', params={})
                         self.shutdown_mode = True
+
+            data = {
+                'timestamp': time.time(),
+                'block_name': 'actions',
+                'data': {
+                    'pmx_action': self.hwp_state.pmx_action,
+                    'gripper_action': self.hwp_state.gripper_action,
+                    'shutdown_mode': int(self.shutdown_mode),
+                },
+            }
+            self.agent.publish_to_feed('actions', data)
 
             if test_mode:
                 break
