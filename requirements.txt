@@ -8,7 +8,7 @@ twisted
 pyserial
 pysnmp==4.4.12
 pysmi
-pyasn1==0.4.8
+pyasn1==0.6.3
 
 # common dependencies - used by multiple agents
 numpy
