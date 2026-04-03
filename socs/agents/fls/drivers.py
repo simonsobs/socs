@@ -14,7 +14,7 @@ class DLCSmart(TCPInterface):
         self.timeout = timeout
         super().__init__(self.ip_addr, self.port, self.timeout)
 
-    def read_welcome(self, decode=True):
+    def drain_buffer(self, decode=True):
         drained = b""
         rlist, _, _ = select.select([self.comm], [], [], 0.2)
         if rlist:
@@ -32,7 +32,7 @@ class DLCSmart(TCPInterface):
 
     def _is_ready(self, max_attempts=3, delay=0.05):
         for attempt in range(max_attempts):
-            if self.read_welcome():
+            if self.drain_buffer():
                 return True
             time.sleep(delay)
 

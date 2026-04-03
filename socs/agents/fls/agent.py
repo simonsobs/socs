@@ -41,6 +41,9 @@ class FLSAgent:
         self.tx_bias_amp = None
         self.tx_bias_offset = None
 
+        self.set_freq = None
+        self.actual_freq = None
+
         agg_params = {'frame_length': 60} # is this correct?
 
         self.agent.register_feed('sampling_data',
@@ -66,12 +69,9 @@ class FLSAgent:
 #            self.dlcsmart = DLCSmart(ip_addr=self.ip, port=self.port)
 
             try:
-#                welcome = self.dlcsmart.connect()
                 self.dlcsmart = DLCSmart(ip_addr=self.ip, port=self.port)
-                welcome = self.dlcsmart.read_welcome()
+                welcome = self.dlcsmart.drain_buffer()
                 print('welcome='+str(welcome))
-#                self.log.info(welcome)
-#                self.log.info(welcome)
             except ConnectionError:
                 self.log.error("could not establish connection to DLC Smart")
                 return False, "FLS agent initialization failed"
@@ -79,8 +79,8 @@ class FLSAgent:
             bias_read = self.dlcsmart.check_bias()
             self.tx_bias_amp = bias_read[0]
             self.tx_bias_offset = bias_read[1]
-            self.log.info('Tx bias amplitude: ' + str(self.tx_bias_amp))
-            self.log.info('Tx bias offset: ' + str(self.tx_bias_offset))
+            self.log.info(f'Tx bias amplitude: {self.tx_bias_amp}')
+            self.log.info(f'Tx bias offset:  + {self.tx_bias_offset}')
 
             lasers_on = self.dlcsmart.check_laser_emission()
             if "#t" in lasers_on:
@@ -92,6 +92,14 @@ class FLSAgent:
             else:
                 print(lasers_on)
                 self.log.warn("Could not determine if lasers are on!")
+
+            actual_freq = self.dlcsmart.get_actual_frequency()
+            try:
+                self.actual_freq = float(actual_freq)
+            except ValueError:
+                self.log.warn(f'Could not convert {actual_freq} to float!')
+                self.actual_freq = actual_freq
+            self.log.info(f'Actual frequency: {actual_freq}')
 
         self.initialized = True
 
@@ -148,6 +156,9 @@ class FLSAgent:
                     session.degraded = True
                     time.sleep(1)
                     continue
+
+                self.set_freq = data['set_frequency']
+                self.actual_freq = data['actual_frequency']
 
                 sampling_data = {}
                 for key, val in data.items():
@@ -259,9 +270,6 @@ class FLSAgent:
                 self.dlcsmart.set_bias_to_zero()
             elif bias_to_set == 'default':
                 self.dlcsmart.set_bias_to_default()
-#            else:
-#                self.log.warn(f"{bias_to_set} is not available. Choose 'zero' or 'default'.")
-#                return False, f"Could not set bias to {bias_to_set}"
             time.sleep(0.01)
             check_bias_amp, check_bias_offset = self.dlcsmart.check_bias()
             if bias_to_set == 'zero' and (check_bias_amp, check_bias_offset) == (0., 0.):
@@ -286,7 +294,7 @@ class FLSAgent:
             frequency (float): The frequency to set the laser to.
         """
         set_frequency = params['frequency']
-        precision = 0.01
+#        precision = 0.01
         assert set_frequency >= MIN_FREQ, f"Frequency must be above {MIN_FREQ} GHz!"
         assert set_frequency < MAX_FREQ, f"Frequency must be below {MAX_FREQ} GHz!"
 
@@ -297,23 +305,29 @@ class FLSAgent:
                 return False, "Could not acquire lock"
 
             # Read the actual frequency
-            actual_frequency = self.dlcsmart.get_actual_frequency()
+#            actual_frequency = self.dlcsmart.get_actual_frequency()
+            actual_frequency = self.actual_freq
 
             # Set the new frequency
             set_the_freq = self.dlcsmart.set_frequency(set_frequency)
 
             # Check to see when the actual frequency gets 'close enough' to the set frequency
-            while round(actual_frequency) != round(set_frequency):
+#            while round(actual_frequency) != round(set_frequency):
+            while not _within(actual_frequency, set_frequency):
                 time.sleep(1)
-                actual_frequency = self.dlcsmart.get_actual_frequency()
+#                actual_frequency = self.dlcsmart.get_actual_frequency()
+                actual_frequency = self.actual_freq
                 self.log.info(f"Frequency is {round(actual_frequency, 2)} GHz")
-            if actual_frequency >= (set_frequency - precision) and actual_frequency <= (set_frequency + precision):
+            if _within(actual_frequency, set_frequency):
                 time.sleep(2)
-                actual_frequency = self.dlcsmart.get_actual_frequency()
+                actual_frequency = self.actual_freq
+#                actual_frequency = self.dlcsmart.get_actual_frequency()
                 self.log.info(f"Frequency is {round(actual_frequency, 2)} GHz")
-                while actual_frequency < (set_frequency - precision) or actual_frequency > (set_frequency + precision):
+#                while actual_frequency < (set_frequency - precision) or actual_frequency > (set_frequency + precision):
+                while not _within(actual_frequency, set_frequency):
                     time.sleep(1)
-                    actual_frequency = self.dlcsmart.get_actual_frequency()
+#                    actual_frequency = self.dlcsmart.get_actual_frequency()
+                    actual_frequency = self.actual_freq
                     self.log.info(f"Frequency is {round(actual_frequency, 2)}, GHz")
 
         return True, f"Set frequency to {set_frequency} GHz"
@@ -378,13 +392,15 @@ class FLSAgent:
         nsweeps = params['num_of_sweeps']
 
         assert min_freq < max_freq, "max_freq must be greater than min_freq!"
-        assert min_freq >= MIN_FREQ, "min_freq must be at least 20 GHz."
-        assert min_freq < MAX_FREQ, "min_freq must be less than 880 GHz."
-        assert max_freq >= MIN_FREQ, "max_freq must be at least 20 GHz."
-        assert max_freq < MAX_FREQ, "max_freq must be less than 880 GHz."
+        assert min_freq >= MIN_FREQ, f"min_freq must be at least {MIN_FREQ} GHz."
+        assert min_freq < MAX_FREQ, f"min_freq must be less than {MAX_FREQ} GHz."
+        assert max_freq >= MIN_FREQ, f"max_freq must be at least {MIN_FREQ} GHz."
+        assert max_freq < MAX_FREQ, f"max_freq must be less than {MAX_FREQ} GHz."
         assert freq_step >= 0.01, "minimum step size is 0.01 GHz."
         assert start_dir in (-1, 1), "Choose start_dir=1 (increasing) or -1 (decreasing)"
  
+        scan_precision = freq_step
+
         with self.lock.acquire_timeout(timeout=12, job='run_frequency_sweeps') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
@@ -393,6 +409,18 @@ class FLSAgent:
 
             self.dlcsmart.clear_scan_data()
             self.log.info("Cleared stored scan data from the DLC Smart memory")
+
+            if start_dir == 1 and not _within(self.actual_freq, min_freq):
+                self.log.warn('run_frequency_sweeps called with increasing frequency, '
+                              'but laser is not at min_freq.')
+                if min_freq != self.set_freq:
+                    self.log.warn(f'Set frequency is {self.set_freq} and min_freq is {min_freq}.')
+
+            if start_dir == -1 and not _within(self.actual_freq, max_freq):
+                self.log.warn('run_frequency_sweeps called with decreasing frequency, '
+                              'but laser is not at max_freq.')
+                if max_freq != self.set_freq:
+                    self.log.warn(f'Set frequency is {self.set_freq} and max_freq is {max_freq}.')
 
             i = 0
             while i < nsweeps:
@@ -403,12 +431,21 @@ class FLSAgent:
                     return False, "Could not correctly set scan params"
                 self.dlcsmart.start_scan()
                 time.sleep(1)
-                act_freq = self.dlcsmart.get_actual_frequency()
+#                act_freq = self.dlcsmart.get_actual_frequency()
+                act_freq = self.actual_freq
 
-                while act_freq > min_freq and act_freq < max_freq:
+                while _within(act_freq, min_freq) or _within(act_freq, max_freq):
+                    print(f'Frequency is still {act_freq}')
                     time.sleep(1)
-                    act_freq = self.dlcsmart.get_actual_frequency()
+                    act_freq = self.actual_freq
+                self.log.info('Scan has started.')
+
+                while not _within(act_freq, min_freq+scan_precision) or not _within(act_freq, max_freq-scan_precision):
+                    time.sleep(1)
+                    act_freq = self.actual_freq
+
                 self.dlcsmart.stop_scan()
+                self.log.info('Completed scan iteration number {i}.')
                 time.sleep(1)
                 start_dir = -1 * start_dir
                 i += 1
