@@ -486,6 +486,7 @@ class HWPPMXAgent:
             self.agent.publish_to_feed('rotation_action', data)
             session.data = {
                 'rotation_action': action,
+                'shutdown_mode': int(self.shutdown_mode),
                 'time': time.time()
             }
 

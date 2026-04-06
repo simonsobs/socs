@@ -900,6 +900,7 @@ class HWPGripperAgent:
             self.agent.publish_to_feed('gripper_action', data)
             session.data = {
                 'gripper_action': action,
+                'shutdown_mode': int(self.shutdown_mode),
                 'time': time.time()
             }
 
