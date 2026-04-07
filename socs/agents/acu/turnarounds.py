@@ -3,7 +3,7 @@ import numpy as np
 
 def gen_turnaround(turnaround_method, t0, az0, el0, v0, turntime, az_flag, el_flag,
                    point_group_batch, second_leg_time=None, second_leg_velocity=0,
-                   step_time=0.05):
+                   step_time=0.1):
     from .drivers import TrackPoint
     """
     Generates the trajectory of a turnaround given the initial position and velocity of the platform.
