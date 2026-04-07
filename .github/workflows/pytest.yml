@@ -20,13 +20,13 @@ concurrency:
 jobs:
   unit-test:
     name: Run unit tests
-    runs-on: ubuntu-22.04  # 3.7 needs 22.04, can move to -latest when we drop 3.7 support
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       matrix:
         # Don't test in 3.12 until #1035 is fixed
         # https://github.com/simonsobs/socs/issues/1035
-        python: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+        python: ["3.8", "3.9", "3.10", "3.11"]
 
     steps:
     - name: Set up Python ${{ matrix.python }}
