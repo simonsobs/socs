@@ -58,6 +58,15 @@ jobs:
     name: Run integration tests
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      matrix:
+        marker:
+          - 'http'
+          - 'hwp'
+          - 'pysmurf'
+          - 'serial'
+          - 'snmp'
+          - 'tcp'
 
     steps:
     - name: Install system packages
@@ -78,15 +87,15 @@ jobs:
         pip3 install -r requirements.txt
         pip3 install -e .
 
-    - name: Run integration tests
+    - name: Run ${{ matrix.marker }} integration tests
       working-directory: ./tests
       run: |
-        COVERAGE_FILE=.coverage.int python3 -m pytest --cov -m 'integtest'
+        COVERAGE_FILE=.coverage.int.${{ matrix.marker }} python3 -m pytest --cov -m 'integtest and ${{ matrix.marker }}'
 
     - name: Upload coverage file artifact
       uses: actions/upload-artifact@v7
       with:
-        name: coverage-integ
+        name: coverage-integ-${{ matrix.marker }}
         include-hidden-files: true
         path: ./tests/.coverage.*
 

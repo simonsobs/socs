@@ -166,6 +166,7 @@ def get_hwp_state(client) -> Dict[str, Any]:
     return client.query_hwp_state().session["data"]["state"]
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_supervisor_grip(hwp_em, supervisor_agent, sup_client) -> None:
     state = get_hwp_state(sup_client)
@@ -183,6 +184,7 @@ def test_supervisor_grip(hwp_em, supervisor_agent, sup_client) -> None:
         assert False
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_spinup(supervisor_agent, sup_client) -> None:
     assert not get_hwp_state(sup_client)["is_spinning"]
