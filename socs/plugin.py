@@ -32,6 +32,7 @@ agents = {
     'MagpieAgent': {'module': 'socs.agents.magpie.agent', 'entry_point': 'main'},
     'MeinbergM1000Agent': {'module': 'socs.agents.meinberg_m1000.agent', 'entry_point': 'main'},
     'MeinbergSyncboxAgent': {'module': 'socs.agents.meinberg_syncbox.agent', 'entry_point': 'main'},
+    'NetMonitorAgent': {'module': 'socs.agents.netmonitor.agent', 'entry_point': 'main'},
     'PCR500MAAgent': {'module': 'socs.agents.kikusui_pcr500ma.agent', 'entry_point': 'main'},
     'PfeifferAgent': {'module': 'socs.agents.pfeiffer_tpg366.agent', 'entry_point': 'main'},
     'PfeifferTC400Agent': {'module': 'socs.agents.pfeiffer_tc400.agent', 'entry_point': 'main'},
