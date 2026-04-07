@@ -25,6 +25,7 @@ client = create_client_fixture('cryomech')
 emulator = create_device_emulator({init_msg: init_res}, relay_type='tcp', port=5502, encoding=None)
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_cryomech_cpa_init(wait_for_crossbar, emulator, run_agent,
                            client):
@@ -36,6 +37,7 @@ def test_cryomech_cpa_init(wait_for_crossbar, emulator, run_agent,
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 @pytest.mark.parametrize("state,command", [('on', b'\t\x99\x00\x00\x00\x06\x01\x06\x00\x01\x00\x01'),
                                            ('off', b'\t\x99\x00\x00\x00\x06\x01\x06\x00\x01\x00\xff')])
@@ -54,6 +56,7 @@ def test_cryomech_cpa_power_ptc(wait_for_crossbar, emulator, run_agent,
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_cryomech_cpa_auto_start_acq(wait_for_crossbar, emulator, run_agent_acq, client):
     client.init()
@@ -65,6 +68,7 @@ def test_cryomech_cpa_auto_start_acq(wait_for_crossbar, emulator, run_agent_acq,
     assert resp.status == ocs.OK
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_cryomech_cpa_acq(wait_for_crossbar, emulator, run_agent, client):
     client.init()
@@ -82,6 +86,7 @@ def test_cryomech_cpa_acq(wait_for_crossbar, emulator, run_agent, client):
     print(resp)
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 @pytest.mark.parametrize("state,command", [('on', b'\t\x99\x00\x00\x00\x06\x01\x06\x00\x01\x00\x01')])
 def test_cryomech_cpa_release_reacquire(wait_for_crossbar, emulator, run_agent_acq,
