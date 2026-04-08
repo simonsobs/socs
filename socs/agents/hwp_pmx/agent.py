@@ -443,6 +443,16 @@ class HWPPMXAgent:
         course of action recommended by the HWP supervisor. If certain conditions
         are met, this will trigger a shutdown and force the power supply to
         power off.
+
+        Notes:
+            The most recent data collected is stored in session data in the
+            structure::
+
+                >>> response.session
+                {"rotation_action": "ok",
+                 "shutdown_mode": 0,
+                 "time": 1775567776.1574914}
+
         """
 
         last_ok_time = time.time()
@@ -475,7 +485,10 @@ class HWPPMXAgent:
                     self.agent.start('initiate_shutdown', params={})
 
             data = {
-                'data': {'rotation_action': action},
+                'data': {
+                    'rotation_action': action,
+                    'shutdown_mode': int(self.shutdown_mode),
+                },
                 'block_name': 'rotation_action',
                 'timestamp': time.time()
             }
@@ -483,6 +496,7 @@ class HWPPMXAgent:
             self.agent.publish_to_feed('rotation_action', data)
             session.data = {
                 'rotation_action': action,
+                'shutdown_mode': int(self.shutdown_mode),
                 'time': time.time()
             }
 

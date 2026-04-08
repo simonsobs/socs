@@ -56,6 +56,7 @@ def start_responder():
         os.kill(p.pid, signal.SIGINT)
 
 
+@pytest.mark.snmp
 @pytest.mark.integtest
 def test_ibootbar_acq(wait_for_crossbar, start_responder, run_agent, client):
     resp = client.acq.start(test_mode=True)
@@ -63,6 +64,7 @@ def test_ibootbar_acq(wait_for_crossbar, start_responder, run_agent, client):
     check_resp_success(resp)
 
 
+@pytest.mark.snmp
 @pytest.mark.integtest
 @inlineCallbacks
 def test_ibootbar_set_outlet(wait_for_crossbar, start_responder, run_agent, client):
@@ -81,6 +83,7 @@ def test_ibootbar_set_outlet(wait_for_crossbar, start_responder, run_agent, clie
     assert resp.session["data"][f"outletStatus_{outlet_number - 1}"]["status"] == 1
 
 
+@pytest.mark.snmp
 @pytest.mark.integtest
 def test_ibootbar_set_initial_state(
         wait_for_crossbar, start_responder, run_agent, client):
@@ -88,12 +91,14 @@ def test_ibootbar_set_initial_state(
     check_resp_success(resp)
 
 
+@pytest.mark.snmp
 @pytest.mark.integtest
 def test_ibootbar_cycle_outlet(wait_for_crossbar, start_responder, run_agent, client):
     resp = client.cycle_outlet(outlet=7, cycle_time=5)
     check_resp_success(resp)
 
 
+@pytest.mark.snmp
 @pytest.mark.integtest
 def test_ibootbar_set_locked_outlet(wait_for_crossbar, start_responder, run_agent, client):
     resp = client.lock_outlet(outlet=2, lock=True)
@@ -103,6 +108,7 @@ def test_ibootbar_set_locked_outlet(wait_for_crossbar, start_responder, run_agen
     assert resp.session["op_code"] == OpCode.FAILED.value
 
 
+@pytest.mark.snmp
 @pytest.mark.integtest
 def test_ibootbar_cycle_locked_outlet(wait_for_crossbar, start_responder, run_agent, client):
     resp = client.lock_outlet(outlet=2, lock=True)
@@ -112,6 +118,7 @@ def test_ibootbar_cycle_locked_outlet(wait_for_crossbar, start_responder, run_ag
     assert resp.session["op_code"] == OpCode.FAILED.value
 
 
+@pytest.mark.snmp
 @pytest.mark.integtest
 def test_ibootbar_unlock_outlet(wait_for_crossbar, start_responder, run_agent, client):
     resp = client.set_outlet(outlet=1, state="off")

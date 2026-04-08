@@ -83,6 +83,7 @@ def write_test_file(path):
     return full_path
 
 
+@pytest.mark.pysmurf
 @pytest.mark.integtest
 def test_pysmurf_monitor_run_data_file(wait_for_crossbar, publisher, run_agent, client,
                                        cleanup, tmp_path):
@@ -103,6 +104,7 @@ def test_pysmurf_monitor_run_data_file(wait_for_crossbar, publisher, run_agent, 
     check_resp(client.run.status())
 
 
+@pytest.mark.pysmurf
 @pytest.mark.integtest
 def test_pysmurf_monitor_run_session_log(wait_for_crossbar, publisher, run_agent, client, cleanup):
     log_message = "This is a test log message"
@@ -112,6 +114,7 @@ def test_pysmurf_monitor_run_session_log(wait_for_crossbar, publisher, run_agent
     check_resp(client.run.status())
 
 
+@pytest.mark.pysmurf
 @pytest.mark.integtest
 def test_pysmurf_monitor_run_metadata(wait_for_crossbar, publisher, run_agent, client,
                                       cleanup, tmp_path):
