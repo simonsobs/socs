@@ -2597,6 +2597,14 @@ class ACUAgent:
                     while len(lines) and len(upload_lines) and upload_lines[-1].group_flag != 0:
                         upload_lines.append(lines.pop(0))
 
+                    # If there are any upcoming points left with timestamps < 3 step_times, transfer them in.
+                    # This prevents the update_line from running out of points 
+                    # if points are generated faster than the step_time.
+                    # 
+                    first_upload_timestamp = upload_lines[0].timestamp
+                    while len(lines) and (lines[0].timestamp - first_upload_timestamp) < 3 * step_time:
+                        upload_lines.append(lines.pop(0))
+
                     if len(upload_lines):
                         # Discard the group flag and upload all.
                         text = sh.get_track_points_text(
