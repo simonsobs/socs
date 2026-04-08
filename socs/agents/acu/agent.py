@@ -2598,9 +2598,10 @@ class ACUAgent:
                         upload_lines.append(lines.pop(0))
 
                     # If there are any upcoming points left with timestamps < 3 step_times, transfer them in.
-                    # This prevents the update_line from running out of points 
+                    # This prevents the update_line from running out of points
                     # if points are generated faster than the step_time.
-                    # 
+                    # This mainly happens with the new turnaround functions that need to generate points
+                    # with step_times << 1.0s.
                     first_upload_timestamp = upload_lines[0].timestamp
                     while len(lines) and (lines[0].timestamp - first_upload_timestamp) < 3 * step_time:
                         upload_lines.append(lines.pop(0))
