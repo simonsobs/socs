@@ -555,7 +555,7 @@ class UKKIDController:
 
         
     
-    @ocs_agent.param("duration", default=30, type=float) # JL 30 seconds is default stream time - useful for test/debugging. In practice, will be manually set in co-ordination with expected ACU scan time. 
+    @ocs_agent.param("duration", default=30, type=int) # JL 30 seconds is default stream time - useful for test/debugging. In practice, will be manually set in co-ordination with expected ACU scan time. 
     def stream(self, session, params=None):
         """
 
@@ -563,7 +563,7 @@ class UKKIDController:
 
         Args
         -----
-        duration : float, optional
+        duration : int, optional
             If set, determines how many seconds to stream data. Default is 30 seconds (for debug). 
         """
         
@@ -572,7 +572,8 @@ class UKKIDController:
                 self.log.warn("Lock could not be acquired because it "
                               + f"is held by {self.lock.job}")
                 return False
-            
+
+            TERMINATE_GRACE_PERIOD_SECONDS = 4
             self.log.info("Streaming RFSoc system information...")
             self.log.info("kid_stream_id: " + self.kid_stream_id)
             
@@ -601,7 +602,7 @@ class UKKIDController:
             else:
                mock_flag = "F" 
             
-            executable_list = [sys.executable, "receive_stream_g3.py","-m",mock_flag,"-n",str(num_freqs),"-f",output_stream_relative_path]
+            executable_list = [sys.executable, "receive_stream_g3.py","-m",mock_flag,"-n",str(num_freqs),"-f",output_stream_relative_path,"-i",self.kid_stream_id,"-t",str(params['duration'])]
             executable_string = " ".join(executable_list)
             self.log.info("Launching stream task " + executable_string)
             
@@ -628,9 +629,11 @@ class UKKIDController:
              now = time.time()
              steam_active_seconds = (now - stream_start_time)
 
-             # Check it is still running,
+             # Check it is still running
+             # p.poll() returns None if the process is still alive, return code otherwise.
              process_died = False
-             if p.poll() is None:
+             ret_code = p.poll()
+             if ret_code is None:
                 if os.path.exists(output_stream_full_path): 
                   file_size = os.path.getsize(output_stream_full_path)
                 else:
@@ -642,7 +645,7 @@ class UKKIDController:
                   stream_status_string = "Data has been streaming for %.1f seconds, no output file exists yet."  % (now - stream_start_time)
                   
              else:
-                stream_status_string = "WARNING streaming process finished unexpectedly at %.1f seconds." % (now - stream_start_time)
+                stream_status_string = "WARNING streaming process finished unexpectedly at %.1f seconds with return code %i" % ((now - stream_start_time),ret_code)
                 process_died = True
                 
              session.data = {"value": stream_status_string,
@@ -663,21 +666,32 @@ class UKKIDController:
              time.sleep(2)
              now = time.time()
                   
-        # End of time duration loop, disable the stream, and terminate the strea,ing process.
-        self.log.info("Disabling stream on RFSoc board.")
+        # End of time duration loop, disable the stream, and terminate the streaming process.
+        self.log.info(f"Stream duration {params['duration']} seconds expired.")
+        # Wait a few extra seconds to allow the streaming process to terminate/
+        time.sleep(TERMINATE_GRACE_PERIOD_SECONDS)
+        
+        # The streaming process should have concluded of its own accord after params['duration'] + TERMINATE_GRACE_PERIOD_SECONDS seconds. 
+        # Check whether this is the case. If not, send SIGTERM to the process
+        # and send a warning that the streaming process needed to be manually SIGTERMed  
+        self.log.info(f"Stream duration of {params['duration']} seconds has expired.")
+        ret_code = p.poll()
+        if ret_code is None:
+            self.log.warn("Streaming process unexpectedly still alive after the streaming duration has expired.")
+            self.log.warn("Will attempt to terminate - sending SIGTERM to the process...")
+            try:
+               os.kill(p.pid, signal.SIGTERM)  
+            except OSError as e:
+              self.log.error("Error received from os.kill:")
+              self.log.error(f"Failed to send signal: {os.strerror(e.errno)}") 
+
+            self.log.warn("... terminated.")
+        else:
+            self.log.info(f'Streaming process appears to have terminated cleanly with return code {ret_code}.')
+            
+        self.log.info('Disabling TCP/IP data streaming on RFSoc board.') 
         client.disable_stream()
         
-        self.log.info("Sending SIGTERM to recieve process...")
-        try:
-            os.kill(p.pid, signal.SIGTERM)
-            
-        except OSError as e:
-             self.log.error("Error received from os.kill:")
-             self.log.error(f"Failed to send signal: {os.strerror(e.errno)}")
-             
-        self.log.info("... done.")
-        
-        self.log.info("Streaming RFSoc duration expired.") 
         self.log.info("Returning from stream function.")
         message = {'block_name': 'stream_string',
                     'timestamp': now,
