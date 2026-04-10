@@ -26,7 +26,7 @@ jobs:
       matrix:
         # Don't test in 3.12 until #1035 is fixed
         # https://github.com/simonsobs/socs/issues/1035
-        python: ["3.8", "3.9", "3.10", "3.11"]
+        python: ["3.10", "3.11"]
 
     steps:
     - name: Set up Python ${{ matrix.python }}
