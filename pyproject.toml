@@ -47,8 +47,7 @@ acu = [
     "so3g",
     # "soaculib @ git+https://github.com/simonsobs/soaculib.git@master",
 ]
-# Note: Not including the holography deps, which are Python 3.8 only. Also not
-# including any dependencies with only direct references.
+# Note: Not including any dependencies with only direct references.
 all = [
     "imutils",
     "labjack-ljm",
@@ -61,11 +60,6 @@ all = [
     "scipy",
     "so3g",
 ]
-# Holography FPGA and Synthesizer Agents
-# holography = [  # Note: supports python 3.8 only!
-#     "casperfpga @ git+https://github.com/casper-astro/casperfpga.git@py38",
-#     "holog_daq @ git+https://github.com/McMahonCosmologyGroup/holog_daq.git@main",
-# ]
 # Labjack Agent
 labjack = [
     "labjack-ljm",
