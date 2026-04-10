@@ -49,8 +49,6 @@ If you would like to install all optional dependencies use the special varient
     trying to run for more details.
 
         - :ref:`ACU Agent<acu_deps>`
-        - :ref:`Holography FPGA Agent<holo_fpga_deps>`
-        - :ref:`Holography Synthesizer Agent<holo_synth_deps>`
         - :ref:`Pysmurf Controller Agent<pysmurf_controller_deps>`
         - :ref:`LATRt XY Stage Agent<latrt_xy_stage_deps>`
 
