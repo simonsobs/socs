@@ -59,6 +59,8 @@ all = [
     "pyepics",
     "scipy",
     "so3g",
+    "sodetlib",
+    "sotodlib",
 ]
 # Labjack Agent
 labjack = [
@@ -85,8 +87,8 @@ pfeiffer = [
 pysmurf = [
     "pyepics",
     # "pysmurf-slac @ git+https://github.com/slaclab/pysmurf.git@main",
-    # "sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master",
-    # "sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master",
+    "sodetlib",
+    "sotodlib",
 ]
 # SMuRF File Emulator, SMuRF Stream Simulator
 smurf_sim = [
