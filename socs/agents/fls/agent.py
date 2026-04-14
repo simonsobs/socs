@@ -415,6 +415,7 @@ class FLSAgent:
  
         scan_precision = freq_step
         fls = self
+        self.take_data = False
 
         with self.lock.acquire_timeout(0, job='run_frequency_sweeps') as acquired:
             if not acquired:
@@ -534,7 +535,9 @@ class FLSAgent:
                                   f"currently held by {self.lock.job}.")
 
         self.agent.feeds['fls_sampling'].flush_buffer()
+        self.run_sweep = False
         self.dlcsmart.stop_scan()
+        return True, "Frequency scan completed."
 
 
 #        with self.lock.acquire_timeout(timeout=12, job='run_frequency_sweeps') as acquired:
