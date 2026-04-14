@@ -443,7 +443,7 @@ class FLSAgent:
                 act_freq = self.actual_freq
 
                 while _within(act_freq, min_freq) or _within(act_freq, max_freq):
-                    print(f'Frequency is still {act_freq}')
+                    print(f'Frequency is {act_freq}, so scan has not started.')
                     time.sleep(1)
                     act_freq = self.actual_freq
                 self.log.info('Scan has started.')
@@ -451,6 +451,8 @@ class FLSAgent:
                 while not _within(act_freq, min_freq+scan_precision) or not _within(act_freq, max_freq-scan_precision):
                     time.sleep(1)
                     act_freq = self.actual_freq
+                    self.log.info('Scan is still running.')
+                self.log.info(f'Scan iteration number {i} has reached the end frequency. Waiting for stop_scan.')
 
                 self.dlcsmart.stop_scan()
                 self.log.info('Completed scan iteration number {i}.')
