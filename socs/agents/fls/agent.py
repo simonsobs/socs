@@ -80,6 +80,11 @@ class FLSAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
+        self.agent.register_feed('scan_sampling_data',
+                                 record=True,
+                                 agg_params=agg_params,
+                                 buffer_time=1)
+
     @ocs_agent.param('auto_acquire', type=bool, default=False)
     def initialize(self, session, params=None):
         """
@@ -172,7 +177,7 @@ class FLSAgent:
                 pm.sleep()
                 if time.time() - last_time > 1:
                     last_time = time.time()
-                if not self.lock.release_and_acquire(timeout=5):
+                if not self.lock.release_and_acquire(timeout=12):
                     self.log.warn(f"acq: Failed to re-acquire sampling lock, "
                                   f"currently held by {self.lock.job}.")
                     continue
@@ -411,7 +416,7 @@ class FLSAgent:
 
         with self.lock.acquire_timeout(0, job='run_frequency_sweeps') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start sampling because {self.lock.job}"
+                self.log.warn(f"Could not start run_frequency_sweeps because {self.lock.job} "
                               "is already running")
                 return False, "Could not acquire lock."
 
@@ -477,14 +482,14 @@ class FLSAgent:
                         for key, val in data.items():
                             sampling_data[key] = val
 
-                        session.data = {"sampling_data": sampling_data,
+                        session.data = {"scan_sampling_data": sampling_data,
                                         "timestamp": time.time()}
 
                         pub_data = {'timestamp': time.time(),
-                                    'block_name': 'sampling_data',
+                                    'block_name': 'scan_sampling_data',
                                     'data': sampling_data}
 
-                        self.agent.publish_to_feed('sampling_data', pub_data)
+                        self.agent.publish_to_feed('scan_sampling_data', pub_data)
 
                     while not _within(act_freq, min_freq+scan_precision) and not _within(act_freq, max_freq-scan_precision):
                         self.log.info("Scan is still running.")
@@ -506,14 +511,14 @@ class FLSAgent:
                         for key, val in data.items():
                             sampling_data[key] = val
 
-                        session.data = {"sampling_data": sampling_data,
+                        session.data = {"scan_sampling_data": sampling_data,
                                         "timestamp": time.time()}
 
                         pub_data = {'timestamp': time.time(),
-                                    'block_name': 'sampling_data',
+                                    'block_name': 'scan_sampling_data',
                                     'data': sampling_data}
 
-                        self.agent.publish_to_feed('sampling_data', pub_data)
+                        self.agent.publish_to_feed('scan_sampling_data', pub_data)
 
                     self.log.info(f'Scan iteration number {scan_iter} completed. Waiting for scan_end call.')
 
