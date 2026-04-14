@@ -304,7 +304,8 @@ class DLCSmart(TCPInterface):
 
     def sampling(self):
         """
-        Query the set frequency (GHz), actual frequency (GHz), and photocurrent (nA).
+        Query the set frequency (GHz), actual frequency (GHz), photocurrent (nA), 
+        bias voltage (V), and bias offset (V).
         For general monitoring purposes.
         """
         reset = self.command("lockin:lock-in-reset")
@@ -316,9 +317,12 @@ class DLCSmart(TCPInterface):
             photocurrent = 'nan'
         set_frequency = self.param_ref("frequency:frequency-set")
         act_frequency = self.param_ref("frequency:frequency-act")
+        bias = self.check_bias()
         value_dict = {'set_frequency': float(set_frequency),
                       'actual_frequency': float(act_frequency),
                       'photocurrent': float(photocurrent),
+                      'bias_voltage': float(bias[0]),
+                      'bias_offset': float(bias[1]),
                       }
         return value_dict
 

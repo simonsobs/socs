@@ -15,6 +15,35 @@ MIN_FREQ = 20.
 def _within(val, target, tolerance=1e-2):
     return abs(val-target) <= tolerance
 
+def _check_scan_params(fls, min_freq, max_freq, freq_step, start_dir):
+    """
+    Check that the scan parameters are the same as what you set them to.
+    """
+    scan_param_check = fls.dlcsmart.check_scan_params()
+    if scan_param_check[0] == "#t" + BYTE_END:
+        fls.log.info("Scan mode set to fast")
+    elif scan_param_check[0] == "#f" + BYTE_END:
+        fls.log.info("Scan mode set to precise")
+        return False, "Scan mode must be set to fast"
+
+        if scan_param_check[1] == min_freq and scan_param_check[2] == max_freq \
+        and scan_param_check[3] == start_dir * freq_step:
+            fls.log.info(f"Scan parameters set: {min_freq} GHz to {max_freq} GHz " \
+                          f"with step size {start_dir * freq_step}")
+        else:
+            if scan_param_check[1] != min_freq:
+                fls.log.warn(f"Minimum frequency set to {scan_param_check[1]}, not {min_freq}")
+            if scan_param_check[2] != max_freq:
+                fls.log.warn(f"Maximum frequency set to {scan_param_check[2]}, not {max_freq}")
+            if scan_param_check[3] != start_dir * freq_step:
+                if abs(scan_param_check[3]) != freq_step:
+                    fls.log.warn(f"Frequency step set to {abs(scan_param_check[3])}, not {freq_step}")
+                if np.sign(scan_param_check[3]) != start_dir:
+                    fls.log.warn(f"Scan direction is incorrect")
+            return False, "Scan parameter validation failed!"
+    return True
+
+
 
 class FLSAgent:
     """
@@ -124,6 +153,8 @@ class FLSAgent:
                     {'set_frequency': 110.0,
                      'actual_frequency': 109.3425,
                      'photocurrent': 0.1124,
+                     'bias_voltage': 1.50,
+                     'bias_offset': -0.50,
                      'timestamp': 1771277799.562098}
         """
         with self.lock.acquire_timeout(0, job='acq') as acquired:
@@ -136,7 +167,7 @@ class FLSAgent:
 
             self.take_sampling = True
 
-            pm = Pacemaker(1/3, quantize=False) # what is this?
+            pm = Pacemaker(1/3, quantize=False)
             while self.take_sampling:
                 pm.sleep()
                 if time.time() - last_time > 1:
@@ -192,9 +223,13 @@ class FLSAgent:
     @ocs_agent.param('state', type=str, choices=['on','off'])
     def toggle_laser_power(self, session, params):
         """
-        turn_lasers_on()
+        toggle_laser_power(state)
 
-        ***Task*** - Enable emission from both lasers
+        ***Task*** - Enable or disable emission from both lasers
+
+        Parameters
+        ----------
+            state (str): State ('on' or 'off') to set the lasers to
         """
         state = params['state']
         with self.lock.acquire_timeout(timeout=12, job='toggle_laser_power') as acquired:
@@ -332,37 +367,9 @@ class FLSAgent:
 
         return True, f"Set frequency to {set_frequency} GHz"
 
-    def _check_scan_params(self, min_freq, max_freq, freq_step, start_dir):
-        """
-        Check that the scan parameters are the same as what you set them to.
-        """
-        scan_param_check = self.dlcsmart.check_scan_params()
-        if scan_param_check[0] == "#t" + BYTE_END:
-            self.log.info("Scan mode set to fast")
-        elif scan_param_check[0] == "#f" + BYTE_END:
-            self.log.info("Scan mode set to precise")
-            return False, "Scan mode must be set to fast"
-
-            if scan_param_check[1] == min_freq and scan_param_check[2] == max_freq \
-            and scan_param_check[3] == start_dir * freq_step:
-                self.log.info(f"Scan parameters set: {min_freq} GHz to {max_freq} GHz " \
-                              f"with step size {start_dir * freq_step}")
-            else:
-                if scan_param_check[1] != min_freq:
-                    self.log.warn(f"Minimum frequency set to {scan_param_check[1]}, not {min_freq}")
-                if scan_param_check[2] != max_freq:
-                    self.log.warn(f"Maximum frequency set to {scan_param_check[2]}, not {max_freq}")
-                if scan_param_check[3] != start_dir * freq_step:
-                    if abs(scan_param_check[3]) != freq_step:
-                        self.log.warn(f"Frequency step set to {abs(scan_param_check[3])}, not {freq_step}")
-                    if np.sign(scan_param_check[3]) != start_dir:
-                        self.log.warn(f"Scan direction is incorrect")
-                return False, "Could not correctly set scan parameters"
-        return True
-
     @ocs_agent.param('min_frequency', type=float)
     @ocs_agent.param('max_frequency', type=float)
-    @ocs_agent.param('start_direction', type=int)
+    @ocs_agent.param('start_direction', type=int, choices=[-1,1])
     @ocs_agent.param('frequency_step', type=float, default=0.05)
     @ocs_agent.param('num_of_sweeps', type=int, default=1)
     def run_frequency_sweeps(self, session, params):
@@ -400,6 +407,7 @@ class FLSAgent:
         assert start_dir in (-1, 1), "Choose start_dir=1 (increasing) or -1 (decreasing)"
  
         scan_precision = freq_step
+        fls = self
 
         with self.lock.acquire_timeout(timeout=12, job='run_frequency_sweeps') as acquired:
             if not acquired:
@@ -426,7 +434,7 @@ class FLSAgent:
             while i < nsweeps:
                 self.dlcsmart.set_scan_params(min_freq, max_freq, freq_step, start_dir)
                 time.sleep(0.01)
-                csp = self._check_scan_params(min_freq, max_freq, freq_step, start_dir)
+                csp = _check_scan_params(fls, min_freq, max_freq, freq_step, start_dir)
                 if not csp:
                     return False, "Could not correctly set scan params"
                 self.dlcsmart.start_scan()
@@ -487,7 +495,6 @@ def main(args=None):
     fls_agent = FLSAgent(agent, args.ip, args.port)
     agent.register_task('initialize', fls_agent.initialize, startup=init_params)
     agent.register_task('toggle_laser_power', fls_agent.toggle_laser_power)
-#    agent.register_task('turn_lasers_off', fls_agent.turn_lasers_off)
     agent.register_task('set_bias', fls_agent.set_bias)
     agent.register_task('set_frequency', fls_agent.set_frequency)
     agent.register_task('run_frequency_sweeps', fls_agent.run_frequency_sweeps)
