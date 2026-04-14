@@ -473,9 +473,6 @@ class FLSAgent:
                             time.sleep(1)
                             continue
 
-                        self.set_freq = data['set_frequency']
-                        self.actual_freq = data['actual_frequency']
-
                         sampling_data = {}
                         for key, val in data.items():
                             sampling_data[key] = val
