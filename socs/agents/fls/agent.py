@@ -66,6 +66,8 @@ class FLSAgent:
 
         self.initialized = False
         self.take_data = False
+        self.run_sweep = False
+
         self.lasers_on = False
         self.tx_bias_amp = None
         self.tx_bias_offset = None
@@ -170,10 +172,10 @@ class FLSAgent:
 
             last_time = time.time()
 
-            self.take_sampling = True
+            self.take_data = True
 
             pm = Pacemaker(1/3, quantize=False)
-            while self.take_sampling:
+            while self.take_data:
                 pm.sleep()
                 if time.time() - last_time > 1:
                     last_time = time.time()
@@ -219,8 +221,8 @@ class FLSAgent:
         """
         Stops sampling process.
         """
-        if self.take_sampling:
-            self.take_sampling = False
+        if self.take_data:
+            self.take_data = False
             return True, 'requested to stop taking sampling data.'
         else:
             return False, 'acq is not currently running.'
@@ -440,11 +442,11 @@ class FLSAgent:
 
             last_time = time.time()
 
-#            self.take_sampling = True
+#            self.take_data = True
             self.run_scan = True
 
             pm = Pacemaker(1/3, quantize=False)
-#            while self.take_sampling:
+#            while self.take_data:
             while self.run_scan:
                 scan_iter = 0
                 pm.sleep()
