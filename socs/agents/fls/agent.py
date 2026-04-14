@@ -450,10 +450,10 @@ class FLSAgent:
                 pm.sleep()
                 if time.time() - last_time > 1:
                     last_time = time.time()
-                if not self.lock.release_and_acquire(timeout=5):
-                    self.log.warn(f"run_frequency_sweeps: Failed to re-acquire sampling lock, "
-                                  f"currently held by {self.lock.job}.")
-                    continue
+#                if not self.lock.release_and_acquire(timeout=5):
+#                    self.log.warn(f"run_frequency_sweeps: Failed to re-acquire sampling lock, "
+#                                  f"currently held by {self.lock.job}.")
+#                    continue
 
                 while scan_iter < nsweeps:
                     self.dlcsmart.set_scan_params(min_freq, max_freq, freq_step, start_dir)
@@ -526,6 +526,10 @@ class FLSAgent:
                     self.log.info('Completed scan iteration number {scan_iter}.')
                     start_dir = -1 * start_dir
                     scan_iter += 1
+
+                if not self.lock.release_and_acquire(timeout=12):
+                    self.log.warn(f"run_frequency_sweeps: Failed to re-acquire sampling lock, "
+                                  f"currently held by {self.lock.job}.")
 
         self.agent.feeds['fls_sampling'].flush_buffer()
         self.dlcsmart.stop_scan()
@@ -636,8 +640,8 @@ def main(args=None):
     agent.register_task('set_bias', fls_agent.set_bias)
     agent.register_task('set_frequency', fls_agent.set_frequency)
 #    agent.register_task('run_frequency_sweeps', fls_agent.run_frequency_sweeps)
-    agent.register_process('run_frequency_sweeps', fls_agent.run_frequency_sweeps, fls_agent._stop_freq_sweep)
-    agent.register_process('acq', fls_agent.acq, fls_agent._stop_acq)
+    agent.register_process('run_frequency_sweeps', fls_agent.run_frequency_sweeps, fls_agent._stop_freq_sweep)#, blocking=False)
+    agent.register_process('acq', fls_agent.acq, fls_agent._stop_acq)#, blocking=False)
 
     runner.run(agent, auto_reconnect=True)
 
