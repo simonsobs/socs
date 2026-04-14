@@ -448,7 +448,7 @@ class FLSAgent:
                     act_freq = self.actual_freq
                 self.log.info('Scan has started.')
 
-                while not _within(act_freq, min_freq+scan_precision) or not _within(act_freq, max_freq-scan_precision):
+                while not _within(act_freq, min_freq+scan_precision) and not _within(act_freq, max_freq-scan_precision):
                     time.sleep(1)
                     act_freq = self.actual_freq
                     self.log.info('Scan is still running.')
