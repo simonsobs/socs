@@ -211,10 +211,12 @@ class FLSAgent:
 
                 self.agent.publish_to_feed('sampling_data', pub_data)
 
+                print(pub_data)
+
                 if params['test_mode']:
                     break
 
-        self.agent.feeds['fls_sampling'].flush_buffer()
+        self.agent.feeds['sampling_data'].flush_buffer()
         return True, 'Acquisition exited cleanly.'
 
     def _stop_acq(self, session, params):
@@ -416,6 +418,7 @@ class FLSAgent:
         scan_precision = freq_step
         fls = self
         self.take_data = False
+        time.sleep(10)
 
         with self.lock.acquire_timeout(0, job='run_frequency_sweeps') as acquired:
             if not acquired:
@@ -445,6 +448,7 @@ class FLSAgent:
 
 #            self.take_data = True
             self.run_scan = True
+            self.take_data = True
 
             pm = Pacemaker(1/3, quantize=False)
 #            while self.take_data:
@@ -472,32 +476,7 @@ class FLSAgent:
                         self.log.info(f"Frequency is {act_freq}, so scan has not started.")
                         try:
                             data = self.dlcsmart.sampling()
-                            if session.degraded:
-                                self.log.info("Connection re-established.")
-                                session.degraded = False
-                        except ConnectionError:
-                            self.log.error("Failed to get data from DLC Smart. Check network connection")
-                            session.degraded = True
-                            time.sleep(1)
-                            continue
-
-                        sampling_data = {}
-                        for key, val in data.items():
-                            sampling_data[key] = val
-
-                        session.data = {"scan_sampling_data": sampling_data,
-                                        "timestamp": time.time()}
-
-                        pub_data = {'timestamp': time.time(),
-                                    'block_name': 'scan_sampling_data',
-                                    'data': sampling_data}
-
-                        self.agent.publish_to_feed('scan_sampling_data', pub_data)
-
-                    while not _within(act_freq, min_freq+scan_precision) and not _within(act_freq, max_freq-scan_precision):
-                        self.log.info("Scan is still running.")
-                        try:
-                            data = self.dlcsmart.sampling()
+                            print(data)
                             if session.degraded:
                                 self.log.info("Connection re-established.")
                                 session.degraded = False
@@ -521,7 +500,41 @@ class FLSAgent:
                                     'block_name': 'scan_sampling_data',
                                     'data': sampling_data}
 
+                        print(pub_data)
+
                         self.agent.publish_to_feed('scan_sampling_data', pub_data)
+
+                    while not _within(act_freq, min_freq+scan_precision) and not _within(act_freq, max_freq-scan_precision):
+                        self.log.info("Scan is still running.")
+                        try:
+                            data = self.dlcsmart.sampling()
+                            if session.degraded:
+                                self.log.info("Connection re-established.")
+                                session.degraded = False
+                        except ConnectionError:
+                            self.log.error("Failed to get data from DLC Smart. Check network connection")
+                            session.degraded = True
+                            time.sleep(1)
+                            continue
+
+                        self.set_freq = data['set_frequency']
+                        self.actual_freq = data['actual_frequency']
+
+                        print(self.set_freq, self.actual_freq, act_freq)
+                        sampling_data = {}
+                        for key, val in data.items():
+                            sampling_data[key] = val
+
+                        session.data = {"scan_sampling_data": sampling_data,
+                                        "timestamp": time.time()}
+
+                        pub_data = {'timestamp': time.time(),
+                                    'block_name': 'scan_sampling_data',
+                                    'data': sampling_data}
+
+                        self.agent.publish_to_feed('scan_sampling_data', pub_data)
+
+                        act_freq = self.actual_freq
 
                     self.log.info(f'Scan iteration number {scan_iter} completed. Waiting for scan_end call.')
 
@@ -534,7 +547,7 @@ class FLSAgent:
                     self.log.warn(f"run_frequency_sweeps: Failed to re-acquire sampling lock, "
                                   f"currently held by {self.lock.job}.")
 
-        self.agent.feeds['fls_sampling'].flush_buffer()
+        self.agent.feeds['scan_sampling_data'].flush_buffer()
         self.run_sweep = False
         self.dlcsmart.stop_scan()
         return True, "Frequency scan completed."
