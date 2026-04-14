@@ -438,6 +438,7 @@ class FLSAgent:
                 if not csp:
                     return False, "Could not correctly set scan params"
                 self.dlcsmart.start_scan()
+                self.scan_running = True
                 time.sleep(1)
 #                act_freq = self.dlcsmart.get_actual_frequency()
                 act_freq = self.actual_freq
@@ -454,8 +455,10 @@ class FLSAgent:
                     self.log.info('Scan is still running.')
                 self.log.info(f'Scan iteration number {i} has reached the end frequency. Waiting for stop_scan.')
 
-                self.dlcsmart.stop_scan()
-                self.log.info('Completed scan iteration number {i}.')
+                scan_stop = self.dlcsmart.stop_scan()
+                if scan_stop == b'0\n> ':
+                    self.scan_running = False
+                self.log.info(f'Completed scan iteration number {i}.')
                 time.sleep(1)
                 start_dir = -1 * start_dir
                 i += 1
