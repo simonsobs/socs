@@ -1196,6 +1196,7 @@ class ACUAgent:
         unmodified.
 
         """
+        print('Query modes ...')
         modes = list((yield self.acu_control.mode(size=3)))
         changes = [False, False, False]
         for i, (k, v) in enumerate([('az', az), ('el', el), ('third', third)]):
@@ -1203,10 +1204,13 @@ class ACUAgent:
                 changes[i] = True
                 modes[i] = v
         if not any(changes):
+            print('No mode change.')
             return
         if not changes[2]:
+            print('Set modes[:2].')
             yield self.acu_control.mode(modes[:2])
         else:
+            print('Set modes all.')
             yield self.acu_control.mode(modes)
 
     @inlineCallbacks
@@ -1464,6 +1468,7 @@ class ACUAgent:
             # Main state machine
             if state == State.INIT:
                 # Set target position and change mode to Preset.
+                ## It must have stalled here, or else on the get_mode / get_active after going to "WAIT_
                 result = yield ctrl.goto(target)
                 if result in OK_RESPONSES:
                     state = State.WAIT_MOVING
@@ -1581,6 +1586,7 @@ class ACUAgent:
         for name, args in move_defs:
             fb = {'state': 'init'}
             move_def = self._go_to_axis(*args, state_feedback=fb)
+            # Busy-ish wait -- need to enforce timeout in _go_to_axis
             while fb['state'] == 'init':
                 yield dsleep(.1)
             moves.append(move_def)
