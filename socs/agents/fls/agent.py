@@ -14,34 +14,39 @@ MIN_FREQ = 20.
 def _within(val, target, tolerance=1e-2):
     return abs(val-target) <= tolerance
 
-#def _check_scan_params(fls, min_freq, max_freq, freq_step, start_dir):
-#    """
-#    Check that the scan parameters are the same as what you set them to.
-#    """
-#    scan_param_check = fls.dlcsmart.check_scan_params()
-#    if scan_param_check[0] == "#t" + BYTE_END:
-#        fls.log.info("Scan mode set to fast")
-#    elif scan_param_check[0] == "#f" + BYTE_END:
-#        fls.log.info("Scan mode set to precise")
-#        return False, "Scan mode must be set to fast"
-#
-#        if scan_param_check[1] == min_freq and scan_param_check[2] == max_freq \
-#        and scan_param_check[3] == start_dir * freq_step:
-#            fls.log.info(f"Scan parameters set: {min_freq} GHz to {max_freq} GHz " \
-#                          f"with step size {start_dir * freq_step}")
-#        else:
-#            if scan_param_check[1] != min_freq:
-#                fls.log.warn(f"Minimum frequency set to {scan_param_check[1]}, not {min_freq}")
-#            if scan_param_check[2] != max_freq:
-#                fls.log.warn(f"Maximum frequency set to {scan_param_check[2]}, not {max_freq}")
-#            if scan_param_check[3] != start_dir * freq_step:
-#                if abs(scan_param_check[3]) != freq_step:
-#                    fls.log.warn(f"Frequency step set to {abs(scan_param_check[3])}, not {freq_step}")
-#                if np.sign(scan_param_check[3]) != start_dir:
-#                    fls.log.warn(f"Scan direction is incorrect")
-#            return False, "Scan parameter validation failed!"
-#    return True
+def _check_scan_params(fls, min_freq, max_freq, freq_step, start_dir):
+    """
+    Check that the scan parameters are the same as what you set them to.
+    """
+    scan_mode = fls.scan_mode
+    if scan_mode == 'fast':
+        fls.log.info("Scan mode set to fast")
+    elif scan_mode == 'precise':
+        fls.log.info("Scan mode set to precise")
+        return False, "Scan mode must be set to fast."
 
+    scan_min_freq = fls.scan_min_freq
+    scan_max_freq = fls.scan_max_freq
+    scan_step_size = fls.scan_step
+    scan_direction = fls.scan_direction
+
+    if scan_min_freq != min_freq:
+        fls.log.warn(f"Minimum frequency set to {scan_min_freq}, not {min_freq}!)
+        return False, "Scan parameter validation failed: minimum frequency."
+    if scan_max_freq != max_freq:
+        fls.log.warn(f"Minimum frequency set to {scan_max_freq}, not {max_freq}!)
+        return False, "Scan parameter validation failed: maximum frequency."
+    if scan_step_size != freq_step:
+        fls.log.warn(f"Scan step size set to {scan_step_size}, not {freq_step}!)
+        return False, "Scan parameter validation failed: step size."
+    if scan_direction != start_dir:
+        fls.log.warn(f"Start direction set to {scan_direction}, not {start_dir}!)
+        return False, "Scan parameter validation failed: scan direction."
+
+    fls.log.info(f"Scan parameters set: {min_freq} GHz to {max_freq} GHz "\
+                 f"with step size {start_dir * freq_step}.")
+
+    return True
 
 
 class FLSAgent:
