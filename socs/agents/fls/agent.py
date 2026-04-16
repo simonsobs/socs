@@ -1,6 +1,9 @@
 import socket
 import argparse
 import time
+import numpy as np
+
+from autobahn.twisted.util import sleep as dsleep
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
@@ -31,16 +34,16 @@ def _check_scan_params(fls, min_freq, max_freq, freq_step, start_dir):
     scan_direction = fls.scan_direction
 
     if scan_min_freq != min_freq:
-        fls.log.warn(f"Minimum frequency set to {scan_min_freq}, not {min_freq}!)
+        fls.log.warn(f"Minimum frequency set to {scan_min_freq}, not {min_freq}!")
         return False, "Scan parameter validation failed: minimum frequency."
     if scan_max_freq != max_freq:
-        fls.log.warn(f"Minimum frequency set to {scan_max_freq}, not {max_freq}!)
+        fls.log.warn(f"Minimum frequency set to {scan_max_freq}, not {max_freq}!")
         return False, "Scan parameter validation failed: maximum frequency."
     if scan_step_size != freq_step:
-        fls.log.warn(f"Scan step size set to {scan_step_size}, not {freq_step}!)
+        fls.log.warn(f"Scan step size set to {scan_step_size}, not {freq_step}!")
         return False, "Scan parameter validation failed: step size."
     if scan_direction != start_dir:
-        fls.log.warn(f"Start direction set to {scan_direction}, not {start_dir}!)
+        fls.log.warn(f"Start direction set to {scan_direction}, not {start_dir}!")
         return False, "Scan parameter validation failed: scan direction."
 
     fls.log.info(f"Scan parameters set: {min_freq} GHz to {max_freq} GHz "\
@@ -319,8 +322,8 @@ class FLSAgent:
                 return True, f"Laser is already {state}"
 
 #            bias_amp, bias_offset = self.dlcsmart.check_bias()
-            bias_amp = self.bias_amp
-            bias_offset = self.bias_offset
+            bias_amp = self.tx_bias_amp
+            bias_offset = self.tx_bias_offset
             if bias_amp != 0.0 or bias_offset != 0.0:
                 self.log.warn(f'Bias amplitude is {bias_amp} and bias offset '
                               f'is {bias_offset}. Setting bias to zero, then '
@@ -328,8 +331,8 @@ class FLSAgent:
                 self.dlcsmart.set_bias_to_zero()
                 time.sleep(0.3)
 #                bias_amp, bias_offset = self.dlcsmart.check_bias()
-                bias_amp = self.bias_amp
-                bias_offset = self.bias_offset
+                bias_amp = self.tx_bias_amp
+                bias_offset = self.tx_bias_offset
                 if bias_amp != 0.0 or bias_offset != 0.0:
                     return False, "Bias could not be set to zero so did not toggle laser power."
 
@@ -378,17 +381,29 @@ class FLSAgent:
                 self.dlcsmart.set_bias_to_zero()
             elif bias_to_set == 'default':
                 self.dlcsmart.set_bias_to_default()
-            time.sleep(0.3)
+#            yield dsleep(3)
+            time.sleep(3)
 #            check_bias_amp, check_bias_offset = self.dlcsmart.check_bias()
-            check_bias_amp = self.bias_amp
-            check_bias_offset = self.bias_offset
+            check_bias_amp = self.tx_bias_amp
+            check_bias_offset = self.tx_bias_offset
             if bias_to_set == 'zero' and (check_bias_amp, check_bias_offset) == (0., 0.):
                 self.log.info('Bias successfully set to zero.')
             elif bias_to_set == 'default' and round(check_bias_amp, 1) == 1.0 and round(check_bias_offset, 1) == -0.5:
                 self.log.info('Bias successfully set to default.')
             else:
-                self.log.info("Bias not successfully set.")
-                return False, "Bias not successfully set."
+#                yield dsleep(10)
+                bias_amp, bias_off = self.dlcsmart.check_bias()
+                self.tx_bias_amp = bias_amp
+                self.tx_bias_offset = bias_off
+                check_bias_amp = self.tx_bias_amp
+                check_bias_offset = self.tx_bias_offset
+                if bias_to_set == 'zero' and (check_bias_amp, check_bias_offset) == (0., 0.):
+                    self.log.info('Bias successfully set to zero.')
+                elif bias_to_set == 'default' and round(check_bias_amp, 1) == 1.0 and round(check_bias_offset, 1) == -0.5:
+                    self.log.info('Bias successfully set to default.')
+                else:
+                    self.log.info(f"Bias amp is {check_bias_amp} and bias offset is {check_bias_offset}.")
+                    return False, "Bias not successfully set."
         return True, f"Bias successfully set to {bias_to_set}."
 
     @ocs_agent.param('frequency', type=float)

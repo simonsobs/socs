@@ -359,7 +359,7 @@ class DLCSmart(TCPInterface):
                       'scan_min_frequency': float(scan_params[1]),
                       'scan_max_frequency': float(scan_params[2]),
                       'scan_step': abs(scan_params[3]),
-                      'scan_direction': np.sign(scan_params[3])
+                      'scan_direction': int(np.sign(scan_params[3]))
                       }
         return value_dict
 
