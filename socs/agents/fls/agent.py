@@ -8,40 +8,39 @@ from ocs.ocs_twisted import Pacemaker, TimeoutLock
 from socs.agents.fls.drivers import DLCSmart
 
 # TODO: put these in a .yaml file
-BYTE_END = "\n>"
 MAX_FREQ = 880.
 MIN_FREQ = 20.
 
 def _within(val, target, tolerance=1e-2):
     return abs(val-target) <= tolerance
 
-def _check_scan_params(fls, min_freq, max_freq, freq_step, start_dir):
-    """
-    Check that the scan parameters are the same as what you set them to.
-    """
-    scan_param_check = fls.dlcsmart.check_scan_params()
-    if scan_param_check[0] == "#t" + BYTE_END:
-        fls.log.info("Scan mode set to fast")
-    elif scan_param_check[0] == "#f" + BYTE_END:
-        fls.log.info("Scan mode set to precise")
-        return False, "Scan mode must be set to fast"
-
-        if scan_param_check[1] == min_freq and scan_param_check[2] == max_freq \
-        and scan_param_check[3] == start_dir * freq_step:
-            fls.log.info(f"Scan parameters set: {min_freq} GHz to {max_freq} GHz " \
-                          f"with step size {start_dir * freq_step}")
-        else:
-            if scan_param_check[1] != min_freq:
-                fls.log.warn(f"Minimum frequency set to {scan_param_check[1]}, not {min_freq}")
-            if scan_param_check[2] != max_freq:
-                fls.log.warn(f"Maximum frequency set to {scan_param_check[2]}, not {max_freq}")
-            if scan_param_check[3] != start_dir * freq_step:
-                if abs(scan_param_check[3]) != freq_step:
-                    fls.log.warn(f"Frequency step set to {abs(scan_param_check[3])}, not {freq_step}")
-                if np.sign(scan_param_check[3]) != start_dir:
-                    fls.log.warn(f"Scan direction is incorrect")
-            return False, "Scan parameter validation failed!"
-    return True
+#def _check_scan_params(fls, min_freq, max_freq, freq_step, start_dir):
+#    """
+#    Check that the scan parameters are the same as what you set them to.
+#    """
+#    scan_param_check = fls.dlcsmart.check_scan_params()
+#    if scan_param_check[0] == "#t" + BYTE_END:
+#        fls.log.info("Scan mode set to fast")
+#    elif scan_param_check[0] == "#f" + BYTE_END:
+#        fls.log.info("Scan mode set to precise")
+#        return False, "Scan mode must be set to fast"
+#
+#        if scan_param_check[1] == min_freq and scan_param_check[2] == max_freq \
+#        and scan_param_check[3] == start_dir * freq_step:
+#            fls.log.info(f"Scan parameters set: {min_freq} GHz to {max_freq} GHz " \
+#                          f"with step size {start_dir * freq_step}")
+#        else:
+#            if scan_param_check[1] != min_freq:
+#                fls.log.warn(f"Minimum frequency set to {scan_param_check[1]}, not {min_freq}")
+#            if scan_param_check[2] != max_freq:
+#                fls.log.warn(f"Maximum frequency set to {scan_param_check[2]}, not {max_freq}")
+#            if scan_param_check[3] != start_dir * freq_step:
+#                if abs(scan_param_check[3]) != freq_step:
+#                    fls.log.warn(f"Frequency step set to {abs(scan_param_check[3])}, not {freq_step}")
+#                if np.sign(scan_param_check[3]) != start_dir:
+#                    fls.log.warn(f"Scan direction is incorrect")
+#            return False, "Scan parameter validation failed!"
+#    return True
 
 
 
@@ -68,12 +67,17 @@ class FLSAgent:
         self.take_data = False
         self.run_sweep = False
 
+        # for internal referencing
         self.lasers_on = False
         self.tx_bias_amp = None
         self.tx_bias_offset = None
-
         self.set_freq = None
         self.actual_freq = None
+        self.scan_mode = None
+        self.scan_min_freq = None
+        self.scan_max_freq = None
+        self.scan_step = None
+        self.scan_direction = None
 
         agg_params = {'frame_length': 60} # is this correct?
 
@@ -102,8 +106,7 @@ class FLSAgent:
                               "is already running")
                 return False, "Could not acquire lock."
 
-#            self.dlcsmart = DLCSmart(ip_addr=self.ip, port=self.port)
-
+            # Make the connection and read out the welcome message
             try:
                 self.dlcsmart = DLCSmart(ip_addr=self.ip, port=self.port)
                 welcome = self.dlcsmart.drain_buffer()
@@ -112,12 +115,14 @@ class FLSAgent:
                 self.log.error("could not establish connection to DLC Smart")
                 return False, "FLS agent initialization failed"
 
+            # Read the voltage bias and voltage offset
             bias_read = self.dlcsmart.check_bias()
             self.tx_bias_amp = bias_read[0]
             self.tx_bias_offset = bias_read[1]
             self.log.info(f'Tx bias amplitude: {self.tx_bias_amp}')
             self.log.info(f'Tx bias offset:  + {self.tx_bias_offset}')
 
+            # Read the laser emission state (on/off)
             lasers_on = self.dlcsmart.check_laser_emission()
             if "#t" in lasers_on:
                 self.lasers_on = True
@@ -129,6 +134,7 @@ class FLSAgent:
                 print(lasers_on)
                 self.log.warn("Could not determine if lasers are on!")
 
+            # Read the actual frequency
             actual_freq = self.dlcsmart.get_actual_frequency()
             try:
                 self.actual_freq = float(actual_freq)
@@ -137,6 +143,41 @@ class FLSAgent:
                 self.actual_freq = actual_freq
             self.log.info(f'Actual frequency: {actual_freq}')
 
+            # Read the scan parameters
+            scan_params = self.dlcsmart.check_scan_params()
+
+            scan_mode = scan_params[0]
+            if "#t" in scan_mode:
+                self.scan_mode = 'fast'
+            elif "#f" in scan_mode:
+                self.scan_mode = 'precise'
+            else:
+                self.log.warn('Could not interpret scan mode')
+                self.scan_mode = scan_mode
+            
+            scan_min_freq = scan_params[1]
+            try:
+                self.scan_min_freq = float(scan_min_freq)
+            except ValueError:
+                self.log.warn('Could not interpret scan minimum frequency')
+                self.scan_min_freq = scan_min_freq
+
+            scan_max_freq = scan_params[2]
+            try:
+                self.scan_max_freq = float(scan_max_freq)
+            except ValueError:
+                self.log.warn('Could not interpret scan maximum frequency')
+                self.scan_max_freq = scan_max_freq
+
+            scan_step = scan_params[3]
+            try:
+                self.scan_step = abs(float(scan_step))
+                self.scan_direction = np.sign(scan_step)
+            except ValueError as e:
+                self.log.warn(e)
+                self.scan_step = scan_step
+                
+            
         self.initialized = True
 
         if params['auto_acquire']:
@@ -160,8 +201,14 @@ class FLSAgent:
                     {'set_frequency': 110.0,
                      'actual_frequency': 109.3425,
                      'photocurrent': 0.1124,
-                     'bias_voltage': 1.50,
-                     'bias_offset': -0.50,
+                     'bias_voltage': 0.999834227,
+                     'bias_offset': -0.498235892,
+                     'lasers_on': True,
+                     'scan_mode': 'fast',
+                     'scan_min_frequency': 120.0,
+                     'scan_max_frequency': 180.0,
+                     'scan_step': 0.05,
+                     'scan_direction': 1,
                      'timestamp': 1771277799.562098}
         """
         with self.lock.acquire_timeout(0, job='acq') as acquired:
@@ -197,6 +244,14 @@ class FLSAgent:
 
                 self.set_freq = data['set_frequency']
                 self.actual_freq = data['actual_frequency']
+                self.tx_bias_amp = data['bias_voltage']
+                self.tx_bias_offset = data['bias_offset']
+                self.scan_mode = data['scan_mode']
+                self.scan_min_freq = data['scan_min_frequency']
+                self.scan_max_freq = data['scan_max_frequency']
+                self.scan_step = data['scan_step']
+                self.scan_direction = data['scan_direction']
+                self.lasers_on = data['lasers_on']
 
                 sampling_data = {}
                 for key, val in data.items():
@@ -247,24 +302,29 @@ class FLSAgent:
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
         
-            laser_status = self.dlcsmart.check_laser_emission()
-            if "#t" in laser_status:
+#            laser_status = self.dlcsmart.check_laser_emission()
+            laser_status = self.lasers_on
+            if laser_status == True:
                 self.log.info('Current laser state is on.')
                 on_off = 'on'
-            elif "#f" in laser_status:
+            elif laser_status == False:
                 self.log.info('Current laser state is off.')
                 on_off = 'off'
             if on_off == state:
                 return True, f"Laser is already {state}"
 
-            bias_amp, bias_offset = self.dlcsmart.check_bias()
+#            bias_amp, bias_offset = self.dlcsmart.check_bias()
+            bias_amp = self.bias_amp
+            bias_offset = self.bias_offset
             if bias_amp != 0.0 or bias_offset != 0.0:
                 self.log.warn(f'Bias amplitude is {bias_amp} and bias offset '
                               f'is {bias_offset}. Setting bias to zero, then '
                               f'turning lasers {state}.')
                 self.dlcsmart.set_bias_to_zero()
-                time.sleep(0.01)
-                bias_amp, bias_offset = self.dlcsmart.check_bias()
+                time.sleep(0.3)
+#                bias_amp, bias_offset = self.dlcsmart.check_bias()
+                bias_amp = self.bias_amp
+                bias_offset = self.bias_offset
                 if bias_amp != 0.0 or bias_offset != 0.0:
                     return False, "Bias could not be set to zero so did not toggle laser power."
 
@@ -281,13 +341,12 @@ class FLSAgent:
                 change_state = self.dlcsmart.laser_emission_on()
             elif state == 'off':
                 change_state = self.dlcsmart.laser_emission_off()
-            time.sleep(0.01)
-            laser_status = self.dlcsmart.check_laser_emission()
-            if "#t" in laser_status:
-                self.lasers_on = True
+            time.sleep(0.3)
+#            laser_status = self.dlcsmart.check_laser_emission()
+            laser_status = self.lasers_on
+            if laser_status == True:
                 return True, "Lasers turned on"
-            elif "#f" in laser_status:
-                self.lasers_on = False
+            elif laser_status == False:
                 return True, "Lasers turned off"
 
     
@@ -314,8 +373,10 @@ class FLSAgent:
                 self.dlcsmart.set_bias_to_zero()
             elif bias_to_set == 'default':
                 self.dlcsmart.set_bias_to_default()
-            time.sleep(0.01)
-            check_bias_amp, check_bias_offset = self.dlcsmart.check_bias()
+            time.sleep(0.3)
+#            check_bias_amp, check_bias_offset = self.dlcsmart.check_bias()
+            check_bias_amp = self.bias_amp
+            check_bias_offset = self.bias_offset
             if bias_to_set == 'zero' and (check_bias_amp, check_bias_offset) == (0., 0.):
                 self.log.info('Bias successfully set to zero.')
             elif bias_to_set == 'default' and round(check_bias_amp, 1) == 1.0 and round(check_bias_offset, 1) == -0.5:
@@ -358,7 +419,7 @@ class FLSAgent:
             # Check to see when the actual frequency gets 'close enough' to the set frequency
 #            while round(actual_frequency) != round(set_frequency):
             while not _within(actual_frequency, set_frequency):
-                time.sleep(1)
+                time.sleep(0.3)
 #                actual_frequency = self.dlcsmart.get_actual_frequency()
                 actual_frequency = self.actual_freq
                 self.log.info(f"Frequency is {round(actual_frequency, 2)} GHz")

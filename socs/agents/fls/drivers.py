@@ -304,25 +304,62 @@ class DLCSmart(TCPInterface):
 
     def sampling(self):
         """
-        Query the set frequency (GHz), actual frequency (GHz), photocurrent (nA), 
-        bias voltage (V), and bias offset (V).
+        Query the following values:
+          - Set frequency (GHz)
+          - Actual frequency (GHz)
+          - Photocurrent (nA)
+          - Bias voltage (V)
+          - Bias offset (V)
+          - Laser emission on (boolean)
+          - Scan mode ('fast' or 'precise')
+          - Scan minimum frequency (GHz)
+          - Scan maximum frequency (GHz)
+          - Scan step size (GHz)
+          - Scan direction (1 for increasing frequency, -1 for decreasing frequency)
         For general monitoring purposes.
         """
         reset = self.command("lockin:lock-in-reset")
         time.sleep(0.3)
+
+        # Photocurrent
         photocurrent = self.param_ref("lockin:lock-in-value-nanoamp")
         if '#t' in photocurrent:
             photocurrent = photocurrent.strip('(').strip(' #t)')
         else:
             photocurrent = 'nan'
+
+        # Set and actual frequency
         set_frequency = self.param_ref("frequency:frequency-set")
         act_frequency = self.param_ref("frequency:frequency-act")
+
+        # Bias voltage and offset
         bias = self.check_bias()
+
+        # Laser emission
+        laser_status = self.check_laser_emission()
+        if "#t" in laser_status:
+            lasers_on = True
+        elif "#f" in laser_status:
+            lasers_on = False
+
+        # Scan parameters
+        scan_params = self.check_scan_params()
+        if "#t" in scan_params[0]:
+            scan_mode = 'fast'
+        elif "#f" in scan_params[0]:
+            scan_mode = 'precise'
+        
         value_dict = {'set_frequency': float(set_frequency),
                       'actual_frequency': float(act_frequency),
                       'photocurrent': float(photocurrent),
                       'bias_voltage': float(bias[0]),
                       'bias_offset': float(bias[1]),
+                      'lasers_on': lasers_on,
+                      'scan_mode': scan_mode,
+                      'scan_min_frequency': float(scan_params[1]),
+                      'scan_max_frequency': float(scan_params[2]),
+                      'scan_step': abs(scan_params[3]),
+                      'scan_direction': np.sign(scan_params[3])
                       }
         return value_dict
 
