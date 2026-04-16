@@ -2440,7 +2440,7 @@ class ACUAgent:
         # (The cost is that stopping a scan may take a little longer.)
         MIN_STACK_ADVANCE_TIME = 3.
 
-        # Minimum nuber of points to keep in the stack.
+        # Minimum number of points to keep in the stack.
         _pbc = max(MIN_STACK_POP, MIN_STACK_ADVANCE_TIME / step_time)
         if point_batch_count is None or _pbc > point_batch_count:
             point_batch_count = _pbc
@@ -2597,13 +2597,13 @@ class ACUAgent:
                     while len(lines) and len(upload_lines) and upload_lines[-1].group_flag != 0:
                         upload_lines.append(lines.pop(0))
 
-                    # If there are any upcoming points left with timestamps < 3 step_times, transfer them in.
+                    # If there are any upcoming points left with timestamps the MIN_STACK_ADVANCE_TIME transfer them in.
                     # This prevents the update_line from running out of points
                     # if points are generated faster than the step_time.
                     # This mainly happens with the new turnaround functions that need to generate points
                     # with step_times << 1.0s.
                     first_upload_timestamp = upload_lines[0].timestamp
-                    while len(lines) and (lines[0].timestamp - first_upload_timestamp) < 3 * step_time:
+                    while len(lines) and (lines[0].timestamp - first_upload_timestamp) < MIN_STACK_ADVANCE_TIME:
                         upload_lines.append(lines.pop(0))
 
                     if len(upload_lines):
