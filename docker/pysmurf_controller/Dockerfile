@@ -1,10 +1,10 @@
-FROM simonsobs/so_smurf_base:v0.0.8
+FROM simonsobs/so_smurf_base:rogue6-d96b7b
 
 #################################################################
 # sodetlib Install
 #################################################################
 WORKDIR /
-RUN git clone --branch v0.6.4 --depth 1 https://github.com/simonsobs/sodetlib.git
+RUN git clone --branch tpm/rogue6 --depth 1 https://github.com/simonsobs/sodetlib.git
 # allow versioneer to determine sodetlib version safely
 USER cryo
 RUN git config --global --add safe.directory /sodetlib
@@ -19,7 +19,7 @@ ENV OCS_CONFIG_DIR=/config
 ENV PYTHONUNBUFFERED=1
 
 # SOCS installation
-RUN python3 -m pip install git+https://github.com/simonsobs/socs.git@main
+RUN python3 -m pip install git+https://github.com/simonsobs/socs.git@tpm/rogue6
 
 RUN python3 -m pip install dumb-init
 
