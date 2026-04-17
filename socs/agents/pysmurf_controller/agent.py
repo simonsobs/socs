@@ -21,7 +21,12 @@ from ocs.ocs_agent import log_formatter
 from ocs.ocs_twisted import TimeoutLock
 from sodetlib.det_config import DetConfig
 from sodetlib.operations import bias_dets
-from pyrogue.interfaces import VirtualClient
+
+# only need this for Rssi restart
+try:
+    from pyrogue.interfaces import VirtualClient
+except ModuleNotFoundError:
+    print("pyrogue is not installed. restart_rssi not available.")
 
 from socs.agents.pysmurf_controller.smurf_subprocess_util import (
     QuantileData, RunCfg, RunResult, run_smurf_func)
