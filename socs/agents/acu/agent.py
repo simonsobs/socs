@@ -3,6 +3,7 @@ import os
 import random
 import signal
 import struct
+import threading
 import time
 from enum import Enum
 
@@ -361,6 +362,12 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False)
 
+        agent.register_process('monitor_threads',
+                               self.monitor_threads,
+                               self._simple_process_stop,
+                               blocking=False,
+                               startup=startup)
+
         basic_agg_params = {'frame_length': 60}
         fullstatus_agg_params = {'frame_length': 60,
                                  'exclude_influx': True,
@@ -492,6 +499,22 @@ class ACUAgent:
             os.kill(os.getpid(), sig)
             yield dsleep(10.)
         session.add_message('I am not quite dead.')
+        return False, "Failed to die."
+
+    @ocs_agent.param('_')
+    @inlineCallbacks
+    def monitor_threads(self, session, params):
+        pool = reactor.getThreadPool()
+        last_tx = None
+        last_t = time.time()
+        while session.status in ['running']:
+            new_tx = f'tpool size={len(pool.threads)},idle={len(pool.waiters)},pthreads={threading.active_count()}'
+            if new_tx != last_tx or time.time() > last_t - 1800:
+                session.add_message(new_tx)
+                last_tx = new_tx
+                last_t = time.time()
+            yield dsleep(1)
+
         return False, "Failed to die."
 
     @ocs_agent.param('_')
