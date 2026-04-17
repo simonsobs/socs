@@ -1,5 +1,7 @@
 import argparse
+import os
 import random
+import signal
 import struct
 import time
 from enum import Enum
@@ -447,6 +449,9 @@ class ACUAgent:
                             self.escape_sun_now,
                             blocking=False,
                             aborter=self._simple_task_abort)
+        agent.register_task('die',
+                            self.die,
+                            blocking=False)
         if self.datasets['shutter']:
             agent.register_task('set_shutter',
                                 self.set_shutter,
@@ -478,6 +483,16 @@ class ACUAgent:
     def _simple_process_stop(self, session, params):
         # Trigger a process stop by updating state to "stopping"
         yield session.set_status('stopping')
+
+    @ocs_agent.param('_')
+    @inlineCallbacks
+    def die(self, session, params):
+        for sig in [signal.SIGINT, signal.SIGTERM, signal.SIGKILL]:
+            session.add_message(f'Sending signal {sig.name} ...')
+            os.kill(os.getpid(), sig)
+            yield dsleep(10.)
+        session.add_message('I am not quite dead.')
+        return False, "Failed to die."
 
     @ocs_agent.param('_')
     @inlineCallbacks
@@ -1468,7 +1483,7 @@ class ACUAgent:
             # Main state machine
             if state == State.INIT:
                 # Set target position and change mode to Preset.
-                ## It must have stalled here, or else on the get_mode / get_active after going to "WAIT_
+                # It must have stalled here, or else on the get_mode / get_active after going to "WAIT_
                 result = yield ctrl.goto(target)
                 if result in OK_RESPONSES:
                     state = State.WAIT_MOVING
