@@ -321,8 +321,33 @@ class PysmurfController:
                 'num_active_channels': Number of channels outputting tones
             }
         """
-        S, cfg = self._get_smurf_control(load_tune=False, no_dir=True)
-        reg = sdl.Registers(S)
+
+        # =========================================================================
+        # THIS IS A HACK
+        # the pyrogue.interfaces.VirtualClient caches clients, which means that
+        # all ZMQ clients in this namespace for a given server will share the same
+        # socket, which is not thread-safe. All of the operations in this agent are
+        # protected by a mutex lock, except for this one. We need to ensure that it
+        # gets its own socket to avoid conflicting with the others.
+        # There is an issue in rogue to fix this in the client.
+
+        # this is blocking
+        with self.lock.acquire_timeout(-1, job='check_state') as acquired:
+            try:
+                # First back up and clear the cache
+                client_cache = VirtualClient.ClientCache.copy()
+                VirtualClient.ClientCache = {}
+                # now when we get a client it will be a new socket
+                S, cfg = self._get_smurf_control(load_tune=False, no_dir=True)
+                reg = sdl.Registers(S)
+                # restore original cache, not including new client
+                VirtualClient.ClientCache = client_cache
+            except NameError:
+                print("pyrogue is not installed. skipping client cache hack.")
+                # probably in CI, so skip this
+                S, cfg = self._get_smurf_control(load_tune=False, no_dir=True)
+                reg = sdl.Registers(S)
+        # =========================================================================
 
         kw = {}
         while session.status in ['starting', 'running']:
