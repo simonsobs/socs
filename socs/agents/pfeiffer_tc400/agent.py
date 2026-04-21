@@ -106,6 +106,8 @@ class PfeifferTC400Agent:
                     "Turbo_Motor_Temp": 32,
                     "Rotation_Speed": 819,
                     "Acceleration": 60,
+                    "Power_Consumption": 100,
+                    "Nominal_Speed_Confirmation": 860,
                     "Error_Code": "Err001",
                 }
             }
@@ -138,6 +140,8 @@ class PfeifferTC400Agent:
                         data['data']["Turbo_Motor_Temp"] = self.turbo.get_turbo_motor_temperature()
                         data['data']["Rotation_Speed"] = self.turbo.get_turbo_actual_rotation_speed()
                         data['data']["Acceleration"] = self.turbo.get_turbo_acceleration()
+                        data['data']["Power_Consumption"] = self.turbo.get_turbo_power_consumption()
+                        data['data']["Nominal_Speed_Confirmation"] = self.turbo.get_turbo_nominal_speed_confirmation()
                         data['data']['Error_Code'] = self.turbo.get_turbo_error_code()
 
                     except ValueError as e:
@@ -226,6 +230,50 @@ class PfeifferTC400Agent:
 
         return True, 'Acknowledged Turbo Errors.'
 
+    @ocs_agent.param('parameter_number', default=-1, type=int)
+    def query_parameter(self, session, params):
+        """query_parameter()
+
+        **Task** - Queries the turbo for the value of a user-defined
+        parameter number.
+
+        """
+        with self.lock.acquire_timeout(1) as acquired:
+            if acquired:
+                parameter_number = params.get('parameter_number')
+                if parameter_number == -1:
+                    return False, "Invalid Parameter Number"
+
+                return self.turbo.query_parameter(parameter_number)
+            else:
+                return False, "Could not acquire lock"
+
+        return True, 'Acknowledged Turbo Errors.'
+
+    @ocs_agent.param('parameter_number', default=-1, type=int)
+    @ocs_agent.param('set_value', default=None)
+    def set_parameter(self, session, params):
+        """acknowledge_turbo_errors()
+
+        **Task** - Attempts to set the parameter number to the user-defined
+        set_value.
+
+        """
+        with self.lock.acquire_timeout(1) as acquired:
+            if acquired:
+                parameter_number = params.get('parameter_number')
+                set_value = params.get('set_value')
+                if parameter_number == -1:
+                    return False, "Invalid Parameter Number"
+                if set_value is None:
+                    return False, "Parameter Number cannot be None."
+
+                return self.turbo.set_parameter(parameter_number, set_value)
+            else:
+                return False, "Could not acquire lock"
+
+        return True, 'Acknowledged Turbo Errors.'
+
 
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically
@@ -275,6 +323,8 @@ def main(args=None):
     agent.register_task('turn_turbo_on', p.turn_turbo_on)
     agent.register_task('turn_turbo_off', p.turn_turbo_off)
     agent.register_task('acknowledge_turbo_errors', p.acknowledge_turbo_errors)
+    agent.register_task('query_parameter', p.query_parameter)
+    agent.register_task('set_parameter', p.set_parameter)
     agent.register_process('acq', p.acq, p._stop_acq)
 
     runner.run(agent, auto_reconnect=True)

@@ -51,12 +51,43 @@ class PfeifferTC400:
 
         self.turbo_address = turbo_address
 
+    def query_parameter(self, parameter_number):
+        """Queries the value of the user defined parameter_number.
+
+        Returns:
+            Varies
+                Turbo response to desired parameter number query. Varies between int, bool, float, and str
+                depending on parameter.
+        """
+
+        send_data_request(self.ser, self.turbo_address, parameter_number)
+        addr, rw, param_num, parameter_response = read_gauge_response(self.ser)
+
+        return parameter_response
+
+    def set_parameter(self, parameter_number, set_value):
+
+        """Sets the set_value to the user defined parameter_number.
+
+        Returns:
+            Bool / str:
+                True: Success
+                False: Failure
+                Str: Other response from turbo, usually an unreadable set_value error.
+        """
+
+        send_control_command(self.ser, self.turbo_address, parameter_number, set_value)
+
+        addr, rw, param_num, turbo_response = read_gauge_response(self.ser)
+
+        return turbo_response
+
     def get_turbo_drive_voltage(self):
         """Gets the drive voltage supplied to the turbo controller.
 
         Returns
         -------
-        int
+        float
             The drive voltage supplied to the turbo controller in Volts.
         """
 
@@ -71,7 +102,7 @@ class PfeifferTC400:
 
         Returns
         -------
-        int
+        float
             The drive current supplied to the turbo controller in Amps.
         """
 
@@ -223,6 +254,67 @@ class PfeifferTC400:
         addr, rw, param_num, error_code = read_gauge_response(self.ser)
 
         return error_code
+
+    def get_turbo_speed_set_mode(self):
+        """Gets the current rotation speed setting mode of the turbo.
+
+        Returns
+        -------
+        int
+            The current turbo rotation speed setting mode.
+                0 = Off
+                1 = On
+        """
+        send_data_request(self.ser, self.turbo_address, 26)
+
+        addr, rw, param_num, speed_set_mode = read_gauge_response(self.ser)
+
+        return speed_set_mode
+
+    def get_turbo_gas_mode(self):
+        """Gets the current gas mode of the turbo.
+
+        Returns
+        -------
+        int
+            The current turbo gas mode.
+                0 = Heavy Gase
+                1 = Light Gase
+                2 = Helium
+        """
+        send_data_request(self.ser, self.turbo_address, 27)
+
+        addr, rw, param_num, gas_mode = read_gauge_response(self.ser)
+
+        return gas_mode
+
+    def get_turbo_set_power_consumption(self):
+        """Gets the current set_power_consumption of the turbo in % from the turbo controller.
+
+        Returns
+        -------
+        int
+            The current set turbo power comsumption in %.
+        """
+        send_data_request(self.ser, self.turbo_address, 708)
+
+        addr, rw, param_num, power_consumption = read_gauge_response(self.ser)
+
+        return power_consumption
+
+    def get_turbo_nominal_speed_confirmation(self):
+        """Gets the current nominal rotational speed confirmation of the turbo in Hz.
+
+        Returns
+        -------
+        int
+            The nominal rotational speed confirmation of the turbo in Hz.
+        """
+        send_data_request(self.ser, self.turbo_address, 777)
+
+        addr, rw, param_num, nominal_speed_confirmation = read_gauge_response(self.ser)
+
+        return nominal_speed_confirmation
 
     def unready_turbo(self):
         """Unreadies the turbo. Does not cause the turbo to spin up.
