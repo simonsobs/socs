@@ -2565,8 +2565,16 @@ class ACUAgent:
                 if mode == 'abort':
                     lines = []
 
+                last_upload_size = 0
                 # Is it time to upload more lines?
-                if free_positions >= STACK_REFILL_THRESHOLD:
+                # STACK_REFILL_THRESHOLD is the absolute minimum number of points that can be in the stack
+                # based on the constant_velocity step_time.
+                # FULL_STACK - int(last_upload_size/2) is the minimum number of points that we should
+                # try to reupload based on the number of points in the last upload in case we uploaded
+                # points with a lower dt. We always add at least 2xMIN_STACK_ADVANCE_TIME worth of points,
+                # so this should attempt to always keep MIN_STACK_ADVANCE_TIME worth of points in the
+                # upload.
+                if free_positions >= min(STACK_REFILL_THRESHOLD, FULL_STACK - int(last_upload_size / 2)):
                     new_line_target = max(int(free_positions - STACK_TARGET), 1)
 
                     # Make sure that you get one more line than you
@@ -2603,8 +2611,11 @@ class ACUAgent:
                     # This mainly happens with the new turnaround functions that need to generate points
                     # with step_times << 1.0s.
                     first_upload_timestamp = upload_lines[0].timestamp
-                    while len(lines) and (lines[0].timestamp - first_upload_timestamp) < MIN_STACK_ADVANCE_TIME:
+                    while len(lines) and (lines[0].timestamp - first_upload_timestamp) < 2 * MIN_STACK_ADVANCE_TIME:
                         upload_lines.append(lines.pop(0))
+
+                    # The total number of points we just uploaded is at least 2x the number of points we want.
+                    last_upload_size = len(upload_lines)
 
                     if len(upload_lines):
                         # Discard the group flag and upload all.
