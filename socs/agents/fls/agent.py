@@ -350,13 +350,13 @@ class FLSAgent:
             elif state == 'off':
                 change_state = self.dlcsmart.laser_emission_off()
             time.sleep(0.3)
-#            laser_status = self.dlcsmart.check_laser_emission()
-            laser_status = self.lasers_on
-            if laser_status == True:
+            laser_status = self.dlcsmart.check_laser_emission()
+            if "#t" in laser_status:
+                self.lasers_on = True
                 return True, "Lasers turned on"
-            elif laser_status == False:
+            elif "#f" in laser_status:
+                self.lasers_on = False
                 return True, "Lasers turned off"
-
     
     @ocs_agent.param('bias', type=str, choices=['default', 'zero'])
     def set_bias(self, session, params):
@@ -411,9 +411,8 @@ class FLSAgent:
         """
         set_frequency(frequency)
 
-        ***Task*** - Set the frequency of the laser system, and wait until the system
-                     reaches that frequency. Frequency must be between 20 GHz and
-                     880 GHz.
+        ***Task*** - Set the frequency of the laser system. Frequency must be
+                     between 20 GHz and 880 GHz.
 
         Parameters:
             frequency (float): The frequency to set the laser to.
@@ -435,33 +434,35 @@ class FLSAgent:
 
             # Set the new frequency
             set_the_freq = self.dlcsmart.set_frequency(set_frequency)
+            if set_the_freq == '0':
+                return True, f"Frequency set to {set_frequency} in the DLC Smart."
 
             # Check to see when the actual frequency gets 'close enough' to the set frequency
 #            while round(actual_frequency) != round(set_frequency):
-            while not _within(actual_frequency, set_frequency):
-                time.sleep(0.3)
+#            while not _within(actual_frequency, set_frequency):
+#                time.sleep(0.3)
 #                actual_frequency = self.dlcsmart.get_actual_frequency()
-                actual_frequency = self.actual_freq
-                self.log.info(f"Frequency is {round(actual_frequency, 2)} GHz")
-            if _within(actual_frequency, set_frequency):
-                time.sleep(2)
-                actual_frequency = self.actual_freq
+#                self.actual_freq = actual_frequency
+#                self.log.info(f"Frequency is {round(actual_frequency, 2)} GHz")
+#            if _within(actual_frequency, set_frequency):
+#                time.sleep(0.3)
 #                actual_frequency = self.dlcsmart.get_actual_frequency()
-                self.log.info(f"Frequency is {round(actual_frequency, 2)} GHz")
+#                self.actual_freq = actual_frequency
+#                self.log.info(f"Frequency is {round(actual_frequency, 2)} GHz")
 #                while actual_frequency < (set_frequency - precision) or actual_frequency > (set_frequency + precision):
-                while not _within(actual_frequency, set_frequency):
-                    time.sleep(1)
+#                while not _within(actual_frequency, set_frequency):
+#                    time.sleep(1)
 #                    actual_frequency = self.dlcsmart.get_actual_frequency()
-                    actual_frequency = self.actual_freq
-                    self.log.info(f"Frequency is {round(actual_frequency, 2)}, GHz")
-
-        return True, f"Set frequency to {set_frequency} GHz"
+#                    self.actual_freq = actual_frequency
+#                    self.log.info(f"Frequency is {round(actual_frequency, 2)}, GHz")
+#
+#        return True, f"Set frequency to {set_frequency} GHz"
 
     @ocs_agent.param('min_frequency', type=float)
     @ocs_agent.param('max_frequency', type=float)
     @ocs_agent.param('start_direction', type=int, choices=[-1,1])
     @ocs_agent.param('frequency_step', type=float, default=0.05)
-    @ocs_agent.param('num_of_sweeps', type=int, default=1)
+#    @ocs_agent.param('num_of_sweeps', type=int, default=1)
     def run_frequency_sweeps(self, session, params):
         """
         run_frequency_sweeps(min_frequency, max_frequency, start_direction,
@@ -486,7 +487,7 @@ class FLSAgent:
         max_freq = params['max_frequency']
         start_dir = params['start_direction']
         freq_step = params['frequency_step']
-        nsweeps = params['num_of_sweeps']
+#        nsweeps = params['num_of_sweeps']
 
         assert min_freq < max_freq, "max_freq must be greater than min_freq!"
         assert min_freq >= MIN_FREQ, f"min_freq must be at least {MIN_FREQ} GHz."
@@ -496,19 +497,24 @@ class FLSAgent:
         assert freq_step >= 0.01, "minimum step size is 0.01 GHz."
         assert start_dir in (-1, 1), "Choose start_dir=1 (increasing) or -1 (decreasing)"
  
-        scan_precision = freq_step
+#        scan_precision = freq_step
         fls = self
-        self.take_data = False
-        time.sleep(10)
+#        self.take_data = False
 
-        with self.lock.acquire_timeout(0, job='run_frequency_sweeps') as acquired:
+#        with self.lock.acquire_timeout(0, job='run_frequency_sweeps') as acquired:
+#            if not acquired:
+#                self.log.warn(f"Could not start run_frequency_sweeps because {self.lock.job} "
+#                              "is already running")
+#                return False, "Could not acquire lock."
+
+        with self.lock.acquire_timeout(timeout=12, job='set_frequency') as acquired:
             if not acquired:
-                self.log.warn(f"Could not start run_frequency_sweeps because {self.lock.job} "
-                              "is already running")
-                return False, "Could not acquire lock."
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
 
             self.log.info(f'Scan called with min frequency {min_freq}, max frequency {max_freq}, '
-                          f'start direction {start_dir}, freq step {freq_step}, and nsweeps {nsweeps}.')
+                          f'start direction {start_dir}, freq step {freq_step}.')
 
             self.dlcsmart.clear_scan_data()
             self.log.info("Cleared stored scan data from the DLC Smart memory")
@@ -525,114 +531,129 @@ class FLSAgent:
                 if max_freq != self.set_freq:
                     self.log.warn(f'Set frequency is {self.set_freq} and max_freq is {max_freq}.')
 
-            last_time = time.time()
-
+            self.dlcsmart.set_scan_params(min_freq, max_freq, freq_step, start_dir)
+            time.sleep(0.1)
+            csp = _check_scan_params(fls, min_freq, max_freq, freq_step, start_dir)
+            if not csp:
+                return False, "Could not correctly set scan params."
+            self.dlcsmart.start_scan()
+            return True, f"Started scan from {min_freq} GHz to {max_freq} GHz with step size {freq_step} and direction {start_dir}."
+#            last_time = time.time()
+#
 #            self.take_data = True
-            self.run_scan = True
-            self.take_data = True
 
-            pm = Pacemaker(1/3, quantize=False)
+#            pm = Pacemaker(1/5, quantize=False)
 #            while self.take_data:
-            while self.run_scan:
-                scan_iter = 0
-                pm.sleep()
-                if time.time() - last_time > 1:
-                    last_time = time.time()
-#                if not self.lock.release_and_acquire(timeout=5):
+#            while self.run_scan:
+#                scan_iter = 0.
+#                pm.sleep()
+#                if time.time() - last_time > 1:
+#                    last_time = time.time()
+##                if not self.lock.release_and_acquire(timeout=5):
+##                    self.log.warn(f"run_frequency_sweeps: Failed to re-acquire sampling lock, "
+##                                  f"currently held by {self.lock.job}.")
+##                    continue
+#                print(scan_iter, nsweeps)
+#                while scan_iter < nsweeps:
+#                    print(scan_iter, nsweeps)
+#                    self.dlcsmart.set_scan_params(min_freq, max_freq, freq_step, start_dir)
+##                    csp = _check_scan_params(fls, min_freq, max_freq, freq_step, start_dir)
+##                    if not csp:
+##                        return False, "Could not correctly set scan params."
+#                    self.dlcsmart.start_scan()
+#
+#                    act_freq = self.actual_freq
+#
+#                    while _within(act_freq, min_freq) or _within(act_freq, max_freq):
+#                        act_freq = self.actual_freq
+#                        self.log.info(f"Frequency is {act_freq}, so scan has not started.")
+#                        try:
+#                            data = self.dlcsmart.sampling()
+#                            print(data)
+#                            if session.degraded:
+#                                self.log.info("Connection re-established.")
+#                                session.degraded = False
+#                        except ConnectionError:
+#                            self.log.error("Failed to get data from DLC Smart. Check network connection")
+#                            session.degraded = True
+#                            time.sleep(1)
+#                            continue
+#
+#                        self.set_freq = data['set_frequency']
+#                        self.actual_freq = data['actual_frequency']
+#
+#                        sampling_data = {}
+#                        for key, val in data.items():
+#                            sampling_data[key] = val
+#
+#                        session.data = {"scan_sampling_data": sampling_data,
+#                                        "timestamp": time.time()}
+#
+#                        pub_data = {'timestamp': time.time(),
+#                                    'block_name': 'scan_sampling_data',
+#                                    'data': sampling_data}
+#
+#                        print(pub_data)
+#
+#                        self.agent.publish_to_feed('scan_sampling_data', pub_data)
+#                        time.sleep(1)
+#                        if not _within(act_freq, min_freq) and not _within(act_freq, max_freq):
+#                            break
+#
+#                    while not _within(act_freq, min_freq) and not _within(act_freq, max_freq):
+#                        self.log.info("Scan is still running.")
+#                        try:
+#                            data = self.dlcsmart.sampling()
+#                            if session.degraded:
+#                                self.log.info("Connection re-established.")
+#                                session.degraded = False
+#                        except ConnectionError:
+#                            self.log.error("Failed to get data from DLC Smart. Check network connection")
+#                            session.degraded = True
+#                            time.sleep(1)
+#                            continue
+#
+#                        self.set_freq = data['set_frequency']
+#                        self.actual_freq = data['actual_frequency']
+#
+#                        print(self.set_freq, self.actual_freq, act_freq)
+#                        sampling_data = {}
+#                        for key, val in data.items():
+#                            sampling_data[key] = val
+#
+#                        session.data = {"scan_sampling_data": sampling_data,
+#                                        "timestamp": time.time()}
+#
+#                        pub_data = {'timestamp': time.time(),
+#                                    'block_name': 'scan_sampling_data',
+#                                    'data': sampling_data}
+#
+#                        self.agent.publish_to_feed('scan_sampling_data', pub_data)
+#
+#                        act_freq = self.actual_freq
+#
+#                        if _within(act_freq, min_freq) or _within(act_freq, max_freq):
+#                            break
+#
+#                    self.log.info(f'Scan iteration number {scan_iter} completed. Waiting for scan_end call.')
+#
+#                    self.dlcsmart.stop_scan()
+#                    self.log.info('Stop_scan called.')
+#                    self.log.info(f'Completed scan iteration number {scan_iter}.')
+#                    if scan_iter < nsweeps:
+#                        scan_iter += 1
+#                    if scan_iter < nsweeps:
+#                        start_dir = -1 * start_dir
+#
+#                if not self.lock.release_and_acquire(timeout=12):
 #                    self.log.warn(f"run_frequency_sweeps: Failed to re-acquire sampling lock, "
 #                                  f"currently held by {self.lock.job}.")
-#                    continue
-
-                while scan_iter < nsweeps:
-                    self.dlcsmart.set_scan_params(min_freq, max_freq, freq_step, start_dir)
-                    csp = _check_scan_params(fls, min_freq, max_freq, freq_step, start_dir)
-                    if not csp:
-                        return False, "Could not correctly set scan params."
-                    self.dlcsmart.start_scan()
-
-                    act_freq = self.actual_freq
-
-                    while _within(act_freq, min_freq) or _within(act_freq, max_freq):
-                        act_freq = self.actual_freq
-                        self.log.info(f"Frequency is {act_freq}, so scan has not started.")
-                        try:
-                            data = self.dlcsmart.sampling()
-                            print(data)
-                            if session.degraded:
-                                self.log.info("Connection re-established.")
-                                session.degraded = False
-                        except ConnectionError:
-                            self.log.error("Failed to get data from DLC Smart. Check network connection")
-                            session.degraded = True
-                            time.sleep(1)
-                            continue
-
-                        self.set_freq = data['set_frequency']
-                        self.actual_freq = data['actual_frequency']
-
-                        sampling_data = {}
-                        for key, val in data.items():
-                            sampling_data[key] = val
-
-                        session.data = {"scan_sampling_data": sampling_data,
-                                        "timestamp": time.time()}
-
-                        pub_data = {'timestamp': time.time(),
-                                    'block_name': 'scan_sampling_data',
-                                    'data': sampling_data}
-
-                        print(pub_data)
-
-                        self.agent.publish_to_feed('scan_sampling_data', pub_data)
-
-                    while not _within(act_freq, min_freq+scan_precision) and not _within(act_freq, max_freq-scan_precision):
-                        self.log.info("Scan is still running.")
-                        try:
-                            data = self.dlcsmart.sampling()
-                            if session.degraded:
-                                self.log.info("Connection re-established.")
-                                session.degraded = False
-                        except ConnectionError:
-                            self.log.error("Failed to get data from DLC Smart. Check network connection")
-                            session.degraded = True
-                            time.sleep(1)
-                            continue
-
-                        self.set_freq = data['set_frequency']
-                        self.actual_freq = data['actual_frequency']
-
-                        print(self.set_freq, self.actual_freq, act_freq)
-                        sampling_data = {}
-                        for key, val in data.items():
-                            sampling_data[key] = val
-
-                        session.data = {"scan_sampling_data": sampling_data,
-                                        "timestamp": time.time()}
-
-                        pub_data = {'timestamp': time.time(),
-                                    'block_name': 'scan_sampling_data',
-                                    'data': sampling_data}
-
-                        self.agent.publish_to_feed('scan_sampling_data', pub_data)
-
-                        act_freq = self.actual_freq
-
-                    self.log.info(f'Scan iteration number {scan_iter} completed. Waiting for scan_end call.')
-
-                    self.dlcsmart.stop_scan()
-                    self.log.info('Completed scan iteration number {scan_iter}.')
-                    start_dir = -1 * start_dir
-                    scan_iter += 1
-
-                if not self.lock.release_and_acquire(timeout=12):
-                    self.log.warn(f"run_frequency_sweeps: Failed to re-acquire sampling lock, "
-                                  f"currently held by {self.lock.job}.")
-
-        self.agent.feeds['scan_sampling_data'].flush_buffer()
-        self.run_sweep = False
-        self.dlcsmart.stop_scan()
-        return True, "Frequency scan completed."
-
+#
+#        self.agent.feeds['scan_sampling_data'].flush_buffer()
+#        self.run_sweep = False
+#        self.dlcsmart.stop_scan()
+#        return True, "Frequency scan completed."
+#
 
 #        with self.lock.acquire_timeout(timeout=12, job='run_frequency_sweeps') as acquired:
 #            if not acquired:
@@ -692,15 +713,25 @@ class FLSAgent:
 #            self.log.info("Frequency sweeps completed")
 #            return True, f"Completed {i} frequency sweeps"
 
-    def _stop_freq_sweep(self, session, params):
-        """         
-        Stops run_frequency_sweeps process.
-        """             
-        if self.run_sweep:
-            self.run_sweep = False
-            return True, 'Requested to stop running a frequency sweep.'
-        else:
-            return False, 'run_frequency_sweeps is not currently running.'
+#    def _stop_freq_sweep(self, session, params):
+#        """         
+#        Stops run_frequency_sweeps process.
+#        """             
+#        if self.run_sweep:
+#            self.run_sweep = False
+#            return True, 'Requested to stop running a frequency sweep.'
+#        else:
+#            return False, 'run_frequency_sweeps is not currently running.'
+
+    @ocs_agent.param("_")
+    def stop_frequency_sweep(self, agent, params):
+        with self.lock.acquire_timeout(timeout=12, job='set_frequency') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+            self.dlcsmart.stop_scan()
+        return True, "Sent stop scan to the DLC Smart."
 
 def make_parser(parser=None):
     """
@@ -738,8 +769,9 @@ def main(args=None):
     agent.register_task('toggle_laser_power', fls_agent.toggle_laser_power)
     agent.register_task('set_bias', fls_agent.set_bias)
     agent.register_task('set_frequency', fls_agent.set_frequency)
-#    agent.register_task('run_frequency_sweeps', fls_agent.run_frequency_sweeps)
-    agent.register_process('run_frequency_sweeps', fls_agent.run_frequency_sweeps, fls_agent._stop_freq_sweep)#, blocking=False)
+    agent.register_task('run_frequency_sweeps', fls_agent.run_frequency_sweeps)
+#    agent.register_process('run_frequency_sweeps', fls_agent.run_frequency_sweeps, fls_agent._stop_freq_sweep)#, blocking=False)
+    agent.register_task('stop_frequency_sweep', fls_agent.stop_frequency_sweep)
     agent.register_process('acq', fls_agent.acq, fls_agent._stop_acq)#, blocking=False)
 
     runner.run(agent, auto_reconnect=True)
