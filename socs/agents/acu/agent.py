@@ -494,7 +494,7 @@ class ACUAgent:
     @ocs_agent.param('_')
     @inlineCallbacks
     def die(self, session, params):
-        for sig in [signal.SIGINT, signal.SIGTERM, signal.SIGKILL]:
+        for sig in [signal.SIGTERM, signal.SIGKILL]:
             session.add_message(f'Sending signal {sig.name} ...')
             os.kill(os.getpid(), sig)
             yield dsleep(10.)
@@ -509,7 +509,7 @@ class ACUAgent:
         last_t = time.time()
         while session.status in ['running']:
             new_tx = f'tpool size={len(pool.threads)},idle={len(pool.waiters)},pthreads={threading.active_count()}'
-            if new_tx != last_tx or time.time() > last_t - 1800:
+            if new_tx != last_tx or time.time() - last_t > 1800:
                 session.add_message(new_tx)
                 last_tx = new_tx
                 last_t = time.time()
