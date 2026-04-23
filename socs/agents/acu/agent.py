@@ -16,7 +16,7 @@ import yaml
 from autobahn.twisted.util import sleep as dsleep
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
-from soaculib.retwisted_backend import RetwistedHttpBackend
+from soaculib.retwisted_backend import RetwistedHttpBackend2
 from soaculib.twisted_backend import TwistedHttpBackend
 from twisted.internet import protocol, reactor, threads
 from twisted.internet.defer import DeferredList, inlineCallbacks
@@ -290,7 +290,8 @@ class ACUAgent:
         tclient._HTTP11ClientFactory.noisy = False
 
         self.acu_control = aculib.AcuControl(
-            acu_config, backend=RetwistedHttpBackend(persistent=False))
+            # acu_config, backend=RetwistedHttpBackend(persistent=False))
+            acu_config, backend=RetwistedHttpBackend2(persistent=True))
         self.acu_read = aculib.AcuControl(
             acu_config, backend=TwistedHttpBackend(persistent=True), readonly=True)
 
