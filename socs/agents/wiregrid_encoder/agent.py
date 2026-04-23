@@ -250,6 +250,10 @@ class WiregridEncoderAgent:
                         or (len(pru_clock)
                             and (current_time - time_encoder_published)
                             > SEC_ENCODER_TO_PUBLISH):
+                        enc_rdata = {
+                            'block_name': 'wgencoder_rough',
+                            'data': {}
+                        }
                         enc_rdata['timestamps'] = received_time_list
                         enc_rdata['data']['quadrature'] =\
                             quad_data[::COUNTER_INFO_LENGTH]
@@ -264,6 +268,10 @@ class WiregridEncoderAgent:
                         enc_rdata['data']['rotation_speed'] = rot_speed  # Hz
                         self.agent.publish_to_feed(
                             'wgencoder_rough', enc_rdata)
+                        enc_fdata = {
+                            'block_name': 'wgencoder_full',
+                            'data': {}
+                        }
                         enc_fdata['timestamps'] =\
                             count2time(pru_clock, received_time_list[0])
                         enc_fdata['data']['quadrature'] = quad_data
