@@ -175,7 +175,7 @@ class WiregridEncoderAgent:
                             'error': [],
                         }
                     }
-                
+
                 # Check current time
                 current_time = time.time()
 
