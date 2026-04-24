@@ -149,8 +149,8 @@ class WiregridEncoderAgent:
                 irig_fdata = {'timestamps': [],
                         'block_name': 'wgencoder_irig_raw',
                         'data': {
-                            'irig_synch_pulse_clock_time']: [],
-                            'irig_synch_pulse_clock_counts']: [],
+                            'irig_synch_pulse_clock_time': [],
+                            'irig_synch_pulse_clock_counts': [],
                             'irig_info': []
                         }
                     }
@@ -160,9 +160,9 @@ class WiregridEncoderAgent:
                         'data': {
                             'quadrature': [],
                             'pru_clock': [],
-                            'reference_degree': []
+                            'reference_degree':　[],
                             'error': [],
-                            'rotation_speed': [],
+                            'rotation_speed': []
                         }
                     }
                 enc_fdata = {
