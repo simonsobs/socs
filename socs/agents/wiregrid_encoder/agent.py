@@ -133,48 +133,48 @@ class WiregridEncoderAgent:
 
                 # Data container initialization in while loop
                 irig_rdata = {'timestamp': 0,
-                        'block_name': 'wgencoder_irig',
-                        'data': {
-                            'irig_time': 0,
-                            'rising_edge_count': 0,
-                            'edge_diff': 0,
-                            'irig_sec': 0,
-                            'irig_min': 0,
-                            'irig_hour': 0,
-                            'irig_day': 0,
-                            'irig_year': 0,
-                            'bbb_clock_freq': 0,
-                        }
-                    }
+                              'block_name': 'wgencoder_irig',
+                              'data': {
+                                  'irig_time': 0,
+                                  'rising_edge_count': 0,
+                                  'edge_diff': 0,
+                                  'irig_sec': 0,
+                                  'irig_min': 0,
+                                  'irig_hour': 0,
+                                  'irig_day': 0,
+                                  'irig_year': 0,
+                                  'bbb_clock_freq': 0,
+                              }
+                              }
                 irig_fdata = {'timestamps': [],
-                        'block_name': 'wgencoder_irig_raw',
-                        'data': {
-                            'irig_synch_pulse_clock_time': [],
-                            'irig_synch_pulse_clock_counts': [],
-                            'irig_info': []
-                        }
-                    }
+                              'block_name': 'wgencoder_irig_raw',
+                              'data': {
+                    'irig_synch_pulse_clock_time': [],
+                    'irig_synch_pulse_clock_counts': [],
+                    'irig_info': []
+                }
+                }
                 enc_rdata = {
-                        'timestamps': [],
-                        'block_name': 'wgencoder_rough',
-                        'data': {
-                            'quadrature': [],
-                            'pru_clock': [],
-                            'reference_degree':　[],
-                            'error': [],
-                            'rotation_speed': []
-                        }
+                    'timestamps': [],
+                    'block_name': 'wgencoder_rough',
+                    'data': {
+                        'quadrature': [],
+                        'pru_clock': [],
+                        'reference_degree': [],
+                        'error': [],
+                        'rotation_speed': []
                     }
+                }
                 enc_fdata = {
-                        'timestamps': [],
-                        'block_name': 'wgencoder_full',
-                        'data': {
-                            'quadrature': [],
-                            'pru_clock': [],
-                            'reference_count': [],
-                            'error': [],
-                        }
+                    'timestamps': [],
+                    'block_name': 'wgencoder_full',
+                    'data': {
+                        'quadrature': [],
+                        'pru_clock': [],
+                        'reference_count': [],
+                        'error': [],
                     }
+                }
 
                 # Check current time
                 current_time = time.time()
