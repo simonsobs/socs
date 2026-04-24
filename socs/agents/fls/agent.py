@@ -94,11 +94,6 @@ class FLSAgent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-        self.agent.register_feed('scan_sampling_data',
-                                 record=True,
-                                 agg_params=agg_params,
-                                 buffer_time=1)
-
     @ocs_agent.param('auto_acquire', type=bool, default=False)
     def initialize(self, session, params=None):
         """

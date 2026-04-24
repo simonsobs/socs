@@ -286,13 +286,6 @@ class DLCSmart(TCPInterface):
         resp = self.command("frequency:fast-scan-start")
         return resp
 
-    def clear_scan_data(self):
-        """
-        Clear the data from the most recent (prior or active) scan.
-        """
-        clear_data = self.command("frequency:fast-scan-clear-data")
-        return clear_data
-
     # queries and basic commands
     def get_actual_frequency(self):
         """
