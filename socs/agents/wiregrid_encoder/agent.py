@@ -115,39 +115,11 @@ class WiregridEncoderAgent:
                 return False, 'Could not acquire lock.'
 
             self.take_data = True
-            # Initialize data containers
+            # Initialize data containers and update times
             session.data = {'fields': {'irig_data': {}, 'encoder_data': {},
                             'timestamp': 0}}
-            irig_rdata = {'timestamp': 0,
-                          'block_name': 'wgencoder_irig',
-                          'data': {
-                              'irig_time': 0,
-                              'rising_edge_count': 0,
-                              'edge_diff': 0,
-                              'irig_sec': 0,
-                              'irig_min': 0,
-                              'irig_hour': 0,
-                              'irig_day': 0,
-                              'irig_year': 0,
-                          }
-                          }
             irig_last_updated = 0
-            irig_fdata = {'timestamps': [],
-                          'block_name': 'wgencoder_irig_raw',
-                          'data': {}
-                          }
-            enc_rdata = {
-                'timestamps': [],
-                'block_name': 'wgencoder_rough',
-                'data': {}
-            }
             enc_last_updated = 0
-            enc_fdata = {
-                'timestamps': [],
-                'block_name': 'wgencoder_full',
-                'data': {}
-            }
-
             # Loop
             while self.take_data:
 
@@ -159,6 +131,51 @@ class WiregridEncoderAgent:
                     with open('parse_error.log', 'a') as f:
                         traceback.print_exc(file=f)
 
+                # Data container initialization in while loop
+                irig_rdata = {'timestamp': 0,
+                        'block_name': 'wgencoder_irig',
+                        'data': {
+                            'irig_time': 0,
+                            'rising_edge_count': 0,
+                            'edge_diff': 0,
+                            'irig_sec': 0,
+                            'irig_min': 0,
+                            'irig_hour': 0,
+                            'irig_day': 0,
+                            'irig_year': 0,
+                            'bbb_clock_freq': 0,
+                        }
+                    }
+                irig_fdata = {'timestamps': [],
+                        'block_name': 'wgencoder_irig_raw',
+                        'data': {
+                            'irig_synch_pulse_clock_time']: [],
+                            'irig_synch_pulse_clock_counts']: [],
+                            'irig_info': []
+                        }
+                    }
+                enc_rdata = {
+                        'timestamps': [],
+                        'block_name': 'wgencoder_rough',
+                        'data': {
+                            'quadrature': [],
+                            'pru_clock': [],
+                            'reference_degree': []
+                            'error': [],
+                            'rotation_speed': [],
+                        }
+                    }
+                enc_fdata = {
+                        'timestamps': [],
+                        'block_name': 'wgencoder_full',
+                        'data': {
+                            'quadrature': [],
+                            'pru_clock': [],
+                            'reference_count': [],
+                            'error': [],
+                        }
+                    }
+                
                 # Check current time
                 current_time = time.time()
 
@@ -172,7 +189,6 @@ class WiregridEncoderAgent:
                     irig_info = irig_data[2]
                     synch_pulse_clock_counts = irig_data[3]
                     sys_time = irig_data[4]
-
                     irig_rdata['timestamp'] = sys_time
                     irig_rdata['data']['irig_time'] = irig_time
                     irig_rdata['data']['rising_edge_count'] = rising_edge_count
@@ -250,10 +266,6 @@ class WiregridEncoderAgent:
                         or (len(pru_clock)
                             and (current_time - time_encoder_published)
                             > SEC_ENCODER_TO_PUBLISH):
-                        enc_rdata = {
-                            'block_name': 'wgencoder_rough',
-                            'data': {}
-                        }
                         enc_rdata['timestamps'] = received_time_list
                         enc_rdata['data']['quadrature'] =\
                             quad_data[::COUNTER_INFO_LENGTH]
@@ -264,14 +276,10 @@ class WiregridEncoderAgent:
                              * 360 / COUNTS_ON_BELT).tolist()
                         enc_rdata['data']['error'] =\
                             error_flag[::COUNTER_INFO_LENGTH]
-
                         enc_rdata['data']['rotation_speed'] = rot_speed  # Hz
                         self.agent.publish_to_feed(
                             'wgencoder_rough', enc_rdata)
-                        enc_fdata = {
-                            'block_name': 'wgencoder_full',
-                            'data': {}
-                        }
+
                         enc_fdata['timestamps'] =\
                             count2time(pru_clock, received_time_list[0])
                         enc_fdata['data']['quadrature'] = quad_data
