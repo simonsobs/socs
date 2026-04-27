@@ -253,7 +253,7 @@ class DLCSmart(TCPInterface):
         resp = self.command("frequency:fast-scan-clear-data")
         return resp
 
-    def set_scan_params(self, freq_min, freq_max, freq_step, direction):
+    def set_scan_params(self, freq_min, freq_max, freq_step, direction, int_time):
         """
         Set all params to run a frequency sweep.
         """
@@ -262,14 +262,16 @@ class DLCSmart(TCPInterface):
         smin = self.param_set("frequency:frequency-min", freq_min)
         smax = self.param_set("frequency:frequency-max", freq_max)
         sstep = self.param_set("frequency:frequency-step", direction*freq_step)
+        sint = self.param_set("lockin:integration-time", int_time)
 
     def check_scan_params(self):
         fast = self.param_ref("frequency:scan-mode-fast")
         smin = self.param_ref("frequency:frequency-min")
         smax = self.param_ref("frequency:frequency-max")
         sstep = self.param_ref("frequency:frequency-step")
+        sint = self.param_ref("lockin:integration-time")
 
-        data = (fast, float(smin), float(smax), float(sstep))
+        data = (fast, float(smin), float(smax), float(sstep), float(sint)
         return data
 
     def stop_scan(self):
@@ -309,6 +311,7 @@ class DLCSmart(TCPInterface):
           - Scan maximum frequency (GHz)
           - Scan step size (GHz)
           - Scan direction (1 for increasing frequency, -1 for decreasing frequency)
+          - Scan integration time (ms)
         For general monitoring purposes.
         """
         reset = self.command("lockin:lock-in-reset")
@@ -341,7 +344,7 @@ class DLCSmart(TCPInterface):
             scan_mode = 'fast'
         elif "#f" in scan_params[0]:
             scan_mode = 'precise'
-        
+
         value_dict = {'set_frequency': float(set_frequency),
                       'actual_frequency': float(act_frequency),
                       'photocurrent': float(photocurrent),
@@ -352,7 +355,8 @@ class DLCSmart(TCPInterface):
                       'scan_min_frequency': float(scan_params[1]),
                       'scan_max_frequency': float(scan_params[2]),
                       'scan_step': abs(scan_params[3]),
-                      'scan_direction': int(np.sign(scan_params[3]))
+                      'scan_direction': int(np.sign(scan_params[3])),
+                      'integration_time': float(scan_params[4]),
                       }
         return value_dict
 
