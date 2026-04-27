@@ -118,10 +118,6 @@ class WiregridEncoderAgent:
             # Initialize data containers and update times
             session.data = {'fields': {'irig_data': {}, 'encoder_data': {},
                             'timestamp': 0}}
-            irig_last_updated = 0
-            enc_last_updated = 0
-
-            # Initialize data container for session.data
             irig_field_dict = {
                 'last_updated': 0,
                 'irig_time': 0,
@@ -140,6 +136,9 @@ class WiregridEncoderAgent:
                 'reference_degree': [],
                 'error': []
             }
+            irig_last_updated = 0
+            enc_last_updated = 0
+
             # Loop
             while self.take_data:
 
@@ -151,58 +150,37 @@ class WiregridEncoderAgent:
                     with open('parse_error.log', 'a') as f:
                         traceback.print_exc(file=f)
 
-                # Data container initialization
-                irig_rdata = {
-                    'timestamp': 0,
-                    'block_name': 'wgencoder_irig',
-                    'data': {
-                        'irig_time': 0,
-                        'rising_edge_count': 0,
-                        'edge_diff': 0,
-                        'irig_sec': 0,
-                        'irig_min': 0,
-                        'irig_hour': 0,
-                        'irig_day': 0,
-                        'irig_year': 0,
-                        'bbb_clock_freq': 0,
-                    }
-                }
-                irig_fdata = {
-                    'timestamps': [],
-                    'block_name': 'wgencoder_irig_raw',
-                    'data': {
-                        'irig_synch_pulse_clock_time': [],
-                        'irig_synch_pulse_clock_counts': [],
-                        'irig_info': []
-                    }
-                }
-                enc_rdata = {
-                    'timestamps': [],
-                    'block_name': 'wgencoder_rough',
-                    'data': {
-                        'quadrature': [],
-                        'pru_clock': [],
-                        'reference_degree': [],
-                        'error': [],
-                        'rotation_speed': []
-                    }
-                }
-                enc_fdata = {
-                    'timestamps': [],
-                    'block_name': 'wgencoder_full',
-                    'data': {
-                        'quadrature': [],
-                        'pru_clock': [],
-                        'reference_count': [],
-                        'error': [],
-                    }
-                }
-
                 # Check current time
                 current_time = time.time()
 
                 # IRIG part mainly takes over CHWP scripts by H.Nishino
                 if len(self.parser.irig_queue):
+                    # IRIG data container initialization
+                    irig_rdata = {
+                        'timestamp': 0,
+                        'block_name': 'wgencoder_irig',
+                        'data': {
+                            'irig_time': 0,
+                            'rising_edge_count': 0,
+                            'edge_diff': 0,
+                            'irig_sec': 0,
+                            'irig_min': 0,
+                            'irig_hour': 0,
+                            'irig_day': 0,
+                            'irig_year': 0,
+                            'bbb_clock_freq': 0,
+                        }
+                    }
+                    irig_fdata = {
+                        'timestamps': [],
+                        'block_name': 'wgencoder_irig_raw',
+                        'data': {
+                            'irig_synch_pulse_clock_time': [],
+                            'irig_synch_pulse_clock_counts': [],
+                            'irig_info': []
+                        }
+                    }
+
                     irig_last_updated = current_time
                     irig_data = self.parser.irig_queue.popleft()
 
@@ -268,6 +246,7 @@ class WiregridEncoderAgent:
                         'irig_day': irig_rdata['data']['irig_day'],
                         'irig_year': irig_rdata['data']['irig_year']
                     }
+
                     # End of IRIG case
 
                 if len(self.parser.encoder_queue):
@@ -302,6 +281,29 @@ class WiregridEncoderAgent:
                         or (len(pru_clock)
                             and (current_time - time_encoder_published)
                             > SEC_ENCODER_TO_PUBLISH):
+                        # Encoder data container initialization
+                        enc_rdata = {
+                            'timestamps': [],
+                            'block_name': 'wgencoder_rough',
+                            'data': {
+                                'quadrature': [],
+                                'pru_clock': [],
+                                'reference_degree': [],
+                                'error': [],
+                                'rotation_speed': []
+                            }
+                        }
+                        enc_fdata = {
+                            'timestamps': [],
+                            'block_name': 'wgencoder_full',
+                            'data': {
+                                'quadrature': [],
+                                'pru_clock': [],
+                                'reference_count': [],
+                                'error': [],
+                            }
+                        }
+
                         enc_rdata['timestamps'] = received_time_list
                         enc_rdata['data']['quadrature'] =\
                             quad_data[::COUNTER_INFO_LENGTH]
@@ -345,6 +347,7 @@ class WiregridEncoderAgent:
                                 enc_rdata['data']['reference_degree'],
                             'error': enc_rdata['data']['error']
                         }
+
                         # End of filling encoder data
                     # End of encoder case
 
