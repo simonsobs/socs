@@ -2565,24 +2565,20 @@ class ACUAgent:
                 if mode == 'abort':
                     lines = []
 
-                last_upload_size = 0
+                upload_lines = []
                 # Is it time to upload more lines?
-                # STACK_REFILL_THRESHOLD is the absolute minimum number of points that can be in the stack
-                # based on the constant_velocity step_time.
-                # FULL_STACK - int(last_upload_size/2) is the minimum number of points that we should
-                # try to reupload based on the number of points in the last upload in case we uploaded
-                # points with a lower dt. We always add at least 2xMIN_STACK_ADVANCE_TIME worth of points,
-                # so this should attempt to always keep MIN_STACK_ADVANCE_TIME worth of points in the
-                # upload.
-                if free_positions >= min(STACK_REFILL_THRESHOLD, FULL_STACK - int(last_upload_size / 2)):
-                    new_line_target = max(int(free_positions - STACK_TARGET), 1)
+                # This happens when we initiate (len(upload_lines) == 0) or when our last uploaded points
+                # is less than MIN_STACK_ADVANCE_TIME worth of time away.
+                if len(upload_lines) == 0 or (time.time() + MIN_STACK_ADVANCE_TIME >= upload_lines[-1].timestamp()):
 
-                    # Make sure that you get one more line than you
-                    # need (len(lines) > new_line_target), so that
-                    # after "grabbing the minimum batch", below, there
-                    # is still >= 1 line left.  The lines-is-empty
+                    # Make sure that we have at least 1 MIN_STACK_ADVANCE_TIME
+                    # worth of lines more than we need so that 
+                    # after "grabbing 2 * MIN_STACK_ADVANCE_TIME worth of lines", below, there
+                    # is still >= 1 MIN_STACK_ADVANCE_TIME worth of lines left. The lines-is-empty
                     # check is used to decide we're done.
-                    while mode == 'go' and (len(lines) <= new_line_target or lines[-1].group_flag != 0):
+                    while mode == 'go' and (len(lines) == 0 or (time.time() + 4 * MIN_STACK_ADVANCE_TIME >= lines[-1].timestamp()) \
+                        or lines[-1].group_flag != 0):
+                        
                         try:
                             lines.extend(next(point_gen))
                         except StopIteration:
@@ -2598,24 +2594,14 @@ class ACUAgent:
                             # processed.
                             break
 
-                    # Grab the minimum batch
-                    upload_lines, lines = lines[:new_line_target], lines[new_line_target:]
-
-                    # If the last line has a "group" flag, keep transferring lines.
-                    while len(lines) and len(upload_lines) and upload_lines[-1].group_flag != 0:
-                        upload_lines.append(lines.pop(0))
-
-                    # If there are any upcoming points left with timestamps the MIN_STACK_ADVANCE_TIME transfer them in.
-                    # This prevents the update_line from running out of points
-                    # if points are generated faster than the step_time.
-                    # This mainly happens with the new turnaround functions that need to generate points
-                    # with step_times << 1.0s.
+                    # Grab the minimum batch which is 2 * MIN_STACK_ADVANCE_TIME worth of lines.
                     first_upload_timestamp = upload_lines[0].timestamp
                     while len(lines) and (lines[0].timestamp - first_upload_timestamp) < 2 * MIN_STACK_ADVANCE_TIME:
                         upload_lines.append(lines.pop(0))
 
-                    # The total number of points we just uploaded is at least 2x the number of points we want.
-                    last_upload_size = len(upload_lines)
+                    # If the last line has a "group" flag, keep transferring lines.
+                    while len(lines) and len(upload_lines) and upload_lines[-1].group_flag != 0:
+                        upload_lines.append(lines.pop(0))
 
                     if len(upload_lines):
                         # Discard the group flag and upload all.
