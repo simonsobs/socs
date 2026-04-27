@@ -2565,21 +2565,23 @@ class ACUAgent:
                 if mode == 'abort':
                     lines = []
 
-                upload_lines = []
                 # Is it time to upload more lines?
                 # This happens when we initiate (len(upload_lines) == 0) or when our last uploaded points
                 # is less than MIN_STACK_ADVANCE_TIME worth of time away.
-                if len(upload_lines) == 0 or (time.time() + MIN_STACK_ADVANCE_TIME >= upload_lines[-1].timestamp()):
-
+                last_upload_time = time.time()
+                last_upload_length = 0
+                if len(upload_lines) == 0 or (time.time() - last_upload_time) <= max(MIN_STACK_ADVANCE_TIME, last_upload_length):
+                    self.log.info("Uploading Points!")
                     # Make sure that we have at least 1 MIN_STACK_ADVANCE_TIME
                     # worth of lines more than we need so that 
                     # after "grabbing 2 * MIN_STACK_ADVANCE_TIME worth of lines", below, there
                     # is still >= 1 MIN_STACK_ADVANCE_TIME worth of lines left. The lines-is-empty
                     # check is used to decide we're done.
-                    while mode == 'go' and (len(lines) == 0 or (time.time() + 4 * MIN_STACK_ADVANCE_TIME >= lines[-1].timestamp()) \
+                    while mode == 'go' and (len(lines) == 0 or (time.time() + 4 * MIN_STACK_ADVANCE_TIME >= lines[-1].timestamp) \
                         or lines[-1].group_flag != 0):
                         
                         try:
+                            self.log.info("Restocking Lines")
                             lines.extend(next(point_gen))
                         except StopIteration:
                             mode = 'stop'
@@ -2593,17 +2595,23 @@ class ACUAgent:
                             # break out and let some points get
                             # processed.
                             break
+                    self.log.info(f"Lines restocked to {len(lines)}")
 
                     # Grab the minimum batch which is 2 * MIN_STACK_ADVANCE_TIME worth of lines.
-                    first_upload_timestamp = upload_lines[0].timestamp
-                    while len(lines) and (lines[0].timestamp - first_upload_timestamp) < 2 * MIN_STACK_ADVANCE_TIME:
+                    self.log.info("Filling Upload Lines")
+                    while len(lines) and (len(upload_lines) == 0 or (upload_lines[-1].timestamp - upload_lines[0].timestamp) < 2 * MIN_STACK_ADVANCE_TIME):
                         upload_lines.append(lines.pop(0))
-
+                        
                     # If the last line has a "group" flag, keep transferring lines.
                     while len(lines) and len(upload_lines) and upload_lines[-1].group_flag != 0:
                         upload_lines.append(lines.pop(0))
-
+                    
+                    
+                    self.log.info(f"Filled Upload lines to {len(upload_lines)}")
                     if len(upload_lines):
+                        last_upload_time = time.time()
+                        last_upload_length = upload_lines[-1].timestamp - upload_lines[0].timestamp
+
                         # Discard the group flag and upload all.
                         text = sh.get_track_points_text(
                             upload_lines, timestamp_offset=3, text_block=True)
