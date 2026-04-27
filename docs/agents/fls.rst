@@ -63,7 +63,7 @@ The startup procedure is as follows:
 
        client.set_bias(bias='zero')
 
-  4. Ensure that the U-shaped link is removed  from the BNC breakout box,
+  4. Ensure that the U-shaped link is removed from the BNC breakout box,
      then turn on the lasers::
 
        client.toggle_laser_power(state='on')
@@ -95,8 +95,8 @@ To set the frequency of the lasers::
 
   client.set_frequency(frequency=100.0)
 
-This will change the transmitter frequency and check whether the set frequency
-is reached. It will take a few seconds to reach the correct frequency.
+This will change the transmitter frequency. It will take a few seconds to reach
+the correct frequency.
 
 Running frequency sweeps
 ````````````````````````
@@ -106,15 +106,14 @@ sweep at::
 
   client.set_frequency(frequency=120.0)
 
-This Task concludes when you reach the correct frequency. Then, start your 
-frequency sweeps (i.e. changing the frequency between two set endpoints, which may
-be repeated a finite number of times)::
+This Task concludes when the command is sent to the DLC Smart (not when the actual
+frequency reaches the correct value). Then, start your frequency sweeps (i.e.
+changing the frequency between two set endpoints)::
 
   client.run_frequency_sweeps.start(min_frequency=120.0,
                                     max_frequency=160.0,
                                     start_direction=1,
-                                    frequency_step=0.05,
-                                    num_of_sweeps=1)
+                                    frequency_step=0.05)
 
 Here, :code:`min_frequency`, :code:`max_frequency`, and :code:`frequency_step` are
 in units of GHz. :code:`start_direction` determines which direction the sweep will
@@ -125,7 +124,26 @@ the frequency region, where the direction of the sweep will reverse each time (i
 if the first sweep has increasing frequency, the second sweep will have decreasing
 frequency).
 
+Shutting down the FLS
+`````````````````````
+
 .. note::
-    The :code:`run_frequency_sweeps` Process shuts down the :code:`acq` Process
-    and takes over data acquisition. You will need to start :code:`acq` again
-    after :code:`run_frequency_sweeps` concludes.
+    All operations that require you to physically touch the instrument should
+    be performed while wearing a grounding strap.
+
+The shudtown procedure is as follows:
+
+  1. Set the voltage bias to zero::
+
+       client.set_bias(bias='zero')
+
+  2. Put on a grounding strap. Remove the U-shaped link from the BNC Breakout Box.
+  3. While wearing the grounding strap, disonnect the PDA-S power supply to mains
+     (i.e. by removing the green block connector from the PDA-S unit).
+  4. Turn off the lasers::
+
+       client.toggle_laser_power(state='off')
+
+  5. Stop the Agent from running.
+  6. While wearing the grounding strap, turn off the DLC Smart using the power
+     switch on the back of the instrument. 
