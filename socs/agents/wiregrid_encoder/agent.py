@@ -123,23 +123,23 @@ class WiregridEncoderAgent:
 
             # Initialize data container for session.data
             irig_field_dict = {
-                    'last_updated': 0,
-                    'irig_time': 0,
-                    'rising_edge_count': 0,
-                    'edge_diff': 0,
-                    'irig_sec': 0,
-                    'irig_min': 0,
-                    'irig_hour': 0,
-                    'irig_day': 0,
-                    'irig_year': 0
-                }
-                enc_field_dict = {
-                    'last_updated': [],
-                    'quadrature': [],
-                    'pru_clock': [],
-                    'reference_degree': [],
-                    'error': []
-                }
+                'last_updated': 0,
+                'irig_time': 0,
+                'rising_edge_count': 0,
+                'edge_diff': 0,
+                'irig_sec': 0,
+                'irig_min': 0,
+                'irig_hour': 0,
+                'irig_day': 0,
+                'irig_year': 0
+            }
+            enc_field_dict = {
+                'last_updated': [],
+                'quadrature': [],
+                'pru_clock': [],
+                'reference_degree': [],
+                'error': []
+            }
             # Loop
             while self.take_data:
 
@@ -165,8 +165,8 @@ class WiregridEncoderAgent:
                         'irig_day': 0,
                         'irig_year': 0,
                         'bbb_clock_freq': 0,
-                        }
                     }
+                }
                 irig_fdata = {
                     'timestamps': [],
                     'block_name': 'wgencoder_irig_raw',
@@ -174,8 +174,8 @@ class WiregridEncoderAgent:
                         'irig_synch_pulse_clock_time': [],
                         'irig_synch_pulse_clock_counts': [],
                         'irig_info': []
-                        }
                     }
+                }
                 enc_rdata = {
                     'timestamps': [],
                     'block_name': 'wgencoder_rough',
@@ -185,8 +185,8 @@ class WiregridEncoderAgent:
                         'reference_degree': [],
                         'error': [],
                         'rotation_speed': []
-                        }
                     }
+                }
                 enc_fdata = {
                     'timestamps': [],
                     'block_name': 'wgencoder_full',
@@ -195,8 +195,8 @@ class WiregridEncoderAgent:
                         'pru_clock': [],
                         'reference_count': [],
                         'error': [],
-                        }
                     }
+                }
 
                 # Check current time
                 current_time = time.time()
