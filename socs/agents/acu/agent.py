@@ -2570,18 +2570,15 @@ class ACUAgent:
                 # is less than MIN_STACK_ADVANCE_TIME worth of time away.
                 last_upload_time = time.time()
                 last_upload_length = 0
+                upload_lines = []
                 if len(upload_lines) == 0 or (time.time() - last_upload_time) <= max(MIN_STACK_ADVANCE_TIME, last_upload_length):
-                    self.log.info("Uploading Points!")
                     # Make sure that we have at least 1 MIN_STACK_ADVANCE_TIME
-                    # worth of lines more than we need so that 
+                    # worth of lines more than we need so that
                     # after "grabbing 2 * MIN_STACK_ADVANCE_TIME worth of lines", below, there
                     # is still >= 1 MIN_STACK_ADVANCE_TIME worth of lines left. The lines-is-empty
                     # check is used to decide we're done.
-                    while mode == 'go' and (len(lines) == 0 or (time.time() + 4 * MIN_STACK_ADVANCE_TIME >= lines[-1].timestamp) \
-                        or lines[-1].group_flag != 0):
-                        
+                    while mode == 'go' and (len(lines) == 0 or (lines[-1].timestamp - lines[0].timestamp <= 4 * MIN_STACK_ADVANCE_TIME) or lines[-1].group_flag != 0):
                         try:
-                            self.log.info("Restocking Lines")
                             lines.extend(next(point_gen))
                         except StopIteration:
                             mode = 'stop'
@@ -2595,19 +2592,15 @@ class ACUAgent:
                             # break out and let some points get
                             # processed.
                             break
-                    self.log.info(f"Lines restocked to {len(lines)}")
 
                     # Grab the minimum batch which is 2 * MIN_STACK_ADVANCE_TIME worth of lines.
-                    self.log.info("Filling Upload Lines")
                     while len(lines) and (len(upload_lines) == 0 or (upload_lines[-1].timestamp - upload_lines[0].timestamp) < 2 * MIN_STACK_ADVANCE_TIME):
                         upload_lines.append(lines.pop(0))
-                        
+
                     # If the last line has a "group" flag, keep transferring lines.
                     while len(lines) and len(upload_lines) and upload_lines[-1].group_flag != 0:
                         upload_lines.append(lines.pop(0))
-                    
-                    
-                    self.log.info(f"Filled Upload lines to {len(upload_lines)}")
+
                     if len(upload_lines):
                         last_upload_time = time.time()
                         last_upload_length = upload_lines[-1].timestamp - upload_lines[0].timestamp
