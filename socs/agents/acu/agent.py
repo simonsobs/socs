@@ -2445,11 +2445,6 @@ class ACUAgent:
         if point_batch_count is None or _pbc > point_batch_count:
             point_batch_count = _pbc
 
-        STACK_REFILL_THRESHOLD = \
-            FULL_STACK - point_batch_count - LOOP_STEP / step_time
-        STACK_TARGET = \
-            FULL_STACK - point_batch_count * 2 - LOOP_STEP / step_time
-
         # Special error bits to watch here
         PTRACK_FAULT_KEYS = [
             'ProgramTrack_position_failure',
@@ -2509,6 +2504,9 @@ class ACUAgent:
             faults = {}
             got_points_in = False
             first_upload_time = None
+            t0 = time.time()
+            last_upload_length = 0
+            current_uploaded = 0
             wait_stop_timeout = None
 
             prog_track_err = False
@@ -2565,21 +2563,26 @@ class ACUAgent:
                 if mode == 'abort':
                     lines = []
 
+                if first_upload_time is not None:
+                    dt = time.time() - t0
+                    current_uploaded -= dt
+                    t0 += dt
+
                 # Is it time to upload more lines?
                 # This happens when we initiate (len(upload_lines) == 0) or when our last uploaded points
                 # is less than MIN_STACK_ADVANCE_TIME worth of time away.
-                last_upload_time = time.time()
-                last_upload_length = 0
-                upload_lines = []
-                if len(upload_lines) == 0 or (time.time() - last_upload_time) <= max(MIN_STACK_ADVANCE_TIME, last_upload_length):
+                if (current_uploaded <= MIN_STACK_ADVANCE_TIME - step_time):
+
                     # Make sure that we have at least 1 MIN_STACK_ADVANCE_TIME
                     # worth of lines more than we need so that
                     # after "grabbing 2 * MIN_STACK_ADVANCE_TIME worth of lines", below, there
                     # is still >= 1 MIN_STACK_ADVANCE_TIME worth of lines left. The lines-is-empty
                     # check is used to decide we're done.
-                    while mode == 'go' and (len(lines) == 0 or (lines[-1].timestamp - lines[0].timestamp <= 4 * MIN_STACK_ADVANCE_TIME) or lines[-1].group_flag != 0):
+                    while mode == 'go' and (len(lines) == 0 or ((lines[-1].timestamp - lines[0].timestamp) <= (4 * MIN_STACK_ADVANCE_TIME)) or lines[-1].group_flag != 0):
+                        self.log.info("Filling lines!")
                         try:
                             lines.extend(next(point_gen))
+
                         except StopIteration:
                             mode = 'stop'
                             stop_message = 'Stop due to end of the planned track.'
@@ -2593,8 +2596,9 @@ class ACUAgent:
                             # processed.
                             break
 
+                    upload_lines = []
                     # Grab the minimum batch which is 2 * MIN_STACK_ADVANCE_TIME worth of lines.
-                    while len(lines) and (len(upload_lines) == 0 or (upload_lines[-1].timestamp - upload_lines[0].timestamp) < 2 * MIN_STACK_ADVANCE_TIME):
+                    while len(lines) and (len(upload_lines) == 0 or (upload_lines[-1].timestamp - upload_lines[0].timestamp) < (2 * MIN_STACK_ADVANCE_TIME) - current_uploaded - step_time):
                         upload_lines.append(lines.pop(0))
 
                     # If the last line has a "group" flag, keep transferring lines.
@@ -2602,9 +2606,8 @@ class ACUAgent:
                         upload_lines.append(lines.pop(0))
 
                     if len(upload_lines):
-                        last_upload_time = time.time()
-                        last_upload_length = upload_lines[-1].timestamp - upload_lines[0].timestamp
-
+                        self.log.info(f"Filled upload_lines to {len(upload_lines)}")
+                        self.log.info(f"Last Point {upload_lines[-1].timestamp}, First Point {upload_lines[0].timestamp}")
                         # Discard the group flag and upload all.
                         text = sh.get_track_points_text(
                             upload_lines, timestamp_offset=3, text_block=True)
@@ -2624,6 +2627,8 @@ class ACUAgent:
                         if first_upload_time is None:
                             first_upload_time = time.time()
                         last_upload_az = upload_lines[-1].az
+                        last_upload_length = upload_lines[-1].timestamp - upload_lines[0].timestamp
+                        current_uploaded += last_upload_length
 
                 if len(lines) == 0 and free_positions >= FULL_STACK - 1:
                     if mode == 'stop':
