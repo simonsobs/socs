@@ -2433,17 +2433,13 @@ class ACUAgent:
         # more than that to allow for rounding when we are setting the
         # refill threshold.
         MIN_STACK_POP = 6  # points
+        MAX_ALLOWABLE_FREE_POSITIONS = FULL_STACK - MIN_STACK_POP
 
         # Minimum amount of time (seconds), in advance, to populate
         # the trajectory.  In cases where step_time is short, this
         # creates a longer track window to survive agent outages.
         # (The cost is that stopping a scan may take a little longer.)
         MIN_STACK_ADVANCE_TIME = 3.
-
-        # Minimum number of points to keep in the stack.
-        _pbc = max(MIN_STACK_POP, MIN_STACK_ADVANCE_TIME / step_time)
-        if point_batch_count is None or _pbc > point_batch_count:
-            point_batch_count = _pbc
 
         # Special error bits to watch here
         PTRACK_FAULT_KEYS = [
@@ -2504,10 +2500,7 @@ class ACUAgent:
             faults = {}
             got_points_in = False
             first_upload_time = None
-            t0 = time.time()
-            last_upload_length = 0
-            last_uploaded_timestamp = None
-            current_uploaded = 0
+            last_uploaded_timestamp = 0
             wait_stop_timeout = None
 
             prog_track_err = False
@@ -2564,28 +2557,23 @@ class ACUAgent:
                 if mode == 'abort':
                     point_prov.stop()
 
-                # Each loop we'll subtract the time since last loop from the current_uplaod
-                # time. This tracks the amount of time advanced since last upload.
-                # We have no absolute reference between the uploaded points and when
-                # those points are consumed by the ACU, so we have to use a relative
-                # reference since we created the points.
-                if first_upload_time is not None:
-                    dt = time.time() - t0
-                    current_uploaded -= dt
-                    t0 += dt
-
                 # Is it time to upload more lines?
                 # This happens when the current time of uploaded points is less
                 # than the MIN_STACK_ADVANCE_TIME.
-                # (Meaning we have less than the minimum amount of points uploaded).
-                if (current_uploaded <= MIN_STACK_ADVANCE_TIME):
+                # (Meaning we have less than the minimum time worth of points uploaded).
+                # Or if the total number of free positions is higher than the MAX_ALLOWABLE_FREE_POSITIONS.
+                # (Meaning we haven't uploaded at least the minimum number of points)
+                if ((last_uploaded_timestamp - time.time()) <= MIN_STACK_ADVANCE_TIME) or (free_positions > MAX_ALLOWABLE_FREE_POSITIONS):
 
                     upload_lines = []
-                    # Grab points to upload until we'll have a total of 2 * MIN_STACK_ADVANCE_TIME uploaded.
-                    # We subtract the current_uploaded here to make sure we upload UP TO 2 * MIN_STACK_ADVANCE_TIME.
-                    while not point_prov.is_empty() and (
-                            len(upload_lines) == 0
-                            or (upload_lines[-1].timestamp - upload_lines[0].timestamp) < (2 * MIN_STACK_ADVANCE_TIME) - current_uploaded):
+                    # Grab points from point_prov until our last point is at least
+                    # 2 * MIN_STACK_ADVANCE_TIME seconds from now.
+                    # If that isn't enough points to have MIN_STACK_POP_TIME amount of points uploaded,
+                    # Keep grabbing points until we have enough.
+                    while not point_prov.is_empty() and (len(upload_lines) == 0
+                                                         or upload_lines[-1].timestamp - time.time() < (2 * MIN_STACK_ADVANCE_TIME)
+                                                         or (free_positions - len(upload_lines) > MAX_ALLOWABLE_FREE_POSITIONS)):
+
                         upload_lines.append(point_prov.pop())
 
                     # If the last line has a "group" flag, keep transferring lines.
@@ -2597,8 +2585,6 @@ class ACUAgent:
                         stop_message = 'Stop due to end of the planned track.'
 
                     if len(upload_lines):
-                        self.log.info(f"Filled upload_lines to {len(upload_lines)}")
-                        self.log.info(f"Last Point {upload_lines[-1].timestamp}, First Point {upload_lines[0].timestamp}")
                         # Discard the group flag and upload all.
                         text = sh.get_track_points_text(
                             upload_lines, timestamp_offset=3, text_block=True)
@@ -2619,19 +2605,8 @@ class ACUAgent:
                             first_upload_time = time.time()
                         last_upload_az = upload_lines[-1].az
 
-                        # The amount we just uploaded is equal to the time between the last timestamp
-                        # of the last upload and the last timestamp of the current uplaod.
-                        # If this is the first upload, we'll just estimate it as the total time of the current upload.
-                        # This will underestimate the total upload length of the first upload, but thats OK.
-                        if last_uploaded_timestamp is None:
-                            last_upload_length = upload_lines[-1].timestamp - upload_lines[0].timestamp
-                        else:
-                            last_upload_length = upload_lines[-1].timestamp - last_uploaded_timestamp
-
                         # Track the timestamp of the current upload.
-                        # Update the current_uploaded time.
                         last_uploaded_timestamp = upload_lines[-1].timestamp
-                        current_uploaded += last_upload_length
 
                 if point_prov.is_empty() and free_positions >= FULL_STACK - 1:
                     if mode == 'stop':
