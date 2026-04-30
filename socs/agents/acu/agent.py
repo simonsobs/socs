@@ -2506,6 +2506,7 @@ class ACUAgent:
             first_upload_time = None
             t0 = time.time()
             last_upload_length = 0
+            last_uploaded_timestamp = None
             current_uploaded = 0
             wait_stop_timeout = None
 
@@ -2563,15 +2564,21 @@ class ACUAgent:
                 if mode == 'abort':
                     lines = []
 
+                # Each loop we'll subtract the time since last loop from the current_uplaod
+                # time. This tracks the amount of time advanced since last upload.
+                # We have no absolute reference between the uploaded points and when
+                # those points are consumed by the ACU, so we have to use a relative
+                # reference since we created the points.
                 if first_upload_time is not None:
                     dt = time.time() - t0
                     current_uploaded -= dt
                     t0 += dt
 
                 # Is it time to upload more lines?
-                # This happens when we initiate (len(upload_lines) == 0) or when our last uploaded points
-                # is less than MIN_STACK_ADVANCE_TIME worth of time away.
-                if (current_uploaded <= MIN_STACK_ADVANCE_TIME - step_time):
+                # This happens when the current time of uploaded points is less
+                # than the MIN_STACK_ADVANCE_TIME.
+                # (Meaning we have less than the minimum amount of points uploaded).
+                if (current_uploaded <= MIN_STACK_ADVANCE_TIME):
 
                     # Make sure that we have at least 1 MIN_STACK_ADVANCE_TIME
                     # worth of lines more than we need so that
@@ -2597,8 +2604,9 @@ class ACUAgent:
                             break
 
                     upload_lines = []
-                    # Grab the minimum batch which is 2 * MIN_STACK_ADVANCE_TIME worth of lines.
-                    while len(lines) and (len(upload_lines) == 0 or (upload_lines[-1].timestamp - upload_lines[0].timestamp) < (2 * MIN_STACK_ADVANCE_TIME) - current_uploaded - step_time):
+                    # Grab points to upload until we'll have a total of 2 * MIN_STACK_ADVANCE_TIME uploaded.
+                    # We subtract the current_uploaded here to make sure we upload UP TO 2 * MIN_STACK_ADVANCE_TIME.
+                    while len(lines) and (len(upload_lines) == 0 or (upload_lines[-1].timestamp - upload_lines[0].timestamp) < (2 * MIN_STACK_ADVANCE_TIME) - current_uploaded):
                         upload_lines.append(lines.pop(0))
 
                     # If the last line has a "group" flag, keep transferring lines.
@@ -2627,7 +2635,19 @@ class ACUAgent:
                         if first_upload_time is None:
                             first_upload_time = time.time()
                         last_upload_az = upload_lines[-1].az
-                        last_upload_length = upload_lines[-1].timestamp - upload_lines[0].timestamp
+
+                        # The amount we just uploaded is equal to the time between the last timestamp
+                        # of the last upload and the last timestamp of the current uplaod.
+                        # If this is the first upload, we'll just estimate it as the total time of the current upload.
+                        # This will underestimate the total upload length of the first upload, but thats OK.
+                        if last_uploaded_timestamp is None:
+                            last_upload_length = upload_lines[-1].timestamp - upload_lines[0].timestamp
+                        else:
+                            last_upload_length = upload_lines[-1].timestamp - last_uploaded_timestamp
+
+                        # Track the timestamp of the current upload.
+                        # Update the current_uploaded time.
+                        last_uploaded_timestamp = upload_lines[-1].timestamp
                         current_uploaded += last_upload_length
 
                 if len(lines) == 0 and free_positions >= FULL_STACK - 1:
