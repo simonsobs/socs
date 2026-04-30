@@ -105,6 +105,40 @@ def get_track_points_text(tpl, timestamp_offset=None, with_group_flag=False,
     return all_lines
 
 
+class PointProvider:
+    """Wraps a generator that yields lists of points, but then
+    provides them one by one via the pop method, and can tell the
+    caller when the source is empty.
+
+    """
+
+    def __init__(self, gen):
+        self._gen = gen
+        self._stash = []
+
+    def __len__(self):
+        return len(self._stash)
+
+    def is_empty(self):
+        self._request(1)
+        return len(self._stash) == 0
+
+    def _request(self, n):
+        while self._gen is not None and len(self._stash) < n:
+            try:
+                self._stash.extend(next(self._gen))
+            except StopIteration:
+                self._gen = None
+
+    def pop(self):
+        self._request(1)
+        return self._stash.pop(0)
+
+    def stop(self):
+        self._gen = None
+        self._stash = []
+
+
 def from_file(filename, fmt=None):
     """Load a ProgramTrack trajectory from a file.  This function
     supports two formats. The modern format is a pickle file. The
