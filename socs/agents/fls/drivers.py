@@ -271,7 +271,7 @@ class DLCSmart(TCPInterface):
         sstep = self.param_ref("frequency:frequency-step")
         sint = self.param_ref("lockin:integration-time")
 
-        data = (fast, float(smin), float(smax), float(sstep), float(sint)
+        data = (fast, float(smin), float(smax), float(sstep), float(sint))
         return data
 
     def stop_scan(self):

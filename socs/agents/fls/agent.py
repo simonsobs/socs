@@ -86,6 +86,7 @@ class FLSAgent:
         self.scan_max_freq = None
         self.scan_step = None
         self.scan_direction = None
+        self.integration_time = None
 
         agg_params = {'frame_length': 60} # is this correct?
 
@@ -255,6 +256,7 @@ class FLSAgent:
                 self.scan_step = data['scan_step']
                 self.scan_direction = data['scan_direction']
                 self.lasers_on = data['lasers_on']
+                self.integration_time = data['integration_time']
 
                 sampling_data = {}
                 for key, val in data.items():
@@ -401,6 +403,12 @@ class FLSAgent:
                     return False, "Bias not successfully set."
         return True, f"Bias successfully set to {bias_to_set}."
 
+    @ocs_agent.param('integration_time', type=float)
+    def set_integration_time(self, session, params):
+        int_time = params['integration_time']
+        set_int_time = self.dlcsmart.param_set("lockin:integration-time", int_time)
+        return True, f"Set integration time to {int_time}."
+
     @ocs_agent.param('frequency', type=float)
     def set_frequency(self, session, params):
         """
@@ -457,7 +465,7 @@ class FLSAgent:
     @ocs_agent.param('max_frequency', type=float)
     @ocs_agent.param('start_direction', type=int, choices=[-1,1])
     @ocs_agent.param('frequency_step', type=float, default=0.05)
-#    @ocs_agent.param('num_of_sweeps', type=int, default=1)
+    @ocs_agent.param('int_time', type=float, default=None)
     def run_frequency_sweeps(self, session, params):
         """
         run_frequency_sweeps(min_frequency, max_frequency, start_direction,
@@ -483,6 +491,9 @@ class FLSAgent:
         start_dir = params['start_direction']
         freq_step = params['frequency_step']
 #        nsweeps = params['num_of_sweeps']
+        int_time = params['int_time']
+        if int_time is None:
+            int_time = self.integration_time
 
         assert min_freq < max_freq, "max_freq must be greater than min_freq!"
         assert min_freq >= MIN_FREQ, f"min_freq must be at least {MIN_FREQ} GHz."
@@ -526,7 +537,7 @@ class FLSAgent:
                 if max_freq != self.set_freq:
                     self.log.warn(f'Set frequency is {self.set_freq} and max_freq is {max_freq}.')
 
-            self.dlcsmart.set_scan_params(min_freq, max_freq, freq_step, start_dir)
+            self.dlcsmart.set_scan_params(min_freq, max_freq, freq_step, start_dir, int_time)
             time.sleep(0.1)
             csp = _check_scan_params(fls, min_freq, max_freq, freq_step, start_dir)
             if not csp:
