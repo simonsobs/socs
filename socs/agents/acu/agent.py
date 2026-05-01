@@ -121,8 +121,14 @@ MONITOR_STRUCTURE = [
     ('ACU_emergency', 'ACU_emergency', None, None),
     ('ACU_corotator', 'corotator', None, None),
     ('ACU_shutter', 'shutter', None, None),
-    ('ACU_tilt', 'tilt_slow', 'changed', 0.5),
+
+    # Deprecated: tilt_slow and tilt_fast. Removed after soaculib 0.4.3
+    ('ACU_tilt_old', 'tilt_slow', 'changed', 0.5),
     (None, 'tilt_fast', None, None),
+
+    # New tiltmeter dataset.
+    ('ACU_tilt', 'tiltmeter', 'tick', None),
+
     ('ACU_sun_avoidance', 'sun_avoidance', None, 1.),
     ('ACU_corrections', 'corrections', None, 10.),
     ('ACU_hvac_data', 'hvac_data', None, 10.),
@@ -911,7 +917,7 @@ class ACUAgent:
                 new_blocks[block_name] = {
                     'timestamp': self.data['status']['summary']['ctime'],
                     'block_name': block_name,
-                    'data': self.data['status'][data_key],
+                    'data': {} | self.data['status'][data_key],
                 }
 
             # Only keep blocks that have changed or have new data.
