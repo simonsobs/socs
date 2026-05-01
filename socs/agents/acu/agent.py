@@ -2563,7 +2563,8 @@ class ACUAgent:
                 # (Meaning we have less than the minimum time worth of points uploaded).
                 # Or if the total number of free positions is higher than the MAX_ALLOWABLE_FREE_POSITIONS.
                 # (Meaning we haven't uploaded at least the minimum number of points)
-                if ((last_uploaded_timestamp - time.time()) <= MIN_STACK_ADVANCE_TIME) or (free_positions > MAX_ALLOWABLE_FREE_POSITIONS):
+                if ((last_uploaded_timestamp - time.time()) <= MIN_STACK_ADVANCE_TIME) \
+                   or (free_positions > MAX_ALLOWABLE_FREE_POSITIONS):
 
                     upload_lines = []
                     # Grab points from point_prov until our last point is at least
@@ -2580,7 +2581,7 @@ class ACUAgent:
                     while not point_prov.is_empty() and len(upload_lines) and upload_lines[-1].group_flag != 0:
                         upload_lines.append(point_prov.pop())
 
-                    if point_prov.is_empty():
+                    if point_prov.is_empty() and mode == 'go':
                         mode = 'stop'
                         stop_message = 'Stop due to end of the planned track.'
 
