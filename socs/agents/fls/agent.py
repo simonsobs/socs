@@ -405,6 +405,16 @@ class FLSAgent:
 
     @ocs_agent.param('integration_time', type=float)
     def set_integration_time(self, session, params):
+        """
+        set_integration_time(integration_time)
+
+        ***Task*** - Set the integration time of the laser system. Time is in
+                     milliseconds.
+
+        Parameters:
+            integration_time (float): The integration time in milliseconds.
+        
+        """
         int_time = params['integration_time']
         set_int_time = self.dlcsmart.param_set("lockin:integration-time", int_time)
         return True, f"Set integration time to {int_time}."
@@ -731,6 +741,13 @@ class FLSAgent:
 
     @ocs_agent.param("_")
     def stop_frequency_sweep(self, agent, params):
+        """
+        stop_frequency_sweep()
+
+        ***Task*** - Send a stop command to the DLC Smart to stop running a frequency
+                     sweep. This command may be run during or at the end of a sweep.
+
+        """
         with self.lock.acquire_timeout(timeout=12, job='set_frequency') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
@@ -774,9 +791,9 @@ def main(args=None):
     agent.register_task('initialize', fls_agent.initialize, startup=init_params)
     agent.register_task('toggle_laser_power', fls_agent.toggle_laser_power)
     agent.register_task('set_bias', fls_agent.set_bias)
+    agent.register_task('set_integration_time', fls_agent.set_integration_time)
     agent.register_task('set_frequency', fls_agent.set_frequency)
     agent.register_task('run_frequency_sweeps', fls_agent.run_frequency_sweeps)
-#    agent.register_process('run_frequency_sweeps', fls_agent.run_frequency_sweeps, fls_agent._stop_freq_sweep)#, blocking=False)
     agent.register_task('stop_frequency_sweep', fls_agent.stop_frequency_sweep)
     agent.register_process('acq', fls_agent.acq, fls_agent._stop_acq)#, blocking=False)
 
