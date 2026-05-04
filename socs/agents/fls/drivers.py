@@ -1,14 +1,17 @@
-from socs.tcp import TCPInterface
-#import socket
-import time
 import base64
-import numpy as np
 import select
+# import socket
+import time
+
+import numpy as np
+
+from socs.tcp import TCPInterface
+
 
 class DLCSmart(TCPInterface):
     def __init__(self, ip_addr, port=1998, buffer_size=1024, timeout=5):
         self.ip_addr = ip_addr
-        self.port = port # TCP
+        self.port = port  # TCP
 #        self.buffer_size = buffer_size
 #        self.sock = None
         self.timeout = timeout
@@ -24,7 +27,7 @@ class DLCSmart(TCPInterface):
                 if drained.endswith(b"\n> ") or drained.endswith(b"> "):
                     return True
                 else:
-                    #print(drained)
+                    # print(drained)
                     print("not fully drained")
                     return False
         else:
@@ -36,8 +39,8 @@ class DLCSmart(TCPInterface):
                 return True
             time.sleep(delay)
 
+    # basic read and write functionality
 
-    # basic read and write functionality    
     def read_all(self, decode=True):
         """
         Handles decoding anything read out from the DLC Smart.
@@ -46,7 +49,7 @@ class DLCSmart(TCPInterface):
         expect_prompt = False
         while True:
             try:
-#                chunk = self.sock.recv(1024)
+                #                chunk = self.sock.recv(1024)
                 chunk = self.recv(1024)
 #            except self.sock.timeout:
             except self.timeout:
@@ -60,7 +63,7 @@ class DLCSmart(TCPInterface):
             return data.decode('ascii', errors='ignore').replace('\r', '').strip('\n> ')
         else:
             return data
-    
+
     def send_msg(self, cmd, read_response=True, decode=True):
         """
         Encode the message, send to the DLC Smart, and read
@@ -77,7 +80,6 @@ class DLCSmart(TCPInterface):
             return response
         else:
             return True
-
 
     # connect and disconnect
 #    def connect(self):
@@ -104,17 +106,19 @@ class DLCSmart(TCPInterface):
 #                pass
 #            self.sock.close()
 #            self.sock = None
-   
+
     # formatting for requests, param setting, and commands
+
+
     def param_ref(self, param, printout=False):
         """
         Request a parameter from the DLC Smart and read in the
         response.
-        
+
         Input
         -----
         param (str): Name of the parameter from the Command Reference
-        
+
         Return
         ------
         resp: The response from the DLC Smart
@@ -124,16 +128,16 @@ class DLCSmart(TCPInterface):
         if printout:
             print(f"{param}: ", resp)
         return resp
-    
+
     def param_set(self, param, val):
         """
         Set a parameter and read in the response from the DLC Smart.
-        
+
         Input
         -----
         param (str): Name of the parameter from the Command Reference
         val (list): List of values for the parameter
-        
+
         Return
         ------
         resp: The response from the DLC Smart
@@ -141,17 +145,17 @@ class DLCSmart(TCPInterface):
         msg = f"(param-set! '{param} {val})"
         resp = self.send_msg(msg)
         return resp
-    
+
     def command(self, param, decode=False, vals=[]):
         """
         Execute a command to the DLC Smart.
-        
+
         Input
         -----
         param (str): Name of the parameter from the Command Reference
         vals (list, optional): List of values for the parameter. Some commands
                                do not require values.
-        
+
         Return
         ------
         resp: The response from the DLC Smart
@@ -163,9 +167,9 @@ class DLCSmart(TCPInterface):
         msg += ")"
         resp = self.send_msg(msg, decode=decode)
         return resp
-    
 
     # network operations and checks
+
     def get_ip(self):
         resp = self.param_ref("net-conf:ip-addr")
         self.ip_address = resp
@@ -177,7 +181,7 @@ class DLCSmart(TCPInterface):
             apply_dhcp = self.command("net-conf:apply")
             return
         return resp
-    
+
     def get_system_label(self):
         """
         Request the system label (str). Use to check that you are actually
@@ -185,7 +189,7 @@ class DLCSmart(TCPInterface):
         """
         resp = self.param_ref("general:system-label")
         return resp
-    
+
     # laser emission
     def check_laser_emission(self):
         """
@@ -193,21 +197,21 @@ class DLCSmart(TCPInterface):
         """
         resp = self.param_ref("laser-operation:emission-global-enable")
         return resp
-    
+
     def laser_emission_on(self):
         """
         Set the laser emission for both lasers to on (True).
         """
         resp = self.param_set("laser-operation:emission-global-enable", "#t")
         return resp
-    
+
     def laser_emission_off(self):
         """
         Set the laser emission for both lasers to off (False).
         """
         resp = self.param_set("laser-operation:emission-global-enable", "#f")
         return resp
-    
+
     # voltage bias
     def check_bias(self, printall=False):
         """
@@ -219,26 +223,26 @@ class DLCSmart(TCPInterface):
             print(f"Tx Bias Amplitude: {amp} V")
             print(f"Tx Bias Offset: {offset} V")
         return float(amp), float(offset)
-    
+
     def set_bias_to_zero(self):
         """
         Set the bias amplitude and bias offset to zero.
         """
         resp = self.command("lockin:mod-out-set-to-zero")
         return resp
-    
+
     def set_bias_to_default(self):
         """
         Set the bias amplitude and bias offset to the default values.
         """
         resp = self.command("lockin:mod-out-set-to-default")
         return resp
-    
+
     # frequency and scan functions
     def set_frequency(self, frequency):
         """
         Set the frequency of the system.
-        
+
         Input
         -----
         frequency (float): The frequency to set the system to, in GHz
@@ -261,7 +265,7 @@ class DLCSmart(TCPInterface):
         fast = self.param_set("frequency:scan-mode-fast", "#t")
         smin = self.param_set("frequency:frequency-min", freq_min)
         smax = self.param_set("frequency:frequency-max", freq_max)
-        sstep = self.param_set("frequency:frequency-step", direction*freq_step)
+        sstep = self.param_set("frequency:frequency-step", direction * freq_step)
         sint = self.param_set("lockin:integration-time", int_time)
 
     def check_scan_params(self):
@@ -400,11 +404,10 @@ class DLCSmart(TCPInterface):
                 data['scan_set_frequency'].append(fset_readable[i])
                 data['scan_actual_frequency'].append(fact_readable[i])
                 data['scan_photocurrent'].append(pcur_readable[i])
-            
+
             start_ix += 1024
             get_point_num = self.command("frequency:fast-scan-get-data", decode=False, vals=[0, start_ix, 1024])
             pointnum_raw = base64.b64decode(get_point_num)
             pointnum_readable = np.frombuffer(pointnum_raw, dtype=np.float64)
 
         return data
-

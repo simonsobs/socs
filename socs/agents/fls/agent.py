@@ -1,8 +1,8 @@
-import socket
 import argparse
+import socket
 import time
-import numpy as np
 
+import numpy as np
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
@@ -12,8 +12,10 @@ from socs.agents.fls.drivers import DLCSmart
 MAX_FREQ = 880.
 MIN_FREQ = 20.
 
+
 def _within(val, target, tolerance=1e-2):
-    return abs(val-target) <= tolerance
+    return abs(val - target) <= tolerance
+
 
 def _check_scan_params(fls, min_freq, max_freq, freq_step, start_dir):
     """
@@ -44,7 +46,7 @@ def _check_scan_params(fls, min_freq, max_freq, freq_step, start_dir):
         fls.log.warn(f"Start direction set to {scan_direction}, not {start_dir}!")
         return False, "Scan parameter validation failed: scan direction."
 
-    fls.log.info(f"Scan parameters set: {min_freq} GHz to {max_freq} GHz "\
+    fls.log.info(f"Scan parameters set: {min_freq} GHz to {max_freq} GHz "
                  f"with step size {start_dir * freq_step}.")
 
     return True
@@ -86,7 +88,7 @@ class FLSAgent:
         self.scan_direction = None
         self.integration_time = None
 
-        agg_params = {'frame_length': 60} # is this correct?
+        agg_params = {'frame_length': 60}  # is this correct?
 
         self.agent.register_feed('sampling_data',
                                  record=True,
@@ -112,7 +114,7 @@ class FLSAgent:
             try:
                 self.dlcsmart = DLCSmart(ip_addr=self.ip, port=self.port)
                 welcome = self.dlcsmart.drain_buffer()
-                print('welcome='+str(welcome))
+                print('welcome=' + str(welcome))
             except ConnectionError:
                 self.log.error("could not establish connection to DLC Smart")
                 return False, "FLS agent initialization failed"
@@ -156,7 +158,7 @@ class FLSAgent:
             else:
                 self.log.warn('Could not interpret scan mode')
                 self.scan_mode = scan_mode
-            
+
             scan_min_freq = scan_params[1]
             try:
                 self.scan_min_freq = float(scan_min_freq)
@@ -178,8 +180,7 @@ class FLSAgent:
             except ValueError as e:
                 self.log.warn(e)
                 self.scan_step = scan_step
-                
-            
+
         self.initialized = True
 
         if params['auto_acquire']:
@@ -224,7 +225,7 @@ class FLSAgent:
 
             self.take_data = True
 
-            pm = Pacemaker(1/3, quantize=False)
+            pm = Pacemaker(1 / 3, quantize=False)
             while self.take_data:
                 pm.sleep()
                 if time.time() - last_time > 1:
@@ -235,10 +236,10 @@ class FLSAgent:
                     continue
 
                 try:
-                     data = self.dlcsmart.sampling()
-                     if session.degraded:
-                         self.log.info("Connection re-established.")
-                         session.degraded = False
+                    data = self.dlcsmart.sampling()
+                    if session.degraded:
+                        self.log.info("Connection re-established.")
+                        session.degraded = False
                 except ConnectionError:
                     self.log.error("Failed to get data from DLC Smart. Check network connection")
                     session.degraded = True
@@ -288,7 +289,7 @@ class FLSAgent:
         else:
             return False, 'acq is not currently running.'
 
-    @ocs_agent.param('state', type=str, choices=['on','off'])
+    @ocs_agent.param('state', type=str, choices=['on', 'off'])
     def toggle_laser_power(self, session, params):
         """
         toggle_laser_power(state)
@@ -305,9 +306,9 @@ class FLSAgent:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
-        
+
             laser_status = self.lasers_on
-            if laser_status == True:
+            if laser_status:
                 self.log.info('Current laser state is on.')
                 on_off = 'on'
             elif laser_status == False:
@@ -327,7 +328,6 @@ class FLSAgent:
                 bias_amp, bias_offset = self.dlcsmart.check_bias()
                 if bias_amp != 0.0 or bias_offset != 0.0:
                     return False, "Bias could not be set to zero so did not toggle laser power."
-
 
             countdown = 10
             while countdown > 0:
@@ -349,7 +349,7 @@ class FLSAgent:
             elif "#f" in laser_status:
                 self.lasers_on = False
                 return True, "Lasers turned off"
-    
+
     @ocs_agent.param('bias', type=str, choices=['default', 'zero'])
     def set_bias(self, session, params):
         """
@@ -405,7 +405,7 @@ class FLSAgent:
 
         Parameters:
             integration_time (float): The integration time in milliseconds.
-        
+
         """
         int_time = params['integration_time']
         set_int_time = self.dlcsmart.param_set("lockin:integration-time", int_time)
@@ -444,7 +444,7 @@ class FLSAgent:
 
     @ocs_agent.param('min_frequency', type=float)
     @ocs_agent.param('max_frequency', type=float)
-    @ocs_agent.param('start_direction', type=int, choices=[-1,1])
+    @ocs_agent.param('start_direction', type=int, choices=[-1, 1])
     @ocs_agent.param('frequency_step', type=float, default=0.05)
     @ocs_agent.param('int_time', type=float, default=0.0)
     def run_frequency_sweeps(self, session, params):
@@ -458,14 +458,14 @@ class FLSAgent:
             min_frequency (float): Minimum frequency for the sweeps (GHz).
             max_frequency (float): Maximum frequency for the sweeps (GHz).
             start_direction (int): Indicates increasing or decreasing frequency. Use
-                                   start_direction = 1 for increasing frequency, or 
+                                   start_direction = 1 for increasing frequency, or
                                    start_direction = -1 for decreasing frequency
             frequency_step (float): Step size between frequencies during the sweep (GHz).
                                     Must be at least 0.01 GHz.
             int_time (float): Integration time for each step of the sweep (ms). Default
                               chooses the last set integration time.
         """
-        
+
         min_freq = params['min_frequency']
         max_freq = params['max_frequency']
         start_dir = params['start_direction']
@@ -481,7 +481,7 @@ class FLSAgent:
         assert max_freq < MAX_FREQ, f"max_freq must be less than {MAX_FREQ} GHz."
         assert freq_step >= 0.01, "minimum step size is 0.01 GHz."
         assert start_dir in (-1, 1), "Choose start_dir=1 (increasing) or -1 (decreasing)"
- 
+
         fls = self
 
         with self.lock.acquire_timeout(timeout=12, job='set_frequency') as acquired:
@@ -533,6 +533,7 @@ class FLSAgent:
             self.dlcsmart.stop_scan()
         return True, "Sent stop scan to the DLC Smart."
 
+
 def make_parser(parser=None):
     """
     Build the argument parser for the Agent. Allows sphinx to automatically
@@ -572,9 +573,10 @@ def main(args=None):
     agent.register_task('set_frequency', fls_agent.set_frequency)
     agent.register_task('run_frequency_sweeps', fls_agent.run_frequency_sweeps)
     agent.register_task('stop_frequency_sweep', fls_agent.stop_frequency_sweep)
-    agent.register_process('acq', fls_agent.acq, fls_agent._stop_acq)#, blocking=False)
+    agent.register_process('acq', fls_agent.acq, fls_agent._stop_acq)  # , blocking=False)
 
     runner.run(agent, auto_reconnect=True)
 
-if __name__== '__main__':
+
+if __name__ == '__main__':
     main()

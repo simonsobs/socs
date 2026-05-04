@@ -25,7 +25,7 @@ Agent in a docker container.
 OCS Site Config
 ````````````````
 
-To configure your FLS for use with OCS you need to add an FLSAgent block to 
+To configure your FLS for use with OCS you need to add an FLSAgent block to
 your ocs configuration file. Here is an example configuration block::
 
   {'agent-class': 'FLSAgent',
@@ -57,7 +57,7 @@ The startup procedure is as follows:
      system is ready, it will produce a series of audible tones, and the
      light under "System Ready" on the front of the unit will flash green.
   2. Start the FLS Agent. This will initialize the connection. The DLC Smart
-     unit will produce a series of audible tones, and the Agent will begin 
+     unit will produce a series of audible tones, and the Agent will begin
      data acquisition.
   3. To ensure that the voltage bias is set to zero::
 
@@ -71,7 +71,7 @@ The startup procedure is as follows:
      The white lights on top of the laser units will turn on if this operation
      is successful.
 
-  5. Connect the PDA-S power supply to mains (i.e. by inserting the green 
+  5. Connect the PDA-S power supply to mains (i.e. by inserting the green
      block connector into the PDA-S unit).
   6. Insert the U-shaped link into the BNC breakout box, closing the voltage
      bias line to the transmitter photomixer.
@@ -85,7 +85,7 @@ Once this procedure is complete, the system is on and ready to use.
     Although you can perform basic operations such as alignment with the system
     immediately after startup, the lasers will not reach full power until about
     1 hour after they are turned on. The frequency will also drift as the lasers
-    warm up, so it is best to wait at least 36 hours from system startup to 
+    warm up, so it is best to wait at least 36 hours from system startup to
     make any scientific measurements.
 
 Setting the laser frequency
@@ -146,4 +146,4 @@ The shudtown procedure is as follows:
 
   5. Stop the Agent from running.
   6. While wearing the grounding strap, turn off the DLC Smart using the power
-     switch on the back of the instrument. 
+     switch on the back of the instrument.
