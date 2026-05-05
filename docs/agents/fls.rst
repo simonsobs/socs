@@ -9,11 +9,11 @@ FLS Agent
 The Frequency-selectable Laser Source (FLS) is a calibrator that uses the
 Toptica TeraScan 1550 laser system, installed in a setup with attenuating
 prisms and mirrors. The calibrator is used for passband measurements with
-detectors that are sensistive to 20 GHz - 1 THz frequencies.
+detectors that are sensitive to 20 GHz - 1 THz frequencies.
 
 .. argparse::
     :filename: ../socs/agents/fls/agent.py
-    :func: ??
+    :func: make_parser
     :prog: python3 agent.py
 
 Configuration File Examples
@@ -30,9 +30,9 @@ your ocs configuration file. Here is an example configuration block::
 
   {'agent-class': 'FLSAgent',
    'instance-id': 'fls',
-                 ['--ip', '169.254.18.24',
-                  '--port', '1998',
-                  '--mode', 'acq']}
+   'arguments': ['--ip', '169.254.18.24',
+                 '--port', '1998',
+                 '--mode', 'acq']}
 
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
@@ -131,14 +131,14 @@ Shutting down the FLS
     All operations that require you to physically touch the instrument should
     be performed while wearing a grounding strap.
 
-The shudtown procedure is as follows:
+The shutdown procedure is as follows:
 
   1. Set the voltage bias to zero::
 
        client.set_bias(bias='zero')
 
   2. Put on a grounding strap. Remove the U-shaped link from the BNC Breakout Box.
-  3. While wearing the grounding strap, disonnect the PDA-S power supply to mains
+  3. While wearing the grounding strap, disconnect the PDA-S power supply to mains
      (i.e. by removing the green block connector from the PDA-S unit).
   4. Turn off the lasers::
 
