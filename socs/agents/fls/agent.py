@@ -309,7 +309,7 @@ class FLSAgent:
                 return False, "Could not acquire lock"
 
             laser_status = self.lasers_on
-            if laser_status == True:
+            if laser_status:
                 self.log.info('Current laser state is on.')
                 on_off = 'on'
             elif laser_status == False:
