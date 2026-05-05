@@ -1,6 +1,5 @@
 import base64
 import select
-# import socket
 import time
 
 import numpy as np
@@ -45,7 +44,6 @@ class DLCSmart(TCPInterface):
             try:
                 #                chunk = self.sock.recv(1024)
                 chunk = self.recv(1024)
-#            except self.sock.timeout:
             except self.timeout:
                 break
             data += chunk
@@ -63,9 +61,6 @@ class DLCSmart(TCPInterface):
         Encode the message, send to the DLC Smart, and read
         back the response.
         """
-#        if not self.sock:
-#            raise ConnectionError("Not connected to device")
-#        self.sock.sendall((cmd + "\n").encode())
         self._is_ready()
         self.send((cmd + "\n").encode())
         time.sleep(0.01)
@@ -75,34 +70,7 @@ class DLCSmart(TCPInterface):
         else:
             return True
 
-    # connect and disconnect
-#    def connect(self):
-#        """
-#        Make the socket connection to the command port and read the
-#        welcome message.
-#        """
-#        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#        self.sock.settimeout(self.timeout)
-#        self.sock.connect((self.ip_addr, self.port))
-#        time.sleep(0.1)
-#        welcome_req = self.read_all()
-#        return True, welcome_req
-
-
-#    def close_connection(self):
-#        """
-#        Close the socket connection.
-#        """
-#        if self.sock:
-#            try:
-#                self.send_msg("(quit)", read_response=False)
-#            except Exception:
-#                pass
-#            self.sock.close()
-#            self.sock = None
-
     # formatting for requests, param setting, and commands
-
 
     def param_ref(self, param, printout=False):
         """
@@ -172,7 +140,7 @@ class DLCSmart(TCPInterface):
     def set_dhcp(self, apply=False):
         resp = self.command("net-conf:set-dhcp")
         if apply:
-            apply_dhcp = self.command("net-conf:apply")
+            self.command("net-conf:apply")
             return
         return resp
 
@@ -256,11 +224,11 @@ class DLCSmart(TCPInterface):
         Set all params to run a frequency sweep.
         """
         # set the scan to fast mode
-        fast = self.param_set("frequency:scan-mode-fast", "#t")
-        smin = self.param_set("frequency:frequency-min", freq_min)
-        smax = self.param_set("frequency:frequency-max", freq_max)
-        sstep = self.param_set("frequency:frequency-step", direction * freq_step)
-        sint = self.param_set("lockin:integration-time", int_time)
+        self.param_set("frequency:scan-mode-fast", "#t")
+        self.param_set("frequency:frequency-min", freq_min)
+        self.param_set("frequency:frequency-max", freq_max)
+        self.param_set("frequency:frequency-step", direction * freq_step)
+        self.param_set("lockin:integration-time", int_time)
 
     def check_scan_params(self):
         fast = self.param_ref("frequency:scan-mode-fast")
@@ -364,13 +332,6 @@ class DLCSmart(TCPInterface):
         photocurrent (nA) from a scan. For when you need to just get the data but
         weren't monitoring with timestamps.
         """
-        scanning_query = self.param_ref("frequency:fast-scan-isscanning")
-        if scanning_query == '#t':
-            scanning = True
-        elif scanning_query == '#f':
-            scanning = False
-        else:
-            return scanning_query
         start_ix = 0
         data = {'scan_point_number': [],
                 'scan_set_frequency': [],

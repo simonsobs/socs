@@ -1,5 +1,4 @@
 import argparse
-import socket
 import time
 
 import numpy as np
@@ -310,7 +309,7 @@ class FLSAgent:
                 return False, "Could not acquire lock"
 
             laser_status = self.lasers_on
-            if laser_status:
+            if laser_status == True:
                 self.log.info('Current laser state is on.')
                 on_off = 'on'
             elif laser_status == False:
@@ -340,9 +339,9 @@ class FLSAgent:
                 countdown -= 1
             self.log.info(f'Proceeding to toggle laser power {state}.')
             if state == 'on':
-                change_state = self.dlcsmart.laser_emission_on()
+                self.dlcsmart.laser_emission_on()
             elif state == 'off':
-                change_state = self.dlcsmart.laser_emission_off()
+                self.dlcsmart.laser_emission_off()
             time.sleep(0.3)
             laser_status = self.dlcsmart.check_laser_emission()
             if "#t" in laser_status:
@@ -410,7 +409,7 @@ class FLSAgent:
 
         """
         int_time = params['integration_time']
-        set_int_time = self.dlcsmart.param_set("lockin:integration-time", int_time)
+        self.dlcsmart.param_set("lockin:integration-time", int_time)
         return True, f"Set integration time to {int_time}."
 
     @ocs_agent.param('frequency', type=float)
@@ -433,9 +432,6 @@ class FLSAgent:
                 self.log.warn(f"Could not start Task because "
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
-
-            # Read the actual frequency
-            actual_frequency = self.actual_freq
 
             # Set the new frequency
             set_the_freq = self.dlcsmart.set_frequency(set_frequency)
