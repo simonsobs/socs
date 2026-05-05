@@ -312,7 +312,7 @@ class FLSAgent:
             if laser_status:
                 self.log.info('Current laser state is on.')
                 on_off = 'on'
-            elif laser_status == False:
+            elif laser_status is False:
                 self.log.info('Current laser state is off.')
                 on_off = 'off'
             if on_off == state:

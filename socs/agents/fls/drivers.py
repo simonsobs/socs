@@ -280,7 +280,7 @@ class DLCSmart(TCPInterface):
           - Scan integration time (ms)
         For general monitoring purposes.
         """
-        reset = self.command("lockin:lock-in-reset")
+        self.command("lockin:lock-in-reset")
         time.sleep(0.3)
 
         # Photocurrent
