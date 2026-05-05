@@ -9,13 +9,8 @@ from socs.tcp import TCPInterface
 
 
 class DLCSmart(TCPInterface):
-    def __init__(self, ip_addr, port=1998, buffer_size=1024, timeout=5):
-        self.ip_addr = ip_addr
-        self.port = port  # TCP
-#        self.buffer_size = buffer_size
-#        self.sock = None
-        self.timeout = timeout
-        super().__init__(self.ip_addr, self.port, self.timeout)
+    def __init__(self, ip_addr, port=1998, timeout=5):
+        super().__init__(ip_addr, port, timeout)
 
     def drain_buffer(self, decode=True):
         drained = b""
@@ -27,7 +22,6 @@ class DLCSmart(TCPInterface):
                 if drained.endswith(b"\n> ") or drained.endswith(b"> "):
                     return True
                 else:
-                    # print(drained)
                     print("not fully drained")
                     return False
         else:

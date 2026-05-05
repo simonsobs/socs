@@ -113,6 +113,7 @@ class FLSAgent:
             # Make the connection and read out the welcome message
             try:
                 self.dlcsmart = DLCSmart(ip_addr=self.ip, port=self.port)
+                time.sleep(1)
                 welcome = self.dlcsmart.drain_buffer()
                 print('welcome=' + str(welcome))
             except ConnectionError:
@@ -182,6 +183,7 @@ class FLSAgent:
                 self.scan_step = scan_step
 
         self.initialized = True
+        print('auto_acquire:', params['auto_acquire'])
 
         if params['auto_acquire']:
             resp = self.agent.start('acq', params={})
@@ -573,7 +575,7 @@ def main(args=None):
     agent.register_task('set_frequency', fls_agent.set_frequency)
     agent.register_task('run_frequency_sweeps', fls_agent.run_frequency_sweeps)
     agent.register_task('stop_frequency_sweep', fls_agent.stop_frequency_sweep)
-    agent.register_process('acq', fls_agent.acq, fls_agent._stop_acq)  # , blocking=False)
+    agent.register_process('acq', fls_agent.acq, fls_agent._stop_acq)
 
     runner.run(agent, auto_reconnect=True)
 
