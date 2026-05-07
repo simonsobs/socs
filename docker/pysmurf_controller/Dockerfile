@@ -1,4 +1,4 @@
-FROM simonsobs/so_smurf_base:v0.0.8
+FROM simonsobs/so_smurf_base:v0.0.9
 
 #################################################################
 # sodetlib Install
