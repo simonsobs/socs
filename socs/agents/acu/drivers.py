@@ -134,9 +134,56 @@ class PointProvider:
         self._request(1)
         return self._stash.pop(0)
 
-    def stop(self):
+    def abort(self):
+        """
+            Nuclear option to clear stash and gen immediately.
+        """
+
         self._gen = None
         self._stash = []
+
+    def stop(self, free_form):
+        """
+            Stop point gen gracefully by clearing stash + gen and
+            setting the last point's velocities to 0.
+
+            If free_form, then a graceful free_form stop is generated using
+            the timestamp, az, and az_vel of the final point.
+
+            args:
+                free_form (bool): Arg tracking if the scan is a done with free_form=True.
+        """
+
+        self._request(1)
+
+        final_point = self._stash[0]
+
+        if free_form:
+            STOP_TIME = 5  # seconds
+            final_timestamp = final_point.timestamp
+            final_az = final_point.az
+            final_el = final_point.el
+            final_az_vel = final_point.az_vel
+            final_az_flag = final_point.az_flag
+            final_el_flag = final_point.el_flag
+            final_point_group_batch = 1  # Give a non-zero point_batch_group to ensure full upload.
+
+            final_point.point_group_batch = final_point_group_batch
+
+            stop_point_track = turnarounds.gen_free_form_stop(t0=final_timestamp, v0=final_az_vel,
+                                                              az0=final_az, el0=final_el, stop_time=STOP_TIME,
+                                                              az_flag=final_az_flag, el_flag=final_el_flag,
+                                                              point_group_batch=final_point_group_batch)
+
+            self._stash = [final_point]
+            self._stash.extend(stop_point_track)
+
+        else:
+            final_point.az_vel = 0
+            final_point.el_vel = 0
+            self._stash = [final_point]
+
+        self._gen = None
 
 
 def from_file(filename, fmt=None):

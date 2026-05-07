@@ -2552,10 +2552,10 @@ class ACUAgent:
                     if session.status == 'stopping' and mode not in ['stop', 'abort']:
                         mode = 'stop'
                         stop_message = 'User-requested stop.'
-                        point_prov.stop()
+                        point_prov.stop(free_form)
 
                 if mode == 'abort':
-                    point_prov.stop()
+                    point_prov.abort()
 
                 # Is it time to upload more lines?
                 # This happens when the current time of uploaded points is less

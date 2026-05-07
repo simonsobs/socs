@@ -3,7 +3,7 @@ import numpy as np
 
 def gen_turnaround(turnaround_method, t0, az0, el0, v0, turntime, az_flag, el_flag,
                    point_group_batch, second_leg_time=None, second_leg_velocity=0,
-                   step_time=0.05):
+                   step_time=0.1):
     from .drivers import TrackPoint
     """
     Generates the trajectory of a turnaround given the initial position and velocity of the platform.
@@ -68,6 +68,64 @@ def gen_turnaround(turnaround_method, t0, az0, el0, v0, turntime, az_flag, el_fl
                                 group_flag=int(point_group_batch > 0)))
 
     return turnaround_track
+
+
+def gen_free_form_stop(t0, v0, az0, el0, stoptime, az_flag, el_flag, point_group_batch, step_time=0.1):
+    """
+    Generates the trajectory of a gentle stop for a free_form scan given an timestamp, azimuth, and velocity
+    of the last point in a scan. This function generates a list of TrackPoints for the platform to follow
+    during for a gentle stop, which is necessary for free_form scans.
+
+    Args:
+        t0 (float): The initial time of the stop.
+        az0 (float): The iniital azimuth position of the stop. Should be equal to the final azimuth position of the stop.
+        el0 (float): The initial elevation of the turnaround. El velocity is forced to 0 here so this is only used for creating TrackPoints.
+        v0 (float): The initial azimuth velocity of the stop.
+        stoptime (float): The turnaround time given by the above equation.
+        az_flag (int): The az flag used by the ACU. Inherited from the scan generation function and not changed. Used for TrackPoints.
+        el_flag (int): The el flag used by the ACU. Inherited from the scan generation function and not changed. Used for TrackPoints.
+        point_group_batch (int): the point group batch used by the ACU. Inherited from the scan generation function and not changed. Used for TrackPoints.
+        step_time (float): The step time between points in the turnaround. Defaults to 0.1 seconds (10Hz).
+
+    Returns:
+        free_form_stop_track (list of TrackPoints): A list of generated TrackPoints for the platform to follow for a gentle stop.
+    """
+
+    from sim_scan import TrackPoint
+
+    el_vel = 0.
+
+    t_start = 0
+    t_target = t_start + stoptime
+    az_start = 0
+    az_target = az_start
+    v_start = v0
+    v_target = 0
+    a_start = 0
+    a_target = 0
+
+    # Uses standard turnaround method as that method solves using t, az, v.
+    ts, azs, vs = _gen_trajectory(t_start, t_target, 0,
+                                  az_start, az_target, v_start,
+                                  v_target, a_start, a_target,
+                                  step_time, turnaround_method='standard')
+
+    ts = ts[1:]
+    azs = azs[1:]
+    vs = vs[1:]
+
+    ts += t0
+    azs += az0
+
+    # Turn our turnaround solution into TrackPoint's for the ACU.
+    free_form_stop_track = []
+    for t, az, v in zip(ts, azs, vs):
+        free_form_stop_track.append(TrackPoint(timestamp=t,
+                                               az=az, el=el0, az_vel=v, el_vel=el_vel,
+                                               az_flag=az_flag, el_flag=el_flag,
+                                               group_flag=int(point_group_batch > 0)))
+
+    return free_form_stop_track
 
 
 def _gen_standard_turnaround(v0, turntime, step_time=0.05):
