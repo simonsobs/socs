@@ -21,19 +21,23 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
 # JL: append the parent directory to the path so we can import the readout_client module
-souk_readout_tools_path = '/home/leechj/souk_readout_tools/src/souk_readout_tools/client/'
+#v1
+#souk_readout_tools_path = '/home/leechj/souk_readout_tools/src/souk_readout_tools/client/'
+souk_readout_tools_path = '/home/leechj/souk_readout_tools/client_venv/lib/python3.10/site-packages'
 sys.path.append(souk_readout_tools_path)
 
 if mock:
     import mock_readout_client as readout_client
 else:
-    import readout_client
+    from souk_readout_tools.client.readout_client import ReadoutClient
+    # v1 #import readout_client
 
-# These modules should be present in souk_readout_tools_path...    
+# These modules should be present in souk_readout_tools_path...
+# REMINDER These python files need to be inserted by hand at the moment.  
 import res_fns
 from resonator_fitter import interactive_fit_viewer, fit_summary_table, fit_summary_plot, fit_resonator,fit_summary_histograms,fit_summary_write_json
 
-client = readout_client.ReadoutClient(config_file='config.yaml')
+client = ReadoutClient(config_file='/home/leechj/souk_readout_tools/config.yaml')
 # Push the configuration file above to the RFSoc before attempting anything else.
 client.push_config()
     
@@ -107,7 +111,8 @@ class UKKIDController:
                   self.log.info("Created dir "+out_dir )
               out_rel_path = five_digit_ctime+'/'+self.kid_stream_id   
               return out_dir, out_rel_path
-          
+
+    # Tested at v1.1.1       
     def check_state(self, session, params):
         """
 
@@ -180,9 +185,12 @@ class UKKIDController:
                 # TODO: Decide which data are appropriate to send where.
 
                 now = time.time()
-                full_status = client.get_server_status()
-                # JL: Maybe thin the content down here, before sending to feed.
+                # JL: Need to decide what fiedls are best to send here, thinning out by hand if necessaery.
+                full_status = client.get_info(['server','clock'])
                 json_status = json.dumps(full_status)
+                json_status_stripped =  json_status.replace('{','').replace('}','')
+
+                self.log.info(json_status_stripped)
 
                 session.data = {"value": json_status,
                                "timestamp": now}
@@ -206,6 +214,7 @@ class UKKIDController:
             return False, 'check_state is not currently running.'
             
     # Sends a client.get_system information() call to the RF Socs.
+    # Tested at v1.1.1 
     def get_system_information(self, session, params=None):
         """
 
@@ -215,7 +224,7 @@ class UKKIDController:
             None
 
         Notes:
-          Will call client.get_system information()   
+          Will call client.get_info() to get full system information.   
           Should be a quick task so does not needs its own aborter.
 
         """
@@ -228,7 +237,7 @@ class UKKIDController:
             self.log.info("Getting RFSoc system information...")
 
             now = time.time()
-            full_status = client.get_server_status()
+            full_status = client.get_info()
             json_status = json.dumps(full_status)
 
             # Write result string to session.data, the feed and the log.
@@ -247,6 +256,7 @@ class UKKIDController:
             return True, 'Obtained RFSoc system information.'
 
    # Sends a client.get_initialise_server() call to the RFsocs.
+   # Tested at v1.1.1
     def initialise_server(self, session, params=None):
         """
 
@@ -270,7 +280,7 @@ class UKKIDController:
             self.log.info("Sending RFSoc initialise_server...")
 
             now = time.time()
-            full_status = client.initialise_server()
+            full_status = client._initialise_server()
             json_status = json.dumps(full_status)
             # JL: This returns a string that looks like this
             # '{"status": "success"}'
@@ -718,9 +728,13 @@ class UKKIDController:
     @ocs_agent.param("step_size_hz", default=10000, type=int)
     @ocs_agent.param("num_tones", default=1024, type=int)
     @ocs_agent.param("samples_per_point", default=10, type=int)
-    @ocs_agent.param("ignore_phase_correction", default=False, type=bool)
-    @ocs_agent.param("plot_data", default = True, type = bool)
-    @ocs_agent.param("tone_amplitude", default=0.2, type=float)
+    @ocs_agent.param("apply_phase_correction", default=False, type=bool)
+    @ocs_agent.param("plot_data", default = True, type=bool)
+    @ocs_agent.param("tone_powers_dbm", default='auto', type=str)
+    @ocs_agent.param("reference_plane", default='detector', type=str)
+    @ocs_agent.param("optimise_tx_dynamic_range", default=True, type=bool)
+    @ocs_agent.param("optimise_rx_gain", default=True, type=bool)
+    @ocs_agent.param("verbose", default=True, type=bool)
     def full_band_sweep(self, session, params=None):
         """
 
@@ -764,7 +778,7 @@ class UKKIDController:
             now_string = str(int(sweep_start_time))
             # Make an output filename string
             if params['filename'] is None:  
-               output_sweep_filename = now_string+'_'+'full_band_sweep'+'.csv'
+               output_sweep_filename = now_string+'_'+'full_band_sweep'+'.'+filetype
             else:
                output_sweep_filename = params['filename']
                
@@ -807,6 +821,11 @@ class UKKIDController:
                self.log.info('full_band_sweep: MOCKED Sweep complete.')
                return True, 'full_band_sweep: MOCKED Sweep complete.'
 
+            '''
+            #################################
+            # REPLACE FROM HERE
+            #################################
+            
             # Rest is for REAL, non-mocked case.
             # Firstly, check if a sweep is already in progress on the RFSoC.
             # It shouldn't be, but throw an error and return from function if there is.
@@ -1014,7 +1033,36 @@ class UKKIDController:
                self.log.info(f'full_band_sweep: Sweep progress: {100*p:.3f}%')
                if p==1.0: break
                else: time.sleep(1.0)
+               
+            #################################
+            # NEW VER
+            # TO HERE
+            #################################
+            '''
+            self.log.info('full_band_sweep: Starting sweep...')
+                         
+            if params['tone_powers_dbm'] != 'auto':
+               params['tone_powers_dbm'] = float(params['tone_powers_dbm']) 
+            
+            sweep_data = client.wideband_sweep(
+                bandwidth_hz=params['bandwidth_hz'],               # None = defaults to 90% of full bandwidth
+                center_freq_hz=params['center_freq_hz'],             # None = defaults to center of band
+                step_size_hz=params['step_size_hz'],              # frequency step size
+                num_tones=params['num_tones'],                  # number of parallel tones
+                samples_per_point=params['samples_per_point'],            # accumulation per point
+                tone_powers_dbm=params['tone_powers_dbm'],             # per-tone power in dBm (scalar or array), or 'auto'
+                reference_plane=params['reference_plane'],      # reference plane for tone power calibration
+                apply_phase_correction=params['apply_phase_correction'],         # remove linear phase slope
+                optimise_tx_dynamic_range=params['optimise_tx_dynamic_range'],  # automatically adjust TX parameters to maximise dynamic range
+                optimise_rx_gain=params['optimise_rx_gain'],           # automatically adjust RX gain/attenuation to maximise SNR without saturation
+                verbose=params['verbose']
+            )
 
+            
+            # sweep_data = client.wideband_sweep(apply_phase_correction=params['apply_phase_correction'])
+            #
+            
+            '''
             self.log.info('full_band_sweep: Parsing sweep data ...')
             s = client.parse_sweep_data(client.get_sweep_data(),apply_phase_correction=not ignore_phase_correction)
             f = s['sweep_f']
@@ -1032,13 +1080,46 @@ class UKKIDController:
             s['sweep_q'] = [np.imag(zcat)]
             s['sweep_ei'] = [np.ravel(s['sweep_ei'].T)]
             s['sweep_eq'] = [np.ravel(s['sweep_eq'].T)]
+            '''
 
+            ## SUSPECT???
             self.log.info('full_band_sweep: Saving sweep data to disk.')
-            client.export_sweep(output_sweep_full_path, s, filetype)
-            filename = output_sweep_full_path.replace(filetype,'')+filetype
-            self.log.info('full_band_sweep: Fullband sweep exported to:'+filename)
+            self.log.info('full_band_sweep: sweep_full_path '+ output_sweep_full_path)
+            no_ext_output_sweep_full_path = output_sweep_full_path.replace('.'+filetype,'')
+            client.export_sweep(no_ext_output_sweep_full_path, sweep_data, filetype)
+            self.log.info('full_band_sweep: Fullband sweep exported to:'+output_sweep_full_path)
+
+            ##################################
+            # NEW VER 
+            # Something like this could replace this plot data bit here.
+            # from souk_readout_tools.plotting import plot_sweep
+            # fig = plot_sweep(data, format='magphase',multitone='overlay', title='Frequency Sweep')
+            # plt.show()
+            ##################################
             
             if plot_data:
+                import matplotlib.pyplot as plt
+                from souk_readout_tools.plotting import plot_sweep
+                #fig = plot_sweep(sweep_data, format='magphase',multitone='overlay', title='Frequency Sweep')
+
+                plot_filename =  output_sweep_full_path.replace(filetype,'')+'png'
+                self.log.info('full_band_sweep: Generating quick look plot, writing to ' + plot_filename)
+                
+                fig = plot_sweep(sweep_data, format='magphase', title='Frequency Sweep') 
+                plt.savefig(plot_filename,dpi=300)                                                                                                                                                                                                                                                                                                                        
+                self.log.info('full_band_sweep: Plot saved to ' + plot_filename)
+                '''
+                #######################
+                # Direct plot example (v1.1.1)
+                f = sweep_data['sweep_f'][0]
+                z = sweep_data['sweep_i'][0] + 1j * sweep_data['sweep_q'][0]
+                plt.plot(f / 1e9, 20 * np.log10(np.abs(z)))
+                plt.xlabel('Frequency (GHz)') 
+                plt.ylabel('|S21| (dB)')
+                plt.show()
+                ######################
+                # Old code.
+
                 error_bars = False
                 plot_filename =  output_sweep_full_path.replace(filetype,'')+'png'
                 self.log.info('full_band_sweep: Generating quick look plot, writing to ' + plot_filename)                
@@ -1072,7 +1153,8 @@ class UKKIDController:
                 s2.set_ylim(np.min(uphase),np.max(uphase))
                 plt.savefig(plot_filename,dpi=300) 
                 self.log.info('full_band_sweep: Plot saved to ' + plot_filename)
-            
+                '''
+                
             ################################################
               
         self.log.info('full_band_sweep: Sweep complete.')
@@ -1317,8 +1399,10 @@ class UKKIDController:
             samples_per_point = params['samples_per_point']
 
             client.perform_sweep(f_accurate_list, spans, num_points, samples_per_point, 'up')
-
-            while client.get_server_status()['message']['latest_sweep_data_valid'] == False:
+            
+            #while client.get_server_status()['message']['latest_sweep_data_valid'] == False:
+            #while client.get_info(['server'])['server']['latest_sweep_data_valid'] == False:
+            while client.get_info(['server'])[0]['latest_sweep_data_valid'] == False:
                  self.log.info('Waiting for scan to complete, sleeping for 1 second.')
                  time.sleep(1)
                      
@@ -1330,8 +1414,9 @@ class UKKIDController:
             s = client.parse_sweep_data(raw_sweep)
             self.log.info('...done')
 
-            self.log.info('Exporting sweep data to ' + output_sweep_narrow_path +' ...')            
-            client.export_sweep(output_sweep_narrow_path, s, filetype)   
+            self.log.info('Exporting sweep data to ' + output_sweep_narrow_path +' ...')
+            no_ext_output_sweep_narrow_path = output_sweep_narrow_path.replace('.'+filetype,'')
+            client.export_sweep(no_ext_output_sweep_narrow_path, s, filetype)   
             self.log.info('...done')     
 
             #remove slope from phase
