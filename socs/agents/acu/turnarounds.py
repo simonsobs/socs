@@ -91,31 +91,20 @@ def gen_free_form_stop(t0, v0, az0, el0, stoptime, az_flag, el_flag, point_group
         free_form_stop_track (list of TrackPoints): A list of generated TrackPoints for the platform to follow for a gentle stop.
     """
 
-    from sim_scan import TrackPoint
+    from .drivers import TrackPoint
 
     el_vel = 0.
 
-    t_start = 0
-    t_target = t_start + stoptime
-    az_start = 0
-    az_target = az_start
-    v_start = v0
-    v_target = 0
-    a_start = 0
-    a_target = 0
-
     # Uses standard turnaround method as that method solves using t, az, v.
-    ts, azs, vs = _gen_trajectory(t_start, t_target, 0,
-                                  az_start, az_target, v_start,
-                                  v_target, a_start, a_target,
-                                  step_time, turnaround_method='standard')
+    ts, azs, vs = _gen_trajectory(t_i=0, t_f=stoptime, xn1_i=az0, x0_i=v0, x0_f=0,
+                                  x1_i=0, x1_f=0, x2_i=0, x2_f=0, step_time=step_time,
+                                  turnaround_method='three_leg')
 
     ts = ts[1:]
     azs = azs[1:]
     vs = vs[1:]
 
     ts += t0
-    azs += az0
 
     # Turn our turnaround solution into TrackPoint's for the ACU.
     free_form_stop_track = []
