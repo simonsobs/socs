@@ -287,7 +287,7 @@ class ACUAgent:
         tclient._HTTP11ClientFactory.noisy = False
 
         self.acu_control = aculib.AcuControl(
-            acu_config, backend=RetwistedHttpBackend(persistent=False))
+            acu_config, backend=RetwistedHttpBackend(persistent=True))
         self.acu_read = aculib.AcuControl(
             acu_config, backend=TwistedHttpBackend(persistent=True), readonly=True)
 
