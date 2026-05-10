@@ -2384,7 +2384,7 @@ class ACUAgent:
                                     'data': scan_params_bundle})
 
         ret_val = (yield self._run_track(
-            session=session, point_gen=g, step_time=step_time, min_stop_time=min_turnaround_time,
+            session=session, point_gen=g, step_time=step_time, max_stop_accel=max_turnaround_accel,
             track_axes=track_axes, point_batch_count=point_batch_count,
             free_form=free_form, unabort_failure=(params['scan_type'] in [2, 3])))
 
@@ -2396,7 +2396,7 @@ class ACUAgent:
         return ret_val
 
     @inlineCallbacks
-    def _run_track(self, session, point_gen, step_time, min_stop_time, track_axes=['az'],
+    def _run_track(self, session, point_gen, step_time, max_stop_accel=None, track_axes=['az'],
                    point_batch_count=None, free_form=False, unabort_failure=False):
         """Run a ProgramTrack track scan, with points provided by a
         generator.
@@ -2552,7 +2552,7 @@ class ACUAgent:
                     if session.status == 'stopping' and mode not in ['stop', 'abort']:
                         mode = 'stop'
                         stop_message = 'User-requested stop.'
-                        point_prov.stop(free_form, min_stop_time)
+                        point_prov.stop(free_form, max_stop_accel)
 
                 if mode == 'abort':
                     point_prov.abort()

@@ -115,7 +115,7 @@ class PointProvider:
     def __init__(self, gen):
         self._gen = gen
         self._stash = []
-        self._last_yielded_point = None
+        self._last_yielded_points = []  # Keep a queue of the last 2 yielded points.
 
     def __len__(self):
         return len(self._stash)
@@ -134,7 +134,11 @@ class PointProvider:
     def pop(self):
         self._request(1)
         if len(self._stash):
-            self._last_yielded_point = self._stash[0]
+            if len(self._last_yielded_points) == 2:
+                # Ensure we only ever have 2 points in the last yielded points.
+                self._last_yielded_points.pop(0)
+
+            self._last_yielded_points.append(self._stash[0])
             return self._stash.pop(0)
 
         return None
@@ -147,7 +151,7 @@ class PointProvider:
         self._gen = None
         self._stash = []
 
-    def stop(self, free_form, stop_time=None):
+    def stop(self, free_form, max_stop_accel=None):
         """
         Stop point gen gracefully by clearing stash + gen and
         setting the last point's velocities to 0.
@@ -158,13 +162,24 @@ class PointProvider:
         args:
             free_form (bool): Arg tracking if the scan is a done with free_form=True.
         """
-        stop_time = 5 if stop_time is None else stop_time  # seconds
 
-        self._request(1)
+        self.abort()
 
-        final_point = self._last_yielded_point
+        if not len(self._last_yielded_points):
+            return  # Platform was never in motion because we never yielded a point!
 
+        final_point = self._last_yielded_points[-1]
+
+        # We'll use a standard turnaround to stop the telescope.
+        # For standard turnarounds, stop_time = 3 * v0 / max_acceleration
+        stoptime = 2
+        if max_stop_accel is not None:
+            v0 = final_point.az_vel
+            stoptime = 2 * abs(v0) / max_stop_accel
+
+        # If we're in a free_form scan, we need to generate a smooth stop based from the last point uploaded.
         if free_form:
+            # Grab the data from the final point to form a smooth stop from it.
             final_timestamp = final_point.timestamp
             final_az = final_point.az
             final_el = final_point.el
@@ -173,20 +188,29 @@ class PointProvider:
             final_el_flag = final_point.el_flag
             final_point_group_batch = 1  # Give a non-zero point_batch_group to ensure full upload.
 
-            stop_point_track = turnarounds.gen_free_form_stop(t0=final_timestamp, v0=final_az_vel,
-                                                              az0=final_az, el0=final_el, stoptime=stop_time,
+            # Calculate the final stop acceleration to make the stop smooth in case we stop in a turnaround.
+            if len(self._last_yielded_points[-1]) == 1:
+                final_az_accel = 0  # We only have one point, just assume 0 az acceleration.
+
+            else:
+                dt = self._last_yielded_points[1].timestamp - self._last_yielded_points[0].timestamp
+                dv = self._last_yielded_points[1].az_vel - self._last_yielded_points[0].az_vel
+                final_az_accel = dv / dt  # Calculate the final acceleration given the last two points.
+
+            # Generate the final point track of the free_form stop
+            stop_point_track = turnarounds.gen_free_form_stop(t0=final_timestamp, a0=final_az_accel, v0=final_az_vel,
+                                                              az0=final_az, el0=final_el, stoptime=stoptime,
                                                               az_flag=final_az_flag, el_flag=final_el_flag,
                                                               point_group_batch=final_point_group_batch)
 
             self._stash.extend(stop_point_track)
 
+        # If we're not in a free_form scan, we can just set the final velocities to 0.
         else:
-            final_point.timestamp += stop_time
+            final_point.timestamp += stoptime
             final_point.az_vel = 0
             final_point.el_vel = 0
             self._stash = [final_point]
-
-        self._gen = None
 
 
 def from_file(filename, fmt=None):
