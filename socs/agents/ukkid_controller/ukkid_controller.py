@@ -26,6 +26,8 @@ from ocs.ocs_twisted import TimeoutLock
 souk_readout_tools_path = '/home/leechj/souk_readout_tools/client_venv/lib/python3.10/site-packages'
 sys.path.append(souk_readout_tools_path)
 
+stream_script_path = '/home/leechj/souk_readout_tools/src/souk_readout_tools/client/'
+
 if mock:
     import mock_readout_client as readout_client
 else:
@@ -37,7 +39,8 @@ else:
 import res_fns
 from resonator_fitter import interactive_fit_viewer, fit_summary_table, fit_summary_plot, fit_resonator,fit_summary_histograms,fit_summary_write_json
 
-client = ReadoutClient(config_file='/home/leechj/souk_readout_tools/config.yaml')
+config_file = '/home/leechj/souk_readout_tools/config.yaml'
+client = ReadoutClient(config_file=config_file)
 # Push the configuration file above to the RFSoc before attempting anything else.
 client.push_config()
     
@@ -607,16 +610,18 @@ class UKKIDController:
             output_stream_full_path = out_full_path + '/'+output_stream_filename
             self.log.info("Will stream data to file: "+output_stream_relative_path)
  
-            if mock:
-               mock_flag = "T" 
+            if mock:           
+               mock_flag = "-m"
+               executable_list = [sys.executable, "receive_stream_g3.py",mock_flag,"-n",str(num_freqs),"-f",output_stream_relative_path,"-i",self.kid_stream_id,"-t",str(params['duration']),'-C',config_file]
             else:
-               mock_flag = "F" 
+               executable_list = [sys.executable, "receive_stream_g3.py","-n",str(num_freqs),"-f",output_stream_relative_path,"-i",self.kid_stream_id,"-t",str(params['duration']),'-C', config_file]
+
             
-            executable_list = [sys.executable, "receive_stream_g3.py","-m",mock_flag,"-n",str(num_freqs),"-f",output_stream_relative_path,"-i",self.kid_stream_id,"-t",str(params['duration'])]
+            # executable_list = [sys.executable, "receive_stream_g3.py",mock_flag,"-n",str(num_freqs),"-f",output_stream_relative_path,"-i",self.kid_stream_id,"-t",str(params['duration'])]
             executable_string = " ".join(executable_list)
             self.log.info("Launching stream task " + executable_string)
             
-            p=subprocess.Popen(executable_list,cwd=souk_readout_tools_path+'/client_scripts/',stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=False)
+            p=subprocess.Popen(executable_list,cwd=stream_script_path+'/client_scripts/',stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=False)
 
             self.log.info("stream receive process pid is " + str(p.pid))
             
