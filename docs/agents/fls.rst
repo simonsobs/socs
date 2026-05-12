@@ -170,3 +170,9 @@ The shutdown procedure is as follows:
   5. Stop the Agent from running.
   6. While wearing the grounding strap, turn off the DLC Smart using the power
      switch on the back of the instrument.
+
+Agent API
+---------
+
+.. autoclass:: socs.agents.fls.agent.FLSAgent
+    :members:

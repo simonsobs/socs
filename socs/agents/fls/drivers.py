@@ -39,16 +39,13 @@ class DLCSmart(TCPInterface):
         Handles decoding anything read out from the DLC Smart.
         """
         data = b""
-        expect_prompt = False
         while True:
             try:
                 chunk = self.recv(1024)
-            except self.timeout:
+            except ConnectionError:
                 break
             data += chunk
-            if expect_prompt and data.endswith(b">"):
-                break
-            if not expect_prompt and b"\n" in chunk:
+            if b"\n" in chunk:
                 break
         if decode:
             return data.decode('ascii', errors='ignore').replace('\r', '').strip('\n> ')
@@ -107,7 +104,7 @@ class DLCSmart(TCPInterface):
         resp = self.send_msg(msg)
         return resp
 
-    def command(self, param, decode=False, vals=[]):
+    def command(self, param, decode=False, vals=None):
         """
         Execute a command to the DLC Smart.
 
@@ -122,21 +119,27 @@ class DLCSmart(TCPInterface):
         resp: The response from the DLC Smart
         """
         msg = f"(exec '{param}"
-        if len(vals):
-            for val in vals:
-                msg += " " + str(val)
+        if vals is not None:
+            if type(vals) is list:
+                for val in vals:
+                    msg += " " + str(val)
         msg += ")"
         resp = self.send_msg(msg, decode=decode)
         return resp
 
     # network operations and checks
 
-    def get_ip(self):
-        resp = self.param_ref("net-conf:ip-addr")
-        self.ip_address = resp
-        return resp
-
     def set_dhcp(self, apply=False):
+        """
+        Set the DLC Smart to DHCP instead of static IP.
+
+        Parameters:
+            apply (bool): Command the DLC Smart to apply the DHCP setting. Default
+                          value is False. Note that if you do apply the setting,
+                          you should restart the DLC Smart.
+        Note: This function exists in the driver for non-OCS usage. It is not intended
+              for OCS/SOCS workflows.
+        """
         resp = self.command("net-conf:set-dhcp")
         if apply:
             self.command("net-conf:apply")
@@ -285,7 +288,7 @@ class DLCSmart(TCPInterface):
         # Photocurrent
         photocurrent = self.param_ref("lockin:lock-in-value-nanoamp")
         if '#t' in photocurrent:
-            photocurrent = photocurrent.strip('(').strip(' #t)')
+            photocurrent = photocurrent.strip('( #t)')
         else:
             photocurrent = 'nan'
 

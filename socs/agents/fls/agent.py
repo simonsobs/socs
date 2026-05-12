@@ -61,7 +61,7 @@ class FLSAgent:
     @ocs_agent.param('auto_acquire', type=bool, default=False)
     def initialize(self, session, params=None):
         """
-        initialize()
+        initialize(auto_acquire=False)
 
         ***Task*** - Initialize the connection to the DLC Smart
 
@@ -80,7 +80,6 @@ class FLSAgent:
             # Make the connection and read out the welcome message
             try:
                 self.dlcsmart = DLCSmart(ip_addr=self.ip, port=self.port)
-                time.sleep(1)
                 self.dlcsmart.drain_buffer()
             except ConnectionError:
                 self.log.error("could not establish connection to DLC Smart")
@@ -160,7 +159,7 @@ class FLSAgent:
     @ocs_agent.param('test_mode', default=False, type=bool)
     def acq(self, session, params):
         """
-        acq()
+        acq(test_mode=False)
 
         ***Process*** - Starts the 'sampling' data acquisiton from the DLC Smart.
 
@@ -171,20 +170,19 @@ class FLSAgent:
             The data collected are stored in session data in the structure:
 
                 >> response.session['data']
-                {'fields':
-                    {'set_frequency': 110.0,
-                     'actual_frequency': 109.3425,
-                     'photocurrent': 0.1124,
-                     'bias_voltage': 0.999834227,
-                     'bias_offset': -0.498235892,
-                     'lasers_on': True,
-                     'scan_mode': 'fast',
-                     'scan_min_frequency': 120.0,
-                     'scan_max_frequency': 180.0,
-                     'scan_step': 0.05,
-                     'scan_direction': 1,
-                     'integration_time': 299.3421
-                     'timestamp': 1771277799.562098}
+                {'set_frequency': 110.0,
+                 'actual_frequency': 109.3425,
+                 'photocurrent': 0.1124,
+                 'bias_voltage': 0.999834227,
+                 'bias_offset': -0.498235892,
+                 'lasers_on': True,
+                 'scan_mode': 'fast',
+                 'scan_min_frequency': 120.0,
+                 'scan_max_frequency': 180.0,
+                 'scan_step': 0.05,
+                 'scan_direction': 1,
+                 'integration_time': 299.3421
+                 'timestamp': 1771277799.562098}
         """
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:
@@ -233,8 +231,8 @@ class FLSAgent:
                 for key, val in data.items():
                     sampling_data[key] = val
 
-                session.data = {"sampling_data": sampling_data,
-                                "timestamp": time.time()}
+                data['timestamp'] = time.time()
+                session.data = data
 
                 pub_data = {'timestamp': time.time(),
                             'block_name': 'sampling_data',
@@ -299,11 +297,14 @@ class FLSAgent:
 
             countdown = 10
             while countdown > 0:
-                self.log.warn(f'Bias amplitude and bias offset are zero. Check that U-shaped link '
-                              f'is unplugged. CANCEL TASK NOW IF NOT. Task will proceed in '
-                              f'{countdown} seconds.')
-                time.sleep(1)
-                countdown -= 1
+                if session.status == "running": 
+                    self.log.warn(f'Bias amplitude and bias offset are zero. Check that '
+                                  f'U-shaped link is unplugged. CANCEL TASK NOW IF NOT. '
+                                  f'Task will proceed in {countdown} seconds.')
+                    time.sleep(1)
+                    countdown -= 1
+                else:
+                    return False, "Laser power has not been toggled."
             self.log.info(f'Proceeding to toggle laser power {state}.')
             if state == 'on':
                 self.dlcsmart.laser_emission_on()
@@ -380,7 +381,7 @@ class FLSAgent:
         self.dlcsmart.param_set("lockin:integration-time", int_time)
         return True, f"Set integration time to {int_time}."
 
-    @ocs_agent.param('frequency', type=float)
+    @ocs_agent.param('frequency', type=float, check=lambda x: MIN_FREQ <= x < MAX_FREQ)
     def set_frequency(self, session, params):
         """
         set_frequency(frequency)
@@ -392,8 +393,6 @@ class FLSAgent:
             frequency (float): The frequency to set the laser to.
         """
         set_frequency = params['frequency']
-        assert set_frequency >= MIN_FREQ, f"Frequency must be above {MIN_FREQ} GHz!"
-        assert set_frequency < MAX_FREQ, f"Frequency must be below {MAX_FREQ} GHz!"
 
         with self.lock.acquire_timeout(timeout=12, job='set_frequency') as acquired:
             if not acquired:
@@ -405,14 +404,15 @@ class FLSAgent:
             response = self.dlcsmart.set_frequency(set_frequency)
             if response == '0':
                 return True, f"Frequency set to {set_frequency} in the DLC Smart."
+            else:
+                return False, "Frequency set command not received by the DLC Smart."
 
-#        return True, f"Set frequency to {set_frequency} GHz"
 
-    @ocs_agent.param('min_frequency', type=float)
-    @ocs_agent.param('max_frequency', type=float)
+    @ocs_agent.param('min_frequency', type=float, check=lambda x: MIN_FREQ <= x < MAX_FREQ)
+    @ocs_agent.param('max_frequency', type=float, check=lambda x: MIN_FREQ <= x < MAX_FREQ)
     @ocs_agent.param('start_direction', type=int, choices=[-1, 1])
-    @ocs_agent.param('frequency_step', type=float, default=0.05)
-    @ocs_agent.param('int_time', type=float, default=0.0)
+    @ocs_agent.param('frequency_step', type=float, default=0.05, check=lambda x >= 0.01)
+    @ocs_agent.param('int_time', type=float, default=300., check=lambda x: 0.5 < x <= 3000)
     def run_frequency_sweeps(self, session, params):
         """
         run_frequency_sweeps(min_frequency, max_frequency, start_direction,
@@ -441,14 +441,6 @@ class FLSAgent:
             int_time = self.integration_time
 
         assert min_freq < max_freq, "max_freq must be greater than min_freq!"
-        assert min_freq >= MIN_FREQ, f"min_freq must be at least {MIN_FREQ} GHz."
-        assert min_freq < MAX_FREQ, f"min_freq must be less than {MAX_FREQ} GHz."
-        assert max_freq >= MIN_FREQ, f"max_freq must be at least {MIN_FREQ} GHz."
-        assert max_freq < MAX_FREQ, f"max_freq must be less than {MAX_FREQ} GHz."
-        assert freq_step >= 0.01, "minimum step size is 0.01 GHz."
-        assert start_dir in (-1, 1), "Choose start_dir=1 (increasing) or -1 (decreasing)"
-        assert int_time > 0.5, "integration time must be greater than 0.5 ms."
-        assert int_time <= 3000, "integration time must be no more than 3000 ms."
 
         with self.lock.acquire_timeout(timeout=12, job='set_frequency') as acquired:
             if not acquired:
