@@ -151,7 +151,7 @@ class PointProvider:
         self._gen = None
         self._stash = []
 
-    def stop(self, free_form, stop_accel=None):
+    def stop(self, free_form, stop_accel=0.5):
         """
         Stop point gen gracefully by clearing stash + gen and
         setting the last point's velocities to 0.
@@ -161,6 +161,8 @@ class PointProvider:
 
         args:
             free_form (bool): Arg tracking if the scan is a done with free_form=True.
+            stop_accel (float): The azimuth acceleration to use to generate the stop.
+              Defaults to 0.5 deg/s^2.
         """
 
         self.abort()
@@ -169,9 +171,6 @@ class PointProvider:
             return  # Platform was never in motion because we never yielded a point!
 
         final_point = self._last_yielded_points[-1]
-
-        if stop_accel is None:
-            stop_accel = 0.5
 
         # For the stop, stop_time = v0 / max_acceleration
         v0 = final_point.az_vel
