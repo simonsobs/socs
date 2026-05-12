@@ -37,6 +37,22 @@ your ocs configuration file. Here is an example configuration block::
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
 
+Docker-compose
+``````````````
+
+The FLS Agent should be configured to run in a Docker container. An example
+configuration is::
+
+  ocs-fls-agent:
+    image: simonobs/socs:latest
+    hostname: ocs-docker
+    network_mode: "host"
+    environment:
+      - INSTANCE_ID=fls
+      - SITE_HUB=ws://127.0.0.1:8001/ws
+      - SITE_HTTP=http://127.0.0.1:8001/call
+    volumes:
+      - ${OCS_CONFIG_DIR}:/config:ro
 
 Example Clients and Procedures
 ------------------------------
@@ -68,8 +84,11 @@ The startup procedure is as follows:
 
        client.toggle_laser_power(state='on')
 
-     The white lights on top of the laser units will turn on if this operation
-     is successful.
+     `toggle_laser_power` includes a 10-second countdown for the user to abort
+     toggling the power if the U-shaped link has not been removed. An abort button
+     will appear in the Task window for `toggle_laser_power` on OCS-web. Once the
+     Task completes, the white lights on top of the laser units will turn on if
+     this operation is successful.
 
   5. Connect the PDA-S power supply to mains (i.e. by inserting the green
      block connector into the PDA-S unit).
@@ -144,6 +163,10 @@ The shutdown procedure is as follows:
 
        client.toggle_laser_power(state='off')
 
+     `toggle_laser_power` includes a 10-second countdown for the user to abort
+     toggling the power if the U-shaped link has not been removed. An abort button
+     will appear in the Task window for `toggle_laser_power` on OCS-web. Once the
+     task completes, the lights on the tops of the lasers will turn off.
   5. Stop the Agent from running.
   6. While wearing the grounding strap, turn off the DLC Smart using the power
      switch on the back of the instrument.

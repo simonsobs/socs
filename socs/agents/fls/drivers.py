@@ -42,7 +42,6 @@ class DLCSmart(TCPInterface):
         expect_prompt = False
         while True:
             try:
-                #                chunk = self.sock.recv(1024)
                 chunk = self.recv(1024)
             except self.timeout:
                 break
@@ -331,6 +330,9 @@ class DLCSmart(TCPInterface):
         Query the point number, set frequency (GHz), actual frequency (GHz), and
         photocurrent (nA) from a scan. For when you need to just get the data but
         weren't monitoring with timestamps.
+
+        Note: This function exists in the driver for non-OCS usage. It is not intended
+              for OCS/SOCS workflows.
         """
         start_ix = 0
         data = {'scan_point_number': [],
