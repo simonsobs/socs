@@ -14,6 +14,7 @@ MIN_FREQ = 20.
 def _within(val, target, tolerance=1e-2):
     return abs(val - target) <= tolerance
 
+
 class FLSAgent:
     """
     Agent for operating the lasers in the Frequency-selectable Laser Source
@@ -559,7 +560,7 @@ def main(args=None):
     fls_agent = FLSAgent(agent, args.ip, args.port)
     agent.register_task('initialize', fls_agent.initialize, startup=init_params)
     agent.register_task('toggle_laser_power', fls_agent.toggle_laser_power,
-        aborter=fls._abort_laser_power)
+                        aborter=fls._abort_laser_power)
     agent.register_task('set_bias', fls_agent.set_bias)
     agent.register_task('set_integration_time', fls_agent.set_integration_time)
     agent.register_task('set_frequency', fls_agent.set_frequency)
