@@ -1,4 +1,4 @@
-FROM simonsobs/so_smurf_base:rogue6-6.12.0
+FROM simonsobs/so_smurf_base:rogue6-status-stream
 
 #################################################################
 # sodetlib Install
