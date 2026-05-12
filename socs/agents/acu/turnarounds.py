@@ -70,7 +70,7 @@ def gen_turnaround(turnaround_method, t0, az0, el0, v0, turntime, az_flag, el_fl
     return turnaround_track
 
 
-def gen_free_form_stop(t0, a0, v0, az0, el0, stoptime, az_flag, el_flag, point_group_batch, step_time=0.1):
+def gen_free_form_stop(t0, a0, v0, az0, el0, stoptime, az_flag, el_flag, step_time=0.1):
     """
     Generates the trajectory of a gentle stop for a free_form scan given an timestamp, azimuth, and velocity
     of the last point in a scan. This function generates a list of TrackPoints for the platform to follow
@@ -96,7 +96,10 @@ def gen_free_form_stop(t0, a0, v0, az0, el0, stoptime, az_flag, el_flag, point_g
 
     el_vel = 0.
 
-    # Uses standard turnaround method as that method solves using t, az, v.
+    # Uses a three_leg turnaround generator as that method solves using time, vel, and accel.
+    # This won't actually generate a stop as three_legs!
+    # This just uses the solver that minimizes snap instead of jerk.
+    # We need to do this because we don't actually know what the final azimuth of the stop is.
     ts, azs, vs = _gen_trajectory(t_i=0, t_f=stoptime, xn1_i=az0, x0_i=v0, x0_f=0,
                                   x1_i=a0, x1_f=0, x2_i=0, x2_f=0, step_time=step_time,
                                   turnaround_method='three_leg')
@@ -113,7 +116,7 @@ def gen_free_form_stop(t0, a0, v0, az0, el0, stoptime, az_flag, el_flag, point_g
         free_form_stop_track.append(TrackPoint(timestamp=t,
                                                az=az, el=el0, az_vel=v, el_vel=el_vel,
                                                az_flag=az_flag, el_flag=el_flag,
-                                               group_flag=int(point_group_batch > 0)))
+                                               group_flag=1))
 
     return free_form_stop_track
 

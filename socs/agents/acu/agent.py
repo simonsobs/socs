@@ -2384,7 +2384,7 @@ class ACUAgent:
                                     'data': scan_params_bundle})
 
         ret_val = (yield self._run_track(
-            session=session, point_gen=g, step_time=step_time, max_stop_accel=max_turnaround_accel,
+            session=session, point_gen=g, step_time=step_time, stop_accel=az_accel,
             track_axes=track_axes, point_batch_count=point_batch_count,
             free_form=free_form, unabort_failure=(params['scan_type'] in [2, 3])))
 
@@ -2396,7 +2396,7 @@ class ACUAgent:
         return ret_val
 
     @inlineCallbacks
-    def _run_track(self, session, point_gen, step_time, max_stop_accel=None, track_axes=['az'],
+    def _run_track(self, session, point_gen, step_time, stop_accel=None, track_axes=['az'],
                    point_batch_count=None, free_form=False, unabort_failure=False):
         """Run a ProgramTrack track scan, with points provided by a
         generator.
@@ -2408,6 +2408,10 @@ class ACUAgent:
             This is used to guarantee that points are uploaded
             sufficiently in advance for the servo unit to process
             them.
+          stop_accel: float acceleration value used to generate the
+            stop PointTrack for the scan. If _run_track is called from
+            generate_scan, stop_accel is equal to the az_accel for the
+            scan. If None, the stop will be generated with stop_accel=0.5.
           track_axes: list of strings indicating which axes ('az',
             'el') should be put in ProgramTrack mode.  Axes not
             included here will not have their mode changed.
@@ -2552,7 +2556,7 @@ class ACUAgent:
                     if session.status == 'stopping' and mode not in ['stop', 'abort']:
                         mode = 'stop'
                         stop_message = 'User-requested stop.'
-                        point_prov.stop(free_form, max_stop_accel)
+                        point_prov.stop(free_form, stop_accel)
 
                 if mode == 'abort':
                     point_prov.abort()

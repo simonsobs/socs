@@ -134,8 +134,8 @@ class PointProvider:
     def pop(self):
         self._request(1)
         if len(self._stash):
-            if len(self._last_yielded_points) == 2:
-                # Ensure we only ever have 2 points in the last yielded points.
+            while len(self._last_yielded_points) >= 2:
+                # Ensure we only ever have 2 points or less in the last yielded points.
                 self._last_yielded_points.pop(0)
 
             self._last_yielded_points.append(self._stash[0])
@@ -151,7 +151,7 @@ class PointProvider:
         self._gen = None
         self._stash = []
 
-    def stop(self, free_form, max_stop_accel=None):
+    def stop(self, free_form, stop_accel=None):
         """
         Stop point gen gracefully by clearing stash + gen and
         setting the last point's velocities to 0.
@@ -170,12 +170,12 @@ class PointProvider:
 
         final_point = self._last_yielded_points[-1]
 
-        # We'll use a standard turnaround to stop the telescope.
-        # For standard turnarounds, stop_time = 3 * v0 / max_acceleration
-        stoptime = 2
-        if max_stop_accel is not None:
-            v0 = final_point.az_vel
-            stoptime = 2 * abs(v0) / max_stop_accel
+        if stop_accel is None:
+            stop_accel = 0.5
+
+        # For the stop, stop_time = v0 / max_acceleration
+        v0 = final_point.az_vel
+        stoptime = abs(v0) / stop_accel
 
         # If we're in a free_form scan, we need to generate a smooth stop based from the last point uploaded.
         if free_form:
@@ -186,10 +186,9 @@ class PointProvider:
             final_az_vel = final_point.az_vel
             final_az_flag = final_point.az_flag
             final_el_flag = final_point.el_flag
-            final_point_group_batch = 1  # Give a non-zero point_batch_group to ensure full upload.
 
             # Calculate the final stop acceleration to make the stop smooth in case we stop in a turnaround.
-            if len(self._last_yielded_points[-1]) == 1:
+            if len(self._last_yielded_points) == 1:
                 final_az_accel = 0  # We only have one point, just assume 0 az acceleration.
 
             else:
@@ -200,8 +199,7 @@ class PointProvider:
             # Generate the final point track of the free_form stop
             stop_point_track = turnarounds.gen_free_form_stop(t0=final_timestamp, a0=final_az_accel, v0=final_az_vel,
                                                               az0=final_az, el0=final_el, stoptime=stoptime,
-                                                              az_flag=final_az_flag, el_flag=final_el_flag,
-                                                              point_group_batch=final_point_group_batch)
+                                                              az_flag=final_az_flag, el_flag=final_el_flag)
 
             self._stash.extend(stop_point_track)
 
