@@ -409,7 +409,7 @@ class FLSAgent:
     @ocs_agent.param('min_frequency', type=float, check=lambda x: MIN_FREQ <= x < MAX_FREQ)
     @ocs_agent.param('max_frequency', type=float, check=lambda x: MIN_FREQ <= x < MAX_FREQ)
     @ocs_agent.param('start_direction', type=int, choices=[-1, 1])
-    @ocs_agent.param('frequency_step', type=float, default=0.05, check=lambda x >= 0.01)
+    @ocs_agent.param('frequency_step', type=float, default=0.05, check=lambda x: x >= 0.01)
     @ocs_agent.param('int_time', type=float, default=300., check=lambda x: 0.5 < x <= 3000)
     def run_frequency_sweeps(self, session, params):
         """
