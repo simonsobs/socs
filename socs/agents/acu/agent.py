@@ -2396,7 +2396,7 @@ class ACUAgent:
         return ret_val
 
     @inlineCallbacks
-    def _run_track(self, session, point_gen, step_time, stop_accel=None, track_axes=['az'],
+    def _run_track(self, session, point_gen, step_time, stop_accel=0.5, track_axes=['az'],
                    point_batch_count=None, free_form=False, unabort_failure=False):
         """Run a ProgramTrack track scan, with points provided by a
         generator.
@@ -2411,7 +2411,7 @@ class ACUAgent:
           stop_accel: float acceleration value used to generate the
             stop PointTrack for the scan. If _run_track is called from
             generate_scan, stop_accel is equal to the az_accel for the
-            scan. If None, the stop will be generated with stop_accel=0.5.
+            scan. By default the stop will be generated with stop_accel=0.5.
           track_axes: list of strings indicating which axes ('az',
             'el') should be put in ProgramTrack mode.  Axes not
             included here will not have their mode changed.
