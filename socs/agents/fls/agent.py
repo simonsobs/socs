@@ -297,7 +297,7 @@ class FLSAgent:
 
             countdown = 10
             while countdown > 0:
-                if session.status == "running": 
+                if session.status == "running":
                     self.log.warn(f'Bias amplitude and bias offset are zero. Check that '
                                   f'U-shaped link is unplugged. CANCEL TASK NOW IF NOT. '
                                   f'Task will proceed in {countdown} seconds.')
@@ -406,7 +406,6 @@ class FLSAgent:
                 return True, f"Frequency set to {set_frequency} in the DLC Smart."
             else:
                 return False, "Frequency set command not received by the DLC Smart."
-
 
     @ocs_agent.param('min_frequency', type=float, check=lambda x: MIN_FREQ <= x < MAX_FREQ)
     @ocs_agent.param('max_frequency', type=float, check=lambda x: MIN_FREQ <= x < MAX_FREQ)
