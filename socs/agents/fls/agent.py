@@ -148,7 +148,6 @@ class FLSAgent:
                 self.scan_step = scan_step
 
         self.initialized = True
-        print('auto_acquire:', params['auto_acquire'])
 
         if params['auto_acquire']:
             resp = self.agent.start('acq', params={})
@@ -379,7 +378,7 @@ class FLSAgent:
         """
         int_time = params['integration_time']
         self.dlcsmart.param_set("lockin:integration-time", int_time)
-        return True, f"Set integration time to {int_time}."
+        return True, f"Commanded integration time to be set to {int_time}."
 
     @ocs_agent.param('frequency', type=float, check=lambda x: MIN_FREQ <= x < MAX_FREQ)
     def set_frequency(self, session, params):
@@ -403,7 +402,7 @@ class FLSAgent:
             # Set the new frequency
             response = self.dlcsmart.set_frequency(set_frequency)
             if response == '0':
-                return True, f"Frequency set to {set_frequency} in the DLC Smart."
+                return True, f"Commanded the DLC Smart to set frequency to {set_frequency}."
             else:
                 return False, "Frequency set command not received by the DLC Smart."
 
