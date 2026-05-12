@@ -354,7 +354,7 @@ class FLSAgent:
             elif bias_to_set == 'default' and round(check_bias_amp, 1) == 1.0 and round(check_bias_offset, 1) == -0.5:
                 self.log.info('Bias successfully set to default.')
             else:
-                bias_amp, bias_off = self.dlcsmart.check_bias()
+                bias_amp, bias_offset = self.dlcsmart.check_bias()
                 if bias_to_set == 'zero' and (bias_amp, bias_offset) == (0., 0.):
                     self.log.info('Bias successfully set to zero.')
                 elif bias_to_set == 'default' and round(bias_amp, 1) == 1.0 and round(bias_offset, 1) == -0.5:
@@ -560,7 +560,7 @@ def main(args=None):
     fls_agent = FLSAgent(agent, args.ip, args.port)
     agent.register_task('initialize', fls_agent.initialize, startup=init_params)
     agent.register_task('toggle_laser_power', fls_agent.toggle_laser_power,
-                        aborter=fls._abort_laser_power)
+        aborter=fls_agent._abort_laser_power)
     agent.register_task('set_bias', fls_agent.set_bias)
     agent.register_task('set_integration_time', fls_agent.set_integration_time)
     agent.register_task('set_frequency', fls_agent.set_frequency)
