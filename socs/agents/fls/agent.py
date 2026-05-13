@@ -106,7 +106,7 @@ class FLSAgent:
 
             # Read the actual frequency
             self.actual_freq = self.dlcsmart.get_actual_frequency()
-            self.log.info(f'Actual frequency: {actual_freq}')
+            self.log.info(f'Actual frequency: {self.actual_freq}')
 
             # Read the scan parameters
             scan_params = self.dlcsmart.check_scan_params()
