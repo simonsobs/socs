@@ -105,12 +105,7 @@ class FLSAgent:
                 self.log.warn("Could not determine if lasers are on!")
 
             # Read the actual frequency
-            actual_freq = self.dlcsmart.get_actual_frequency()
-            try:
-                self.actual_freq = float(actual_freq)
-            except ValueError as e:
-                self.log.warn(f'Could not convert {actual_freq} to float: {e}')
-                self.actual_freq = actual_freq
+            self.actual_freq = self.dlcsmart.get_actual_frequency()
             self.log.info(f'Actual frequency: {actual_freq}')
 
             # Read the scan parameters
@@ -125,27 +120,11 @@ class FLSAgent:
                 self.log.warn('Could not interpret scan mode')
                 self.scan_mode = scan_mode
 
-            scan_min_freq = scan_params[1]
-            try:
-                self.scan_min_freq = float(scan_min_freq)
-            except ValueError as e:
-                self.log.warn(f'Could not interpret scan minimum frequency: {e}')
-                self.scan_min_freq = scan_min_freq
-
-            scan_max_freq = scan_params[2]
-            try:
-                self.scan_max_freq = float(scan_max_freq)
-            except ValueError as e:
-                self.log.warn(f'Could not interpret scan maximum frequency: {e}')
-                self.scan_max_freq = scan_max_freq
-
+            self.scan_min_freq = scan_params[1]
+            self.scan_max_freq = scan_params[2]
             scan_step = scan_params[3]
-            try:
-                self.scan_step = abs(float(scan_step))
-                self.scan_direction = np.sign(scan_step)
-            except ValueError as e:
-                self.log.warn(e)
-                self.scan_step = scan_step
+            self.scan_step = abs(scan_step)
+            self.scan_direction = np.sign(scan_step)
 
         self.initialized = True
 
