@@ -139,7 +139,7 @@ class FLSAgent:
         """
         acq(test_mode=False)
 
-        **Process** - Starts the 'sampling' data acquisiton from the DLC Smart.
+        **Process** - Starts the 'sampling' data acquisition from the DLC Smart.
 
         Parameters:
             test mode (bool): If True, the acquisition loop breaks after one iteration.
@@ -307,7 +307,7 @@ class FLSAgent:
         set_bias(bias)
 
         **Task** - Set the bias amplitude and offset of the lasers to a preset
-                     condition.
+        condition.
 
         Parameters:
             bias (str): Preset condition to set the bias for the lasers. Options are
