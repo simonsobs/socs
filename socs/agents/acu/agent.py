@@ -2617,8 +2617,6 @@ class ACUAgent:
                     if mode == 'stop':
                         if wait_stop_timeout is None:
                             self.log.info('Stack is empty; waiting for settling...')
-                            self.log.info(f"Last Timestamp: {last_uploaded_timestamp}")
-                            self.log.info(f"Last Az: {last_upload_az}")
                             wait_stop_timeout = now + 20.
                         elif now > wait_stop_timeout:
                             self.log.warn('Graceful stop condition not met in a timely fashion.')
