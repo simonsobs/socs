@@ -428,6 +428,10 @@ class FLSAgent:
                                     Must be at least 0.01 GHz.
             int_time (float): Integration time for each step of the sweep (ms). Default
                               chooses the last set integration time.
+        Note:
+            This task only sends commands to the DLC Smart, it does not wait for the end of
+            the frequency sweep. As a result, it returns quickly, and the user needs to call
+            the stop separately using stop_frequency_sweep.
         """
 
         min_freq = params['min_frequency']
