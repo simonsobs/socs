@@ -37,7 +37,7 @@ your ocs configuration file. Here is an example configuration block::
 Each device requires configuration under 'agent-instances'. See the OCS site
 configs documentation for more details.
 
-Docker-compose
+Docker Compose
 ``````````````
 
 The FLS Agent should be configured to run in a Docker container. An example

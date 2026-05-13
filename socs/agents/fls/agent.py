@@ -63,7 +63,7 @@ class FLSAgent:
         """
         initialize(auto_acquire=False)
 
-        ***Task*** - Initialize the connection to the DLC Smart
+        **Task** - Initialize the connection to the DLC Smart
 
         Parameters:
             auto_acquire (bool): If True, start acquisition immediately after
@@ -160,13 +160,13 @@ class FLSAgent:
         """
         acq(test_mode=False)
 
-        ***Process*** - Starts the 'sampling' data acquisiton from the DLC Smart.
+        **Process** - Starts the 'sampling' data acquisiton from the DLC Smart.
 
         Parameters:
             test mode (bool): If True, the acquisition loop breaks after one iteration.
 
         Notes:
-            The data collected are stored in session data in the structure:
+            The data collected are stored in session data in the structure::
 
                 >> response.session['data']
                 {'set_frequency': 110.0,
@@ -260,7 +260,7 @@ class FLSAgent:
         """
         toggle_laser_power(state)
 
-        ***Task*** - Enable or disable emission from both lasers
+        **Task** - Enable or disable emission from both lasers
 
         Parameters:
             state (str): State ('on' or 'off') to set the lasers to
@@ -327,7 +327,7 @@ class FLSAgent:
         """
         set_bias(bias)
 
-        ***Task*** - Set the bias amplitude and offset of the lasers to a preset
+        **Task** - Set the bias amplitude and offset of the lasers to a preset
                      condition.
 
         Parameters:
@@ -369,8 +369,8 @@ class FLSAgent:
         """
         set_integration_time(integration_time)
 
-        ***Task*** - Set the integration time of the laser system. Time is in
-                     milliseconds.
+        **Task** - Set the integration time of the laser system. Time is in
+        milliseconds.
 
         Parameters:
             integration_time (float): The integration time in milliseconds.
@@ -385,8 +385,8 @@ class FLSAgent:
         """
         set_frequency(frequency)
 
-        ***Task*** - Set the frequency of the laser system. Frequency must be
-                     between 20 GHz and 880 GHz.
+        **Task** - Set the frequency of the laser system. Frequency must be
+        between 20 GHz and 880 GHz.
 
         Parameters:
             frequency (float): The frequency to set the laser to.
@@ -413,10 +413,10 @@ class FLSAgent:
     @ocs_agent.param('int_time', type=float, default=300., check=lambda x: 0.5 < x <= 3000)
     def run_frequency_sweeps(self, session, params):
         """
-        run_frequency_sweeps(min_frequency, max_frequency, start_direction,
+        run_frequency_sweeps(min_frequency, max_frequency, start_direction, \
                              frequency_step, num_of_sweeps)
 
-        ***Task*** - Run frequency sweeps between the two frequency values.
+        **Task** - Run frequency sweeps between the two frequency values.
 
         Parameters:
             min_frequency (float): Minimum frequency for the sweeps (GHz).
@@ -503,8 +503,8 @@ class FLSAgent:
         """
         stop_frequency_sweep()
 
-        ***Task*** - Send a stop command to the DLC Smart to stop running a frequency
-                     sweep. This command may be run during or at the end of a sweep.
+        **Task** - Send a stop command to the DLC Smart to stop running a frequency
+        sweep. This command may be run during or at the end of a sweep.
 
         """
         with self.lock.acquire_timeout(timeout=12, job='set_frequency') as acquired:
