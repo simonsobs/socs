@@ -176,38 +176,36 @@ class PointProvider:
         v0 = final_point.az_vel
         stoptime = abs(v0) / stop_accel
 
-        # If we're in a free_form scan, we need to generate a smooth stop based from the last point uploaded.
+        # We need to generate a smooth stop based from the last point uploaded.
+        # Grab the data from the final point to form a smooth stop from it.
+        final_timestamp = final_point.timestamp
+        final_az = final_point.az
+        final_el = final_point.el
+        final_az_vel = final_point.az_vel
+        final_az_flag = final_point.az_flag
+        final_el_flag = final_point.el_flag
+
+        # Calculate the final stop acceleration to make the stop smooth in case we stop in a turnaround.
+        if len(self._last_yielded_points) == 1:
+            final_az_accel = 0  # We only have one point, just assume 0 az acceleration.
+
+        else:
+            dt = self._last_yielded_points[1].timestamp - self._last_yielded_points[0].timestamp
+            dv = self._last_yielded_points[1].az_vel - self._last_yielded_points[0].az_vel
+            final_az_accel = dv / dt  # Calculate the final acceleration given the last two points.
+
+        # Generate the final point track of the free_form stop
+        stop_point_track = turnarounds.gen_free_form_stop(t0=final_timestamp, a0=final_az_accel, v0=final_az_vel,
+                                                          az0=final_az, el0=final_el, stoptime=stoptime,
+                                                          az_flag=final_az_flag, el_flag=final_el_flag)
+
+        # If we're in a free_form stop, we have to upload the entire track for the ACU to follow.
         if free_form:
-            # Grab the data from the final point to form a smooth stop from it.
-            final_timestamp = final_point.timestamp
-            final_az = final_point.az
-            final_el = final_point.el
-            final_az_vel = final_point.az_vel
-            final_az_flag = final_point.az_flag
-            final_el_flag = final_point.el_flag
-
-            # Calculate the final stop acceleration to make the stop smooth in case we stop in a turnaround.
-            if len(self._last_yielded_points) == 1:
-                final_az_accel = 0  # We only have one point, just assume 0 az acceleration.
-
-            else:
-                dt = self._last_yielded_points[1].timestamp - self._last_yielded_points[0].timestamp
-                dv = self._last_yielded_points[1].az_vel - self._last_yielded_points[0].az_vel
-                final_az_accel = dv / dt  # Calculate the final acceleration given the last two points.
-
-            # Generate the final point track of the free_form stop
-            stop_point_track = turnarounds.gen_free_form_stop(t0=final_timestamp, a0=final_az_accel, v0=final_az_vel,
-                                                              az0=final_az, el0=final_el, stoptime=stoptime,
-                                                              az_flag=final_az_flag, el_flag=final_el_flag)
-
             self._stash.extend(stop_point_track)
 
-        # If we're not in a free_form scan, we can just set the final velocities to 0.
+        # If we're not in a free_form scan, we can just upload the final point and the ACU will figure it out.
         else:
-            final_point.timestamp += stoptime
-            final_point.az_vel = 0
-            final_point.el_vel = 0
-            self._stash = [final_point]
+            self._stash = [stop_point_track[-1]]
 
 
 def from_file(filename, fmt=None):
