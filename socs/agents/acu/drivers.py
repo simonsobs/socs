@@ -211,11 +211,13 @@ class PointProvider:
         # We have to move the final point az using the final point az_vel.
         # The ACU does not like if we use the same azimuth as the final point and will throw faults if we try.
         else:
-            final_point.timestamp += 1  # This second mimics the default step_time of generate_constant_velocity_scan
-            final_point.az += final_point.az_vel
-            final_point.az_vel = 0
-            final_point.el_vel = 0
-            self._stash = [final_point]
+            # final_point.timestamp += 1  # This second mimics the default step_time of generate_constant_velocity_scan
+            # final_point.az += final_point.az_vel
+            # final_point.az_vel = 0
+            # final_point.el_vel = 0
+            # self._stash = [final_point]
+
+            pass  # Actually, for now, do nothing for not free_form scans! The ACU can handle it!
 
 
 def from_file(filename, fmt=None):
