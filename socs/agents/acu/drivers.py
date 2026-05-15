@@ -115,6 +115,7 @@ class PointProvider:
     def __init__(self, gen):
         self._gen = gen
         self._stash = []
+        self._last_yielded_points = []  # Keep a queue of the last 2 yielded points.
 
     def __len__(self):
         return len(self._stash)
@@ -132,11 +133,91 @@ class PointProvider:
 
     def pop(self):
         self._request(1)
-        return self._stash.pop(0)
+        if len(self._stash):
+            while len(self._last_yielded_points) >= 2:
+                # Ensure we only ever have 2 points or less in the last yielded points.
+                self._last_yielded_points.pop(0)
 
-    def stop(self):
+            self._last_yielded_points.append(self._stash[0])
+            return self._stash.pop(0)
+
+        return None
+
+    def abort(self):
+        """
+        Nuclear option to clear stash and gen immediately.
+        """
+
         self._gen = None
         self._stash = []
+
+    def stop(self, free_form, stop_accel=0.5):
+        """
+        Stop point gen gracefully by clearing stash + gen and
+        setting the last point's velocities to 0.
+
+        If free_form, then a graceful free_form stop is generated using
+        the timestamp, az, and az_vel of the final point. Else we
+        just generate a point with az_vel=0 and el_vel=0 one second in the future
+        and let the ACU stop itself accordingly.
+
+        args:
+            free_form (bool): Arg tracking if the scan is a done with free_form=True.
+            stop_accel (float): The azimuth acceleration to use to generate the stop.
+              Defaults to 0.5 deg/s^2. Only applicable if free_form=True.
+        """
+
+        self.abort()
+
+        if not len(self._last_yielded_points):
+            return  # Platform was never in motion because we never yielded a point!
+
+        final_point = self._last_yielded_points[-1]
+
+        # If we're in a free_form stop, we have to generate a gentle stop for the platform.
+        # If the ACU doesn't have a track to follow to az_vel = 0 it will throw a az summary fault.
+        if free_form:
+            # For the stop, stop_time = v0 / max_acceleration
+            v0 = final_point.az_vel
+            stoptime = abs(v0) / stop_accel
+
+            # We need to generate a smooth stop based from the last point uploaded.
+            # Grab the data from the final point to form a smooth stop from it.
+            final_timestamp = final_point.timestamp
+            final_az = final_point.az
+            final_el = final_point.el
+            final_az_vel = final_point.az_vel
+            final_az_flag = final_point.az_flag
+            final_el_flag = final_point.el_flag
+
+            # Calculate the final stop acceleration to make the stop smooth in case we stop in a turnaround.
+            if len(self._last_yielded_points) == 1:
+                final_az_accel = 0  # We only have one point, just assume 0 az acceleration.
+
+            else:
+                dt = self._last_yielded_points[1].timestamp - self._last_yielded_points[0].timestamp
+                dv = self._last_yielded_points[1].az_vel - self._last_yielded_points[0].az_vel
+                final_az_accel = dv / dt  # Calculate the final acceleration given the last two points.
+
+            # Generate the final point track of the free_form stop
+            stop_point_track = turnarounds.gen_free_form_stop(t0=final_timestamp, a0=final_az_accel, v0=final_az_vel,
+                                                              az0=final_az, el0=final_el, stoptime=stoptime,
+                                                              az_flag=final_az_flag, el_flag=final_el_flag)
+
+            self._stash.extend(stop_point_track)
+
+        # If we're not in a free_form scan, we can make one final point with az_vel = 0 and el_vel = 0.
+        # To replicate the "end of planned track" stop, we make a point that's one second into the future.
+        # We have to move the final point az using the final point az_vel.
+        # The ACU does not like if we use the same azimuth as the final point and will throw faults if we try.
+        else:
+            # final_point.timestamp += 1  # This second mimics the default step_time of generate_constant_velocity_scan
+            # final_point.az += final_point.az_vel
+            # final_point.az_vel = 0
+            # final_point.el_vel = 0
+            # self._stash = [final_point]
+
+            pass  # Actually, for now, do nothing for not free_form scans! The ACU can handle it!
 
 
 def from_file(filename, fmt=None):
