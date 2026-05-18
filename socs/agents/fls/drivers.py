@@ -233,7 +233,11 @@ class DLCSmart(TCPInterface):
         self.param_set("lockin:integration-time", int_time)
 
     def check_scan_params(self):
-        fast = self.param_ref("frequency:scan-mode-fast")
+        smode = self.param_ref("frequency:scan-mode-fast")
+        if 'fast' in smode:
+            fast = 'fast'
+        elif 'precise' in smode:
+            fast = 'precise'
         smin = self.param_ref("frequency:frequency-min")
         smax = self.param_ref("frequency:frequency-max")
         sstep = self.param_ref("frequency:frequency-step")
@@ -290,7 +294,7 @@ class DLCSmart(TCPInterface):
         if '#t' in photocurrent:
             photocurrent = photocurrent.strip('( #t)')
         else:
-            photocurrent = 'nan'
+            photocurrent = 999999.
 
         # Set and actual frequency
         set_frequency = self.param_ref("frequency:frequency-set")
