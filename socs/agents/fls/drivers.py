@@ -290,7 +290,7 @@ class DLCSmart(TCPInterface):
         if '#t' in photocurrent:
             photocurrent = photocurrent.strip('( #t)')
         else:
-            photocurrent = 'nan'
+            photocurrent = 999999.
 
         # Set and actual frequency
         set_frequency = self.param_ref("frequency:frequency-set")
