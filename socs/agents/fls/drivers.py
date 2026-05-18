@@ -233,10 +233,10 @@ class DLCSmart(TCPInterface):
         self.param_set("lockin:integration-time", int_time)
 
     def check_scan_params(self):
-        smode = self.param_ref("frequency:scan-mode-fast")
-        if 'fast' in smode:
+        fast = self.param_ref("frequency:scan-mode-fast")
+        if 'fast' in fast:
             fast = 'fast'
-        elif 'precise' in smode:
+        elif 'precise' in fast:
             fast = 'precise'
         smin = self.param_ref("frequency:frequency-min")
         smax = self.param_ref("frequency:frequency-max")
