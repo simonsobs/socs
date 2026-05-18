@@ -234,10 +234,6 @@ class DLCSmart(TCPInterface):
 
     def check_scan_params(self):
         fast = self.param_ref("frequency:scan-mode-fast")
-        if 'fast' in fast:
-            fast = 'fast'
-        elif 'precise' in fast:
-            fast = 'precise'
         smin = self.param_ref("frequency:frequency-min")
         smax = self.param_ref("frequency:frequency-max")
         sstep = self.param_ref("frequency:frequency-step")
