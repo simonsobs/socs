@@ -247,30 +247,43 @@ class LS372_Agent:
                                       f"currently held by {self._lock.job}.")
                         continue
 
-                # The 372 reports the last updated measurement repeatedly
-                # during the "pause change time", this results in several
-                # stale datapoints being recorded. To get around this we
-                # query the pause time and skip data collection during it
-                # if the channel has changed (as it would if autoscan is
-                # enabled.)
-                # QUERY
-                active_channel = self.module.get_active_channel()
+                try:
+                    # The 372 reports the last updated measurement repeatedly
+                    # during the "pause change time", this results in several
+                    # stale datapoints being recorded. To get around this we
+                    # query the pause time and skip data collection during it
+                    # if the channel has changed (as it would if autoscan is
+                    # enabled.)
+                    # QUERY
+                    active_channel = self.module.get_active_channel()
 
-                if previous_channel != active_channel:
-                    if previous_channel is not None:
-                        _wait_for_pause_change(
-                            active_channel,
-                            previous_channel)
+                    if previous_channel != active_channel:
+                        if previous_channel is not None:
+                            _wait_for_pause_change(
+                                active_channel,
+                                previous_channel)
 
-                    # Track the last channel we measured
-                    previous_channel = self.module.get_active_channel()
+                        # Track the last channel we measured
+                        # QUERY
+                        previous_channel = self.module.get_active_channel()
 
-                # Collect both temperature and resistance values from each Channel
-                channel_str = active_channel.name.replace(' ', '_')
-                temp_reading = self.module.get_temp(unit='kelvin',
-                                                    chan=active_channel.channel_num)
-                res_reading = self.module.get_temp(unit='ohms',
-                                                   chan=active_channel.channel_num)
+                    # Collect both temperature and resistance values from each Channel
+                    channel_str = active_channel.name.replace(' ', '_')
+
+                    # QUERY
+                    temp_reading = self.module.get_temp(unit='kelvin',
+                                                        chan=active_channel.channel_num)
+                    # QUERY
+                    res_reading = self.module.get_temp(unit='ohms',
+                                                       chan=active_channel.channel_num)
+                    if session.degraded:
+                        self.log.info("Connection re-established.")
+                        session.degraded = False
+                except ConnectionError:
+                    self.log.error("Failed to get data from LS372. Check network connection.")
+                    session.degraded = True
+                    time.sleep(1)
+                    continue
 
                 # For data feed
                 current_time = time.time()
