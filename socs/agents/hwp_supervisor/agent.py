@@ -820,8 +820,15 @@ class ControlState:
         """
         Waits until the HWP has slowed before shutting off PMX
 
+        Attributes
+        -----------
+        freq_tol : float
+            Tolerance of frequency to consider hwp is stopped.
+        freq_tol_duration : float
+            Duration in seconds that the frequency must be within the tolerance
         min_freq : float
             Frequency (Hz) below which the PMX should be shut off.
+            Defaults to 0.5.
         """
         freq_tol: float
         freq_tol_duration: float
