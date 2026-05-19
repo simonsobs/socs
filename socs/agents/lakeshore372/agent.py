@@ -155,6 +155,38 @@ class LS372_Agent:
 
         return True, 'Lakeshore module initialized.'
 
+    def _wait_for_pause_change(self, active_channel, previous_channel):
+        # QUERY
+        pause_time = active_channel.get_pause()
+        self.log.debug("Pause time for {c}: {p}",
+                       c=active_channel.channel_num,
+                       p=pause_time)
+
+        # QUERY
+        dwell_time = active_channel.get_dwell()
+        self.log.debug("User set dwell_time_delay: {p}",
+                       p=self.dwell_time_delay)
+
+        # Check user set dwell time isn't too long
+        if self.dwell_time_delay > dwell_time:
+            self.log.warn("WARNING: User set dwell_time_delay of "
+                          + "{delay} s is larger than channel "
+                          + "dwell time of {chan_time} s. If "
+                          + "you are autoscanning this will "
+                          + "cause no data to be collected. "
+                          + "Reducing dwell time delay to {s} s.",
+                          delay=self.dwell_time_delay,
+                          chan_time=dwell_time,
+                          s=dwell_time - 1)
+            total_time = pause_time + dwell_time - 1
+        else:
+            total_time = pause_time + self.dwell_time_delay
+
+        for i in range(total_time):
+            self.log.debug("Sleeping for {t} more seconds...",
+                           t=total_time - i)
+            time.sleep(1)
+
     @ocs_agent.param('sample_heater', default=False, type=bool)
     @ocs_agent.param('run_once', default=False, type=bool)
     def acq(self, session, params=None):
@@ -215,44 +247,20 @@ class LS372_Agent:
                                       f"currently held by {self._lock.job}.")
                         continue
 
-                active_channel = self.module.get_active_channel()
-
                 # The 372 reports the last updated measurement repeatedly
                 # during the "pause change time", this results in several
                 # stale datapoints being recorded. To get around this we
                 # query the pause time and skip data collection during it
                 # if the channel has changed (as it would if autoscan is
                 # enabled.)
+                # QUERY
+                active_channel = self.module.get_active_channel()
+
                 if previous_channel != active_channel:
                     if previous_channel is not None:
-                        pause_time = active_channel.get_pause()
-                        self.log.debug("Pause time for {c}: {p}",
-                                       c=active_channel.channel_num,
-                                       p=pause_time)
-
-                        dwell_time = active_channel.get_dwell()
-                        self.log.debug("User set dwell_time_delay: {p}",
-                                       p=self.dwell_time_delay)
-
-                        # Check user set dwell time isn't too long
-                        if self.dwell_time_delay > dwell_time:
-                            self.log.warn("WARNING: User set dwell_time_delay of "
-                                          + "{delay} s is larger than channel "
-                                          + "dwell time of {chan_time} s. If "
-                                          + "you are autoscanning this will "
-                                          + "cause no data to be collected. "
-                                          + "Reducing dwell time delay to {s} s.",
-                                          delay=self.dwell_time_delay,
-                                          chan_time=dwell_time,
-                                          s=dwell_time - 1)
-                            total_time = pause_time + dwell_time - 1
-                        else:
-                            total_time = pause_time + self.dwell_time_delay
-
-                        for i in range(total_time):
-                            self.log.debug("Sleeping for {t} more seconds...",
-                                           t=total_time - i)
-                            time.sleep(1)
+                        _wait_for_pause_change(
+                            active_channel,
+                            previous_channel)
 
                     # Track the last channel we measured
                     previous_channel = self.module.get_active_channel()
