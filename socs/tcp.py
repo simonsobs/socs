@@ -39,7 +39,7 @@ class TCPInterface:
         try:
             sock.connect(address)
         except TimeoutError:
-            print(f"Connection not established within {self.timeout}.")
+            print(f"Connection not established within {self.timeout} seconds.")
             return
         except OSError as e:
             print(f"Unable to connect. {e}")
