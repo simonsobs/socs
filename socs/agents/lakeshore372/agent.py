@@ -306,8 +306,21 @@ class LS372_Agent:
 
                 # Also queries control channel if enabled
                 if self.control_chan_enabled:
-                    temp = self.module.get_temp(unit='kelvin', chan=0)
-                    res = self.module.get_temp(unit='ohms', chan=0)
+                    try:
+                        # QUERY
+                        temp = self.module.get_temp(unit='kelvin', chan=0)
+                        # QUERY
+                        res = self.module.get_temp(unit='ohms', chan=0)
+
+                        if session.degraded:
+                            self.log.info("Connection re-established.")
+                            session.degraded = False
+                    except ConnectionError:
+                        self.log.error("Failed to get data from LS372. Check network connection.")
+                        session.degraded = True
+                        time.sleep(1)
+                        continue
+
                     cur_time = time.time()
                     data = {
                         'timestamp': time.time(),
@@ -329,7 +342,18 @@ class LS372_Agent:
                 if params.get("sample_heater", False):
                     # Sample Heater
                     heater = self.module.sample_heater
-                    hout = heater.get_sample_heater_output()
+                    try:
+                        # QUERY
+                        hout = heater.get_sample_heater_output()
+
+                        if session.degraded:
+                            self.log.info("Connection re-established.")
+                            session.degraded = False
+                    except ConnectionError:
+                        self.log.error("Failed to get data from LS372. Check network connection.")
+                        session.degraded = True
+                        time.sleep(1)
+                        continue
 
                     current_time = time.time()
                     htr_data = {
