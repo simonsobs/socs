@@ -147,15 +147,22 @@ class TCPInterface:
             Raised if the socket is not ready to read from.
 
         """
-        self._check_ready()
+        try:
+            self._check_ready()
+        except ConnectionError as e:
+            print(e)
+            self._reset()
+            raise ConnectionError
         try:
             data = self.comm.recv(bufsize)
         except OSError as e:
             print(f"Connection error: {e}")
+            self._reset()
             raise ConnectionError
         except Exception as e:
             print(f"Caught unexpected {type(e).__name__} during recv:")
             print(f"  {e}")
+            self._reset()
             raise ConnectionError
         return data
 
