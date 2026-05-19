@@ -265,13 +265,6 @@ class LS372_Agent:
                     # Track the last channel we measured
                     previous_channel = self.module.get_active_channel()
 
-                current_time = time.time()
-                data = {
-                    'timestamp': current_time,
-                    'block_name': active_channel.name,
-                    'data': {}
-                }
-
                 # Collect both temperature and resistance values from each Channel
                 channel_str = active_channel.name.replace(' ', '_')
                 temp_reading = self.module.get_temp(unit='kelvin',
@@ -280,6 +273,13 @@ class LS372_Agent:
                                                    chan=active_channel.channel_num)
 
                 # For data feed
+                current_time = time.time()
+                data = {
+                    'timestamp': current_time,
+                    'block_name': active_channel.name,
+                    'data': {}
+                }
+
                 data['data'][channel_str + '_T'] = temp_reading
                 data['data'][channel_str + '_R'] = res_reading
                 session.app.publish_to_feed('temperatures', data)
