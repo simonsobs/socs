@@ -7,7 +7,6 @@ import txaio
 import yaml
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
-from twisted.internet import reactor
 
 from socs.Lakeshore.Lakeshore372 import LS372
 
@@ -137,12 +136,6 @@ class LS372_Agent:
             try:
                 self.module = LS372(self.ip)
             except ConnectionError:
-                self.log.error("Could not connect to the LS372. Exiting.")
-                reactor.callFromThread(reactor.stop)
-                return False, 'Lakeshore initialization failed'
-            except Exception as e:
-                self.log.error(f"Unhandled exception encountered: {e}")
-                reactor.callFromThread(reactor.stop)
                 return False, 'Lakeshore initialization failed'
 
             print("Initialized Lakeshore module: {!s}".format(self.module))

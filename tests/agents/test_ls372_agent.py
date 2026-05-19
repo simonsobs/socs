@@ -16,13 +16,8 @@ def mock_connection():
 
 
 def mock_failed_connection():
-    """Mock an unhandled error during connection.
-
-    Typically a failed connection will raise a ConnectionError, but we want to
-    check unhandled exceptions in the tests too.
-
-    """
-    failed_con = mock.Mock(side_effect=RuntimeError('Unhandled error'))
+    """Mock an unhandled error during connection."""
+    failed_con = mock.Mock(side_effect=ConnectionError('ConnectionError'))
     return failed_con
 
 
@@ -124,8 +119,6 @@ def test_ls372_init_lakeshore_already_initialized(agent):
     assert res[0] is True
 
 
-# If we don't patch the reactor out, it'll mess up pytest when stop is called
-@mock.patch('socs.agents.lakeshore372.agent.reactor', mock.MagicMock())
 @mock.patch('socs.tcp.TCPInterface._connect', mock_failed_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_init_lakeshore_failed_connection(agent):
