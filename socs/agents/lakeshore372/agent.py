@@ -245,24 +245,40 @@ class LS372_Agent:
                                       f"currently held by {self._lock.job}.")
                         continue
 
-                # The 372 reports the last updated measurement repeatedly
-                # during the "pause change time", this results in several
-                # stale datapoints being recorded. To get around this we
-                # query the pause time and skip data collection during it
-                # if the channel has changed (as it would if autoscan is
-                # enabled.)
-                # QUERY
-                active_channel = self.module.get_active_channel()
+                try:
+                    # The 372 reports the last updated measurement repeatedly
+                    # during the "pause change time", this results in several
+                    # stale datapoints being recorded. To get around this we
+                    # query the pause time and skip data collection during it
+                    # if the channel has changed (as it would if autoscan is
+                    # enabled.)
+                    active_channel = self.module.get_active_channel()
 
-                if previous_channel != active_channel:
-                    if previous_channel is not None:
-                        self._wait_for_channel_change(
-                            active_channel,
-                            previous_channel)
+                    if previous_channel != active_channel:
+                        if previous_channel is not None:
+                            self._wait_for_channel_change(
+                                active_channel,
+                                previous_channel)
 
-                    # Track the last channel we measured
-                    previous_channel = self.module.get_active_channel()
+                        # Track the last channel we measured
+                        previous_channel = self.module.get_active_channel()
 
+                    # Collect both temperature and resistance values from each Channel
+                    channel_str = active_channel.name.replace(' ', '_')
+                    temp_reading = self.module.get_temp(unit='kelvin',
+                                                        chan=active_channel.channel_num)
+                    res_reading = self.module.get_temp(unit='ohms',
+                                                       chan=active_channel.channel_num)
+                    if session.degraded:
+                        self.log.info("Connection re-established.")
+                        session.degraded = False
+                except ConnectionError:
+                    self.log.error("Failed to get data from LS372. Check network connection.")
+                    session.degraded = True
+                    time.sleep(1)
+                    continue
+
+                # For data feed
                 current_time = time.time()
                 data = {
                     'timestamp': current_time,
@@ -270,14 +286,6 @@ class LS372_Agent:
                     'data': {}
                 }
 
-                # Collect both temperature and resistance values from each Channel
-                channel_str = active_channel.name.replace(' ', '_')
-                temp_reading = self.module.get_temp(unit='kelvin',
-                                                    chan=active_channel.channel_num)
-                res_reading = self.module.get_temp(unit='ohms',
-                                                   chan=active_channel.channel_num)
-
-                # For data feed
                 data['data'][channel_str + '_T'] = temp_reading
                 data['data'][channel_str + '_R'] = res_reading
                 session.app.publish_to_feed('temperatures', data)
@@ -291,8 +299,18 @@ class LS372_Agent:
 
                 # Also queries control channel if enabled
                 if self.control_chan_enabled:
-                    temp = self.module.get_temp(unit='kelvin', chan=0)
-                    res = self.module.get_temp(unit='ohms', chan=0)
+                    try:
+                        temp = self.module.get_temp(unit='kelvin', chan=0)
+                        res = self.module.get_temp(unit='ohms', chan=0)
+                        if session.degraded:
+                            self.log.info("Connection re-established.")
+                            session.degraded = False
+                    except ConnectionError:
+                        self.log.error("Failed to get data from LS372. Check network connection.")
+                        session.degraded = True
+                        time.sleep(1)
+                        continue
+
                     cur_time = time.time()
                     data = {
                         'timestamp': time.time(),
@@ -314,7 +332,16 @@ class LS372_Agent:
                 if params.get("sample_heater", False):
                     # Sample Heater
                     heater = self.module.sample_heater
-                    hout = heater.get_sample_heater_output()
+                    try:
+                        hout = heater.get_sample_heater_output()
+                        if session.degraded:
+                            self.log.info("Connection re-established.")
+                            session.degraded = False
+                    except ConnectionError:
+                        self.log.error("Failed to get data from LS372. Check network connection.")
+                        session.degraded = True
+                        time.sleep(1)
+                        continue
 
                     current_time = time.time()
                     htr_data = {
