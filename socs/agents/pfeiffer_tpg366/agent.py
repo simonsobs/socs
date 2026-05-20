@@ -66,7 +66,17 @@ class PfeifferAgent:
                 # Useful for debugging, but should separate to a task to cut
                 # down on queries in the main acq() loop.
                 # self.gauge.channel_power()
-                pressure_array = self.gauge.read_pressure_all()
+                try:
+                    pressure_array = self.gauge.read_pressure_all()
+                    if session.degraded:
+                        self.log.info("Connection re-established.")
+                        session.degraded = False
+                except ConnectionError:
+                    self.log.error("Failed to get data from device. Check network connection.")
+                    session.degraded = True
+                    time.sleep(1)  # wait between reconnection attempts
+                    continue
+
                 # Loop through all the channels on the device
                 for channel in range(len(pressure_array)):
                     data['data']["pressure_ch" + str(channel + 1)] = pressure_array[channel]
