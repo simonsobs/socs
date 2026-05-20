@@ -121,8 +121,14 @@ MONITOR_STRUCTURE = [
     ('ACU_emergency', 'ACU_emergency', None, None),
     ('ACU_corotator', 'corotator', None, None),
     ('ACU_shutter', 'shutter', None, None),
-    ('ACU_tilt', 'tilt_slow', 'changed', 0.5),
+
+    # Deprecated: tilt_slow and tilt_fast. Removed after soaculib 0.4.3
+    ('ACU_tilt_old', 'tilt_slow', 'changed', 0.5),
     (None, 'tilt_fast', None, None),
+
+    # New tiltmeter dataset.
+    ('ACU_tilt', 'tiltmeter', 'tick', None),
+
     ('ACU_sun_avoidance', 'sun_avoidance', None, 1.),
     ('ACU_corrections', 'corrections', None, 10.),
     ('ACU_hvac_data', 'hvac_data', None, 10.),
@@ -911,7 +917,7 @@ class ACUAgent:
                 new_blocks[block_name] = {
                     'timestamp': self.data['status']['summary']['ctime'],
                     'block_name': block_name,
-                    'data': self.data['status'][data_key],
+                    'data': {} | self.data['status'][data_key],
                 }
 
             # Only keep blocks that have changed or have new data.
@@ -1290,7 +1296,7 @@ class ACUAgent:
         # (SATP), but in "cold" cases where siren needs to sound, this
         # can be as long as 12 seconds.  For the LAT, can take an
         # extra couple seconds if there were faults to clear.
-        MAX_STARTUP_TIME = 15.
+        MAX_STARTUP_TIME = 20.
 
         # How long does it take to sound the warning horn?  It takes
         # 10 seconds.  Don't wait longer than this.
@@ -1300,6 +1306,12 @@ class ACUAgent:
         # brakes released, except in case that warning horn is
         # sounding?  3 seconds should be enough.
         WARNING_HORN_DETECT = 3.
+
+        # How long after mode change should we wait before signaling
+        # to caller that we have passed the "init" stage?  Without
+        # this check, we can get charged double warning horn penalty
+        # for 2-axis moves on LAT.
+        MIN_INIT_PHASE = 1.
 
         # Velocity to assume when computing maximum time a move should
         # take (to bail out in unforeseen circumstances).  There are
@@ -1486,6 +1498,11 @@ class ACUAgent:
                     elif time_since_start > WARNING_HORN_DETECT and not warning_horn:
                         warning_horn = True
                         self.log.info('Warning horn is probably sounding.')
+                    elif state_feedback['state'] == 'init' and time_since_start > MIN_INIT_PHASE:
+                        # This is to prevent az and el warning horns
+                        # from each incurring a 10s delay...
+                        state_feedback['state'] = 'wait'
+
                 elif still and motion_expected:
                     self.log.error(f'Motion did not start within {MAX_STARTUP_TIME:.1f} s.')
                     state = state.FAIL
