@@ -63,12 +63,11 @@ class TPG366(TCPInterface):
 
     def channel_power(self):
         """
-        Function to check the power status of all channels.
+        Check the power state of all channels.
 
-        Args:
-            None
-
-        Returns:
+        Returns
+        -------
+        list
             List of channel states.
 
         """
@@ -81,16 +80,18 @@ class TPG366(TCPInterface):
         return channel_states
 
     def read_pressure(self, ch_no):
-        """
-        Function to measure the pressure of one given channel
-        ch_no is the chanel to be measured (e.g. 1-6)
-        returns the measured pressure as a float
+        """Measure the pressure of one given channel.
 
-        Args:
-            ch_no: The channel to be measured (1-6)
+        Parameters
+        ----------
+        ch_no : int
+            The channel to be measured (1-6).
 
-        Returns:
-            pressure as a float
+        Returns
+        -------
+        float
+            Channel pressure.
+
         """
         msg = 'PR%d\r\n' % ch_no
         read_str = self.send_and_recv(msg)
@@ -99,15 +100,14 @@ class TPG366(TCPInterface):
         return pressure
 
     def read_pressure_all(self):
-        """measure the pressure of all channel
-        Return an array of 6 pressure values as a float array
+        """Measure the pressure of all channels.
 
-        Args:
-            None
+        Returns
+        -------
+        np.array
+            Six element array corresponding to each channels pressure reading,
+            as floats.
 
-        Returns:
-            6 element array corresponding to each channels
-            pressure reading, as floats
         """
         msg = 'PRX\r\n'
         read_str = self.send_and_recv(msg)
