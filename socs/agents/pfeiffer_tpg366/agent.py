@@ -106,7 +106,6 @@ class PfeifferAgent:
         """
         if self.take_data:
             self.take_data = False
-            self.gauge.close()
             return True, 'requested to stop taking data.'
         else:
             return False, 'acq is not currently running'
