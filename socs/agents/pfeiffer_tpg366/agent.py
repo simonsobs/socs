@@ -76,6 +76,16 @@ class PfeifferAgent:
                     session.degraded = True
                     time.sleep(1)  # wait between reconnection attempts
                     continue
+                # When reconnecting after a network outage it's likely we'll
+                # get some junk that can't be processed by
+                # self.gauge.read_pressure_all(), but doesn't show as a
+                # ConnectionError. This will just skip that one time and resume
+                # data collecting.
+                except Exception as e:
+                    self.log.error(f"Caught unexpected error: {e}")
+                    session.degraded = True
+                    time.sleep(1)  # wait between reconnection attempts
+                    continue
 
                 # Loop through all the channels on the device
                 for channel in range(len(pressure_array)):
