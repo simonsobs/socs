@@ -52,6 +52,9 @@ class TCPInterface:
 
     def _reset(self):
         print("Resetting the connection to the device.")
+        if self.comm:
+            self.comm.close()
+            self.comm = None
         self.comm = self._connect((self.ip_address, self.port))
 
     def send(self, msg):
