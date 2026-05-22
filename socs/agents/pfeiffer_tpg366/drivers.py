@@ -34,6 +34,14 @@ class TPG366(TCPInterface):
         # Setup the TCP Interface
         super().__init__(ip_address, port, timeout)
 
+        # On boot the TPG366 starts in 'continuous transmission' mode. This
+        # sends a single 'ENQ', which stops transmission.
+        try:
+            self._send_enquiry()
+            print('Startup ENQ response:', self.recv())
+        except ConnectionError as e:
+            print(f'Encountered error connecting to device: {e}')
+
     def _send_mnemonic(self, mnemonic):
         """Send a mnemonic.
 
