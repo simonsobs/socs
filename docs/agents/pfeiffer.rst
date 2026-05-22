@@ -79,3 +79,9 @@ Below is an example client to start data acquisition::
     If ``['--mode', 'acq']`` is specified in the ocs configuration file,
     acquisition will begin automatically upon agent startup, so there may be no
     need to run this client.
+
+Supporting APIs
+---------------
+
+.. autoclass:: socs.agents.pfeiffer_tpg366.drivers.TPG366
+    :members:
