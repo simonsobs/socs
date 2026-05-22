@@ -34,13 +34,35 @@ class TPG366(TCPInterface):
         # Setup the TCP Interface
         super().__init__(ip_address, port, timeout)
 
+    def _send_mnemonic(self, mnemonic):
+        """Send a mnemonic.
+
+        Parameters
+        ----------
+        mnemonic : str
+            Unencoded mnemonic string, with terminating characters, i.e. 'PRX\r'.
+
+        Returns
+        -------
+        Enocded response from the device. Typically an ACK, unless the device
+        is in a strange state.
+
+        """
+        self.send(mnemonic.encode())
+        resp = self.recv(bufsize=BUFF_SIZE)  # don't decode, might just be ACK
+        return resp
+
+    def _send_enquiry(self):
+        self.send(ENQ.encode())
+
     def send_and_recv(self, message):
         """Send message and request transmission of queried data from device.
 
         The flow control for querying the TPG366 involves first sending a
-        message to set the measuring mode, receiving positive feedback from the
-        device, then sending a request for transmission from the device,
-        followed finally by receiving the measurement data.
+        message (referred to in the TPG366 manual as a mnemonic) to set the
+        measuring mode, receiving positive feedback from the device, then
+        sending a request for transmission from the device, followed finally by
+        receiving the measurement data.
 
         This method combines these four steps into one.
 
@@ -54,9 +76,8 @@ class TPG366(TCPInterface):
         Decoded response from the device.
 
         """
-        self.send(message.encode())
-        self.recv(bufsize=BUFF_SIZE).decode()
-        self.send(ENQ.encode())
+        self._send_mnemonic(message)
+        self._send_enquiry()
         read_str = self.recv(bufsize=BUFF_SIZE).decode()
 
         return read_str
