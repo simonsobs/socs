@@ -4,7 +4,7 @@ import numpy as np
 
 from socs.tcp import TCPInterface
 
-BUFF_SIZE = 128
+BUFF_SIZE = 4096
 ENQ = '\x05'
 
 
