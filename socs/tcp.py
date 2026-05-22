@@ -39,7 +39,7 @@ class TCPInterface:
         try:
             sock.connect(address)
         except TimeoutError:
-            print(f"Connection not established within {self.timeout}.")
+            print(f"Connection not established within {self.timeout} seconds.")
             return
         except OSError as e:
             print(f"Unable to connect. {e}")
@@ -52,6 +52,9 @@ class TCPInterface:
 
     def _reset(self):
         print("Resetting the connection to the device.")
+        if self.comm:
+            self.comm.close()
+            self.comm = None
         self.comm = self._connect((self.ip_address, self.port))
 
     def send(self, msg):
@@ -123,7 +126,7 @@ class TCPInterface:
         if not sel.select(self.timeout):
             raise ConnectionError("Socket not ready to read. Possible timeout.")
 
-    def recv(self, bufsize=4096):
+    def recv(self, bufsize=4096, reset_on_error=False):
         """Receive response from the device.
 
         This method will check if the socket is ready to be read from before
@@ -134,6 +137,11 @@ class TCPInterface:
         ----------
         bufsize : int
             Amount of data to be recieved in bytes. Defaults to 4096.
+        reset_on_error : bool
+            Flag to set whether to recreate the socket connection on error.
+            This can be useful to effectively clear the network buffer, but
+            some devices don't handle multiple rapid connections well.
+            Defaults to False.
 
         Returns
         -------
@@ -147,15 +155,27 @@ class TCPInterface:
             Raised if the socket is not ready to read from.
 
         """
-        self._check_ready()
+        if reset_on_error:
+            try:
+                self._check_ready()
+            except ConnectionError as e:
+                print(e)
+                self._reset()
+                raise ConnectionError
+        else:
+            self._check_ready()
         try:
             data = self.comm.recv(bufsize)
         except OSError as e:
             print(f"Connection error: {e}")
+            if reset_on_error:
+                self._reset()
             raise ConnectionError
         except Exception as e:
             print(f"Caught unexpected {type(e).__name__} during recv:")
             print(f"  {e}")
+            if reset_on_error:
+                self._reset()
             raise ConnectionError
         return data
 
