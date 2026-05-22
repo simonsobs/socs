@@ -226,7 +226,7 @@ class LS372(TCPInterface):
 
         if '?' in message:
             self.send(msg_str)
-            resp = str(self.recv(), 'utf-8').strip()
+            resp = str(self.recv(reset_on_error=True), 'utf-8').strip()
         else:
             self.send(msg_str)
             resp = ''
