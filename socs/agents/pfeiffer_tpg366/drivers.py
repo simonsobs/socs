@@ -57,7 +57,17 @@ class TPG366(TCPInterface):
 
         """
         self.send(mnemonic.encode())
-        resp = self.recv(bufsize=BUFF_SIZE)  # don't decode, might just be ACK
+        resp = self.recv(bufsize=BUFF_SIZE)  # don't decode, expecting ACK
+        # print('Raw response:', resp)  # useful debug print
+
+        # if COM was on we'll get a long string, check just the last message
+        ack = resp.splitlines()[-1].strip()
+
+        if ack != b'\x06':
+            print('WARN: Did not receive ACK. Attempting to drain buffer.')
+            print('Buffer contents:', self.recv())
+            print('Resending command:', mnemonic.encode())
+            self._send_mnemonic(mnemonic)
         return resp
 
     def _send_enquiry(self):
