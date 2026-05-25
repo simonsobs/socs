@@ -25,6 +25,7 @@ RUN apt-get update \
  && cp /usr/share/gclib/examples/python/* .\
  && python3 -c "import gclib; print(f'gclib location: {gclib.__file__}');"
 
+
 COPY ./ ./
 
 ENTRYPOINT ["./wg-actuator-entrypoint.sh"]
