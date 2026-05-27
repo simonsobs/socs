@@ -1,4 +1,4 @@
-FROM simonsobs/so_smurf_base:rogue6-rc2
+FROM simonsobs/so_smurf_base:rogue6-rc3
 
 #################################################################
 # sodetlib Install
