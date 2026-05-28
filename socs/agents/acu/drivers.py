@@ -179,7 +179,12 @@ class PointProvider:
         if free_form:
             # For the stop, stop_time = v0 / max_acceleration
             v0 = final_point.az_vel
-            stoptime = abs(v0) / stop_accel
+
+            # Ensure we always generate at least 5 stop points.
+            # Otherwise if v0 is very small we can generate as little as one point.
+            # Attempting to generate only one point will silently break the _gen_trajectory
+            # function in turnarounds.py and produce unintended results.
+            stoptime = max(0.5, abs(v0) / stop_accel)
 
             # We need to generate a smooth stop based from the last point uploaded.
             # Grab the data from the final point to form a smooth stop from it.
