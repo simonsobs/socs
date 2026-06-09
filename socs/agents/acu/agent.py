@@ -2073,7 +2073,7 @@ class ACUAgent:
                      choices=['end', 'mid', 'az_endpoint1', 'az_endpoint2',
                               'mid_inc', 'mid_dec'])
     @ocs_agent.param('az_drift', type=float, default=None)
-    @ocs_agent.param('scan_type', default=1, choices=[1, 2, 3])
+    @ocs_agent.param('scan_type', default=1, choices=[1, 2, 3, 'sin_el_nod'])
     @ocs_agent.param('az_vel_ref', type=float, default=None)
     @ocs_agent.param('turnaround_method', default=None,
                      choices=[None, 'standard', 'standard_gen',
@@ -2147,6 +2147,7 @@ class ACUAgent:
                 Type 1 is a constant elevation scan.
                 Type 2 includes a variation in az speed that scales as sin(az).
                 Type 3 is a Type 2 with an sinusoidal el nod.
+                'sin_el_nod' is a sinusoidal el nod with no az movement.
             az_vel_ref (float or None): azimuth to center the velocity profile at.
                 If None then the average of the endpoints is used.
             turnaround_method (str): The method used for generating turnaround.
@@ -2210,6 +2211,10 @@ class ACUAgent:
         if el_mode is None:
             el_mode = self.scan_params['el_mode']  # ... which may also be None.
 
+        # Check our az endpoints for sin_el_nods. They should be the same!
+        if params['scan_type'] == 'sin_el_nod' and az_endpoint1 != az_endpoint2:
+            raise ValueError("Cannot run type 4 scans with different az endpoints!")
+
         # Check if the turnaround method is usable for the called scan type.
         # This should never happen with the above turnaround_method setting.
         if turnaround_method == "standard" and params['scan_type'] != 1:
@@ -2261,6 +2266,8 @@ class ACUAgent:
             az_cent = az_vel_ref - 90
             az_edge = np.max(np.abs((az_endpoint1 - az_cent, az_endpoint2 - az_cent)))
             az_edge_speed = az_speed / np.sin(az_edge)
+        if params['scan_type'] == 'sin_el_nod':
+            az_edge_speed = 0
 
         plan = sh.plan_scan(az_endpoint1, az_endpoint2,
                             el=el_endpoint1, v_az=az_edge_speed, a_az=az_accel,
@@ -2374,8 +2381,18 @@ class ACUAgent:
                                        az_vel_ref=az_vel_ref,
                                        az_first_pos=plan['init_az'],
                                        **scan_params)
+
+        elif params['scan_type'] == 'sin_el_nod':
+            free_form = True
+            track_axes = ['el']
+            g = sh.generate_sin_el_nod(az=az_endpoint1,
+                                       el_endpoint1=el_endpoint1,
+                                       el_endpoint2=el_endpoint2,
+                                       el_freq=el_freq,
+                                       **scan_params)
+
         else:
-            raise ValueError("Scan type must be 1, 2, or 3")
+            raise ValueError("Scan type must be 1, 2, 3, or 'sin_el_nod'")
 
         scan_params_bundle = {'session_id': session.session_id,
                               'schema': 1,
@@ -2403,7 +2420,7 @@ class ACUAgent:
         ret_val = (yield self._run_track(
             session=session, point_gen=g, step_time=step_time, stop_accel=az_accel,
             track_axes=track_axes, point_batch_count=point_batch_count,
-            free_form=free_form, unabort_failure=(params['scan_type'] in [2, 3])))
+            free_form=free_form, unabort_failure=(params['scan_type'] in [2, 3, 'sin_el_nod'])))
 
         self.agent.publish_to_feed('scan_params',
                                    {'timestamp': time.time(),
