@@ -38,6 +38,9 @@ class HWPGripperAgent:
 
         self.shutdown_mode = False
         self.supervisor_id = args.supervisor_id
+        self.freq_tol = args.freq_tol
+        self.spin_check_enabled = True
+        self.spin_check_disable_until = 0
 
         self.client: Optional[cli.GripperClient] = None
 
@@ -99,7 +102,11 @@ class HWPGripperAgent:
         return res['data']['hwp_state']['pid_current_freq']
 
     def _check_stopped(self):
-        return self._get_hwp_freq() < 0.1
+        if self.spin_check_enabled and (time.time() > self.spin_check_disable_until):
+            return self._get_hwp_freq() < self.freq_tol
+        else:
+            self.log.info("Spin check is disabled.")
+            return True
 
     def init_connection(self, session, params):
         """init_connection()
@@ -211,7 +218,7 @@ class HWPGripperAgent:
                          "MOVE in Gripper.MOVE() completed successfully"]}
         """
 
-        if self._get_hwp_freq() > 0.1:
+        if not self._check_stopped():
             self.log.warn("Not moving actuators while HWP is spinning")
             return False, "HWP is spinning, not moving actuators"
 
@@ -447,7 +454,7 @@ class HWPGripperAgent:
                                     ..
                  {'result': True, 'log': [.., .., etc]}]
         """
-        if self._get_hwp_freq() > 0.1:
+        if not self._check_stopped():
             return False, "Not gripping HWP because HWP is spinning"
 
         result, session.data = self._grip_hwp(check_shutdown=True)
@@ -701,6 +708,28 @@ class HWPGripperAgent:
         self.shutdown_mode = False
         return True, 'Cancelled shutdown mode'
 
+    @ocs_agent.param('enable', type=bool, default=None)
+    @ocs_agent.param('disable_temporarily', type=float, default=None)
+    def update_spin_check(self, session, params=None):
+        """update_spin_check(enable=None)
+
+        **Task** - Update HWP spin check parameters.
+
+        All arguments are optional.
+
+        Args:
+          enable (bool): If True, enable HWP spin checks.
+            If False, disable HWP spin checks non-temporarily.
+          disable_temporarily (float):  If set, disable
+            HWP spin check for this number of seconds.
+        """
+        if params['enable'] is not None:
+            self.spin_check_enabled = params['enable']
+        if params['disable_temporarily'] is not None:
+            self.spin_check_disable_until = time.time() + params['disable_temporarily']
+
+        return True, 'Params updated.'
+
     def restart(self, session, params=None):
         """restart()
 
@@ -931,6 +960,8 @@ def make_parser(parser=None):
                              'limit switches (mm). This needs to be multiple of 0.1')
     pgroup.add_argument('--supervisor-id', type=str,
                         help='Instance ID for HWP Supervisor agent')
+    pgroup.add_argument('--freq-tol', type=float, default=0.1,
+                        help='Tolerance of frequency to consider hwp is stopped in Hz')
     pgroup.add_argument('--no-data-warn-time', type=float, default=60,
                         help='Time (seconds) since last supervisor-ok signal to '
                              'wait before issuing a warning')
@@ -972,6 +1003,7 @@ def main(args=None):
     agent.register_task('ungrip', gripper_agent.ungrip)
     agent.register_task('cancel_shutdown', gripper_agent.cancel_shutdown)
     agent.register_task('restart', gripper_agent.restart)
+    agent.register_task('update_spin_check', gripper_agent.update_spin_check)
 
     runner.run(agent, auto_reconnect=True)
 
