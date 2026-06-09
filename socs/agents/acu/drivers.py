@@ -999,6 +999,99 @@ def generate_type2_scan(az_endpoint1, az_endpoint2, az_speed,
                                turnaround_method=turnaround_method)
 
 
+def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
+                        el_freq=.15,
+                        num_batches=None,
+                        num_nods=None,
+                        start_time=None,
+                        wait_to_start=10.,
+                        step_time=1.,
+                        batch_size=500):
+    """Python generator to produce times, azimuth and elevation positions,
+    azimuth and elevation velocities, azimuth and elevation flags for
+    arbitrarily long sin el nods.
+
+    Parameters:
+        az (float): azimuth position for the el nods.
+        el_endpoint1 (float): elevation endpoint for the scan start
+        el_endpoint2 (float): second elevation endpoint of the scan. For
+            constant az scans, this must be equal to el_endpoint1.
+        el_freq(float): frequency of the elevation nods in Hz.
+        num_batches (int or None): sets the number of batches for the
+            generator to create. Default value is None (interpreted as infinite
+            batches).
+        num_nods (int or None): if not None, limits the points
+          returned to the specified number of el nods (one nod is one full sine wave).
+        start_time (float or None): a ctime at which to start the scan.
+            Default is None, which is interpreted as starting now +
+            wait_to_start.
+        wait_to_start (float): number of seconds to wait between
+            start_time and when the scan actually starts. Default is 10 seconds.
+        step_time (float): time between points on the constant-velocity
+            parts of the motion. Default value is 1.0 seconds. Minimum value is
+            0.05 seconds.
+        batch_size (int): number of values to produce in each iteration.
+            Default is 500. Batch size is reset to the length of one leg of the
+            motion if num_batches is not None.
+
+    Yields:
+        points (list): a list of TrackPoint objects.  Raises
+          StopIteration once exit condition, if defined, is met.
+
+    """
+    # Get el throw
+    el_throw = abs(el_endpoint2 - el_endpoint1) / 2
+    el_cent = (el_endpoint1 + el_endpoint2) / 2.
+
+    if start_time is None:
+        t0 = time.time() + wait_to_start
+    else:
+        t0 = start_time
+
+    t = 0
+    el = el_endpoint1
+    if step_time < 0.05:
+        raise ValueError('Time step size too small, must be at least '
+                         '0.05 seconds')
+
+    if num_batches is None:
+        stop_iter = float('inf')
+    else:
+        stop_iter = num_batches
+        batch_size = int(np.ceil(1 / (el_freq * step_time)))
+
+    def check_completed_nods():
+        return num_nods is None or t * el_freq > num_nods
+
+    def get_el(_t):
+        return (el_cent - el_throw * np.cos(_t * el_freq * 2 * np.pi),
+                el_throw * el_freq * 2 * np.pi * np.sin(_t * el_freq * 2 * np.pi))
+
+    i = 0
+    while i < stop_iter and check_completed_nods():
+        i += 1
+        point_block = []
+        for j in range(batch_size):
+            el, el_vel = get_el(t + t0)
+            point_block.append(TrackPoint(
+                timestamp=t + t0,
+                az=az, el=el, az_vel=0, el_vel=el_vel,
+                az_flag=0, el_flag=1,
+                group_flag=0))
+
+            t += step_time
+
+            if not check_completed_nods():
+                # Kill the velocity on the last point and exit -- this
+                # was recommended at LAT FAT for smoothly stopping the
+                # motion at end of program.
+                point_block[-1].az_vel = 0
+                point_block[-1].el_vel = 0
+                break
+
+        yield point_block
+
+
 def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None,
               scan_type=1):
     """Determine some important parameters for running a ProgramTrack
