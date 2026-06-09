@@ -810,10 +810,22 @@ class ControlState:
     class Brake:
         """
         Configure the PID and PMX agents to actively brake the HWP
+
+        Attributes
+        -----------
+        freq_tol : float
+            Tolerance of frequency to consider hwp is stopped
+        freq_tol_duration : float
+            Duration in seconds that the frequency must be within the tolerance
+        brake_voltage: float
+            Voltage to use when braking the HWP
+        max_brake_duration : float
+            Maximum duration of time to brake in seconds
         """
         freq_tol: float
         freq_tol_duration: float
         brake_voltage: float
+        max_brake_duration: float
 
     @dataclass
     class WaitForBrake:
@@ -829,10 +841,16 @@ class ControlState:
         min_freq : float
             Frequency (Hz) below which the PMX should be shut off.
             Defaults to 0.5.
+        max_duration : float
+            Maximum duration of time to brake in seconds
+        start_time : float
+            Time that the state was entered
         """
         freq_tol: float
         freq_tol_duration: float
         min_freq: float = 0.5
+        max_duration: Optional[float] = None
+        start_time: float = field(default_factory=time.time)
 
     @dataclass
     class PmxOff:
@@ -1359,13 +1377,22 @@ class ControlStateMachine:
                 self.action.set_state(ControlState.WaitForBrake(
                     freq_tol=state.freq_tol,
                     freq_tol_duration=state.freq_tol_duration,
+                    max_duration=state.max_brake_duration,
                 ))
 
             elif isinstance(state, ControlState.WaitForBrake):
-                f0 = query_pid_state()['current_freq']
+                f0 = query_pid_state().get('current_freq', 999)
                 time.sleep(5)
-                f1 = query_pid_state()['current_freq']
-                if f0 < state.min_freq or (f1 > f0):
+                f1 = query_pid_state().get('current_freq', f0)
+
+                stop_mode = False
+                if state.max_duration is not None:
+                    if time.time() - state.start_time > state.max_duration:
+                        stop_mode = True
+                        self.log.info("Duration of WaitForBrake has exceeded "
+                                      f"max duration of {state.max_duration} seconds.")
+
+                if stop_mode or (f0 < state.min_freq) or (f1 > f0):
                     self.log.info("Turning off PMX and putting PCU in stop mode")
                     self.run_and_validate(clients.pmx.set_off)
                     self.run_and_validate(
@@ -1517,6 +1544,7 @@ class HWPSupervisor:
         self.brake_freq_tol = args.brake_freq_tol
         self.brake_freq_tol_duration = args.brake_freq_tol_duration
         self.brake_voltage = args.brake_voltage
+        self.max_brake_duration = args.max_brake_duration
 
         self.shutdown_no_data_timeout = args.shutdown_no_data_timeout
         self.shutdown_delay = args.shutdown_delay
@@ -1882,6 +1910,7 @@ class HWPSupervisor:
     @ocs_agent.param('freq_tol', type=float, default=None)
     @ocs_agent.param('freq_tol_duration', type=float, default=None)
     @ocs_agent.param('brake_voltage', type=float, default=None)
+    @ocs_agent.param('max_brake_duration', type=float, default=None)
     def brake(self, session, params):
         """brake(freq_tol=0.05, freq_tol_duration=10, brake_voltage=10)
 
@@ -1929,11 +1958,17 @@ class HWPSupervisor:
             if params["brake_voltage"] is not None
             else self.brake_voltage
         )
+        max_brake_duration = (
+            params["max_brake_duration"]
+            if params["max_brake_duration"] is not None
+            else self.max_brake_duration
+        )
 
         state = ControlState.Brake(
             freq_tol=freq_tol,
             freq_tol_duration=freq_tol_duration,
             brake_voltage=brake_voltage,
+            max_brake_duration=max_brake_duration,
         )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
@@ -2289,6 +2324,10 @@ def make_parser(parser=None):
     pgroup.add_argument(
         '--brake-voltage', type=float, default=10.0,
         help="Voltage to use when braking the HWP",
+    )
+    pgroup.add_argument(
+        '--max-brake-duration', type=float, default=None,
+        help="Maximum duration (sec) for brake task",
     )
     pgroup.add_argument(
         '--shutdown-no-data-timeout', type=float, default=15 * 60,
