@@ -730,7 +730,7 @@ class HWPGripperAgent:
             duration = params['disable_temporarily']
             self.spin_check_disable_until = time.time() + duration
             self.log.info(f'Spin check disabled temporarily for {duration:.0f} seconds '
-                          f'(until {self.check_disable_until}).')
+                          f'(until {self.spin_check_disable_until}).')
 
         return True, 'Params updated.'
 
