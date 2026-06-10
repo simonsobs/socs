@@ -1005,7 +1005,6 @@ def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
                         num_nods=None,
                         start_time=None,
                         wait_to_start=10.,
-                        step_time=1.,
                         batch_size=500):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
@@ -1027,9 +1026,6 @@ def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
             wait_to_start.
         wait_to_start (float): number of seconds to wait between
             start_time and when the scan actually starts. Default is 10 seconds.
-        step_time (float): time between points on the constant-velocity
-            parts of the motion. Default value is 1.0 seconds. Minimum value is
-            0.05 seconds.
         batch_size (int): number of values to produce in each iteration.
             Default is 500. Batch size is reset to the length of one leg of the
             motion if num_batches is not None.
@@ -1039,6 +1035,9 @@ def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
           StopIteration once exit condition, if defined, is met.
 
     """
+    POINTS_PER_NOD = 16
+    MIN_STEP_TIME = 0.05  # in seconds.
+
     # Get el throw
     el_throw = abs(el_endpoint2 - el_endpoint1) / 2
     el_cent = (el_endpoint1 + el_endpoint2) / 2.
@@ -1050,15 +1049,14 @@ def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
 
     t = 0
     el = el_endpoint1
-    if step_time < 0.05:
-        raise ValueError('Time step size too small, must be at least '
-                         '0.05 seconds')
 
-    if num_batches is None:
-        stop_iter = float('inf')
-    else:
-        stop_iter = num_batches
-        batch_size = int(np.ceil(1 / (el_freq * step_time)))
+    # We want to divide each nod into at least 16 equadistant points.
+    # This gives a max frequency of el_freq < 1/(0.05*16) -> el_freq < 1.25.
+    if el_freq >= 1 / (POINTS_PER_NOD * MIN_STEP_TIME):
+        raise ValueError("El Freq is too high! El Freq must be < 1.25Hz to keep "
+                         "step_time > 0.05!")
+
+    step_time = POINTS_PER_NOD * el_freq  # Divide nod into 16 points
 
     def check_completed_nods():
         return num_nods is None or t * el_freq > num_nods
@@ -1067,11 +1065,9 @@ def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
         return (el_cent - el_throw * np.cos(_t * el_freq * 2 * np.pi),
                 el_throw * el_freq * 2 * np.pi * np.sin(_t * el_freq * 2 * np.pi))
 
-    i = 0
-    while i < stop_iter and check_completed_nods():
-        i += 1
+    while check_completed_nods():
         point_block = []
-        for j in range(batch_size):
+        for j in range(POINTS_PER_NOD):
             el, el_vel = get_el(t + t0)
             point_block.append(TrackPoint(
                 timestamp=t + t0,
