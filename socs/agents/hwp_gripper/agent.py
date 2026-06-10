@@ -40,7 +40,7 @@ class HWPGripperAgent:
         self.supervisor_id = args.supervisor_id
         self.freq_tol = args.freq_tol
         self.spin_check_enabled = True
-        self.spin_check_disable_until = 0
+        self.spin_check_disable_until = 0.
 
         self.client: Optional[cli.GripperClient] = None
 
@@ -881,7 +881,9 @@ class HWPGripperAgent:
                 >>> response.session
                 {'time': 1649085992.719602,
                  'gripper_action': 'ok',
-                 'shutdown_mode': 0}
+                 'shutdown_mode': 0,
+                 'spin_check_enabled': 1,
+                 'spin_check_disable_until': 1649086292.719602}
         """
         last_ok_time = time.time()
 
