@@ -355,6 +355,11 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=False)
+        agent.register_process('generate_sin_el_nod',
+                               self.generate_sin_el_nod,
+                               self._simple_process_stop,
+                               blocking=False,
+                               startup=False)
         agent.register_process('idle_reset',
                                self.idle_reset,
                                self._simple_process_stop,
@@ -2073,7 +2078,7 @@ class ACUAgent:
                      choices=['end', 'mid', 'az_endpoint1', 'az_endpoint2',
                               'mid_inc', 'mid_dec'])
     @ocs_agent.param('az_drift', type=float, default=None)
-    @ocs_agent.param('scan_type', default=1, choices=[1, 2, 3, 'sin_el_nod'])
+    @ocs_agent.param('scan_type', default=1, choices=[1, 2, 3])
     @ocs_agent.param('az_vel_ref', type=float, default=None)
     @ocs_agent.param('turnaround_method', default=None,
                      choices=[None, 'standard', 'standard_gen',
@@ -2147,7 +2152,6 @@ class ACUAgent:
                 Type 1 is a constant elevation scan.
                 Type 2 includes a variation in az speed that scales as sin(az).
                 Type 3 is a Type 2 with an sinusoidal el nod.
-                'sin_el_nod' is a sinusoidal el nod with no az movement.
             az_vel_ref (float or None): azimuth to center the velocity profile at.
                 If None then the average of the endpoints is used.
             turnaround_method (str): The method used for generating turnaround.
@@ -2211,10 +2215,6 @@ class ACUAgent:
         if el_mode is None:
             el_mode = self.scan_params['el_mode']  # ... which may also be None.
 
-        # Check our az endpoints for sin_el_nods. They should be the same!
-        if params['scan_type'] == 'sin_el_nod' and az_endpoint1 != az_endpoint2:
-            raise ValueError("Cannot run type 4 scans with different az endpoints!")
-
         # Check if the turnaround method is usable for the called scan type.
         # This should never happen with the above turnaround_method setting.
         if turnaround_method == "standard" and params['scan_type'] != 1:
@@ -2266,8 +2266,6 @@ class ACUAgent:
             az_cent = az_vel_ref - 90
             az_edge = np.max(np.abs((az_endpoint1 - az_cent, az_endpoint2 - az_cent)))
             az_edge_speed = az_speed / np.sin(az_edge)
-        if params['scan_type'] == 'sin_el_nod':
-            az_edge_speed = 0
 
         plan = sh.plan_scan(az_endpoint1, az_endpoint2,
                             el=el_endpoint1, v_az=az_edge_speed, a_az=az_accel,
@@ -2381,18 +2379,8 @@ class ACUAgent:
                                        az_vel_ref=az_vel_ref,
                                        az_first_pos=plan['init_az'],
                                        **scan_params)
-
-        elif params['scan_type'] == 'sin_el_nod':
-            free_form = True
-            track_axes = ['el']
-            g = sh.generate_sin_el_nod(az=az_endpoint1,
-                                       el_endpoint1=el_endpoint1,
-                                       el_endpoint2=el_endpoint2,
-                                       el_freq=el_freq,
-                                       **scan_params)
-
         else:
-            raise ValueError("Scan type must be 1, 2, 3, or 'sin_el_nod'")
+            raise ValueError("Scan type must be 1, 2, or 3")
 
         scan_params_bundle = {'session_id': session.session_id,
                               'schema': 1,
@@ -2420,7 +2408,173 @@ class ACUAgent:
         ret_val = (yield self._run_track(
             session=session, point_gen=g, step_time=step_time, stop_accel=az_accel,
             track_axes=track_axes, point_batch_count=point_batch_count,
-            free_form=free_form, unabort_failure=(params['scan_type'] in [2, 3, 'sin_el_nod'])))
+            free_form=free_form, unabort_failure=(params['scan_type'] in [2, 3])))
+
+        self.agent.publish_to_feed('scan_params',
+                                   {'timestamp': time.time(),
+                                    'block_name': 'exit',
+                                    'data': {'session_id': session.session_id,
+                                             'event': 2}})
+        return ret_val
+
+    @ocs_agent.param('az', type=float)
+    @ocs_agent.param('el_endpoint1', type=float, default=None)
+    @ocs_agent.param('el_endpoint2', type=float, default=None)
+    @ocs_agent.param('el_freq', type=float, default=None)
+    @ocs_agent.param('num_nods', type=int, default=None)
+    @ocs_agent.param('start_time', type=float, default=None)
+    @inlineCallbacks
+    def generate_sin_el_nod(self, session, params):
+        """generate_sin_el_nod(az, \
+                               el_endpoint1=None, el_endpoint2=None, \
+                               el_speed=None, el_freq=None, \
+                               num_nods=None, start_time=None, \
+                               scan_upload_length=None)
+
+        **Process** - Scan generator, currently only works for
+        constant-velocity az scans with fixed elevation.
+
+        Parameters:
+            az (float): the azimuth where the nod will take place.
+            el_endpoint1 (float): first endpoint of elevation motion.
+            el_endpoint2 (float): second endpoint of the elevation motion.
+            el_freq (float): frequency of the elevation nods.
+            num_nods (int or None): if not None, limits the nods to
+                the specified number of sinusoidal nods. The
+                process will exit without error once that has
+                completed.
+            start_time (float or None): a unix timestamp giving the
+                time at which the scan should begin.  The default is
+                None, which means the scan will start immediately (but
+                taking into account the value of wait_to_start).
+            wait_to_start (float): number of seconds to wait before
+                starting a scan, in the case that start_time is None.
+                The default is to compute a minimum time based on the
+                scan parameters and the ACU ramp-up algorithm; this is
+                typically 5-10 seconds.
+
+        Notes:
+          Note that all parameters are optional except for
+          az, el_endpoint1 and el_endpoint2.  If only those two parameters
+          are passed, the Process will scan between those endpoints,
+          with the elevation axis held in Stop, indefinitely (until
+          Process .stop method is called)..
+
+        """
+        init_time = time.time()  # for params feed.
+
+        if self._get_sun_policy('motion_blocked'):
+            return False, "Motion blocked; Sun avoidance in progress."
+
+        self.log.info('User scan params: {params}', params=params)
+
+        az = params['az']
+        el_endpoint1 = params['el_endpoint1']
+        el_endpoint2 = params['el_endpoint2']
+
+        # Params with defaults configured ...
+        el_freq = params['el_freq']
+        if el_freq is None:
+            el_freq = self.scan_params['el_freq']
+
+        # Do we need to limit the elevation accel in some way...?
+
+        # If el is not specified, drop in the current elevation.
+        if el_endpoint1 is None or el_endpoint2 is None:
+            raise ValueError("El endpoints must be specified for el nod!")
+
+        if el_endpoint1 == el_endpoint2:
+            raise ValueError("El endpoints must not be the same for el nod!")
+
+        # Could probably use a condition for if the el endpoints are too close?
+
+        # If requested el is just outside acceptable range, tweak it in.
+        _f, _ = self._get_limit_func('elevation')
+        el_endpoint1, _untweaked_el = _f(el_endpoint1), el_endpoint1
+        if abs(el_endpoint1 - _untweaked_el) > 0.1:
+            return False, "Current elevation (%.4f) is well outside limits." % _untweaked_el
+        init_el = el_endpoint1
+
+        scan_params = {k: params.get(k) for k in [
+            'num_nods', 'start_time']
+            if params.get(k) is not None}
+
+        self.log.info('The scan_params: {scan_params}', scan_params=scan_params)
+
+        # Before any motion, check for sun safety. WE GOTTA MAKE THIS FOR NODS UGH
+        ok, msg = self._check_nod_sunsafe(az, el_endpoint1, el_endpoint2)
+        if ok:
+            self.log.info('Sun safety check: {msg}', msg=msg)
+        else:
+            self.log.error('Sun safety check fails: {msg}', msg=msg)
+            return False, 'Scan is not Sun Safe.'
+
+        # Clear faults.
+        self.log.info('Clearing faults to prepare for motion.')
+        yield self.acu_control.clear_faults()
+        yield dsleep(1)
+
+        # Verify we're good to move
+        ok, msg = yield self._check_ready_motion(session)
+        if not ok:
+            return False, msg
+
+        # Seek to starting position.  Note "legs" will always include
+        # at least 2 points; first point being current (az, el).
+        self.log.info(f'Moving to start position, az={az}, el={init_el}')
+        legs, msg = yield self._get_sunsafe_moves(az, init_el)
+        if msg is not None:
+            self.log.error(msg)
+            return False, msg
+        hwp_safe, msg = yield self._check_hwpsafe_legs(legs)
+        if not hwp_safe:
+            msg = f'Move to start position not permitted: {msg}'
+            self.log.info('{msg}', msg=msg)
+            return False, msg
+
+        # Also validate the scan generally -- need to be movable in el.
+        hwp_safe, msg = yield self._check_hwpsafe(el_endpoint1, el_endpoint2, axes=['el'])
+        if not hwp_safe:
+            msg = f'El-nod not permitted: {msg}'
+            self.log.info(msg)
+            return False, msg
+
+        for leg_az, leg_el in legs[1:]:
+            ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
+            if not ok:
+                return False, f'Start position seek failed with message: {msg}'
+
+        # Prepare the point generator.
+        free_form = True
+        track_axes = ['el']
+        g = sh.generate_sin_el_nod(az=az,
+                                   el_endpoint1=el_endpoint1,
+                                   el_endpoint2=el_endpoint2,
+                                   el_freq=el_freq,
+                                   **scan_params)
+
+        scan_params_bundle = {'session_id': session.session_id,
+                              'schema': 1,
+                              'event': 1,
+                              'init_time': init_time,
+                              }
+        scan_params_bundle.update({
+            'az1': az,
+            'el1': el_endpoint1,
+            'el2': el_endpoint2,
+            'el_freq': el_freq,
+            'type': 'sin_el_nod',
+            'track_axes': ','.join(track_axes),
+        })
+
+        self.agent.publish_to_feed('scan_params',
+                                   {'timestamp': time.time(),
+                                    'block_name': 'info',
+                                    'data': scan_params_bundle})
+
+        ret_val = (yield self._run_track(
+            session=session, point_gen=g, step_time=16 * el_freq,
+            track_axes=track_axes, free_form=free_form, unabort_failure=True))
 
         self.agent.publish_to_feed('scan_params',
                                    {'timestamp': time.time(),
@@ -3202,6 +3356,30 @@ class ACUAgent:
             msg = 'Scan is safe for %.1f hours' % (info['sun_time'] / 3600)
         else:
             msg = 'Scan will be unsafe in %.1f hours' % (info['sun_time'] / 3600)
+
+        return safe, msg
+
+    def _check_nod_sunsafe(self, az, el1, el2):
+        """This will return True if active avoidance is disabled.  If active
+        avoidance is enabled, then it will only return true if the
+        planned El-nod seems to currently be sun-safe.
+
+        """
+        if not self._get_sun_policy('sunsafe_moves'):
+            return True, 'Sun-safety checking is not enabled.'
+
+        if not self._get_sun_policy('map_valid'):
+            return False, 'Sun Safety Map not computed or stale; run the monitor_sun process.'
+
+        n = max(2, int(np.ceil((el2 - el1) / 1.)))
+        els = np.linspace(el1, el2, n)
+
+        info = self.sun.check_trajectory(els * 0 + az, els)
+        safe = info['sun_time'] >= self.sun_params['policy']['min_sun_time']
+        if safe:
+            msg = 'El-nod is safe for %.1f hours' % (info['sun_time'] / 3600)
+        else:
+            msg = 'El-nod will be unsafe in %.1f hours' % (info['sun_time'] / 3600)
 
         return safe, msg
 
