@@ -725,8 +725,12 @@ class HWPGripperAgent:
         """
         if params['enable'] is not None:
             self.spin_check_enabled = params['enable']
+            self.log.info(f'Spin check {"enabled" if self.spin_check_enabled else "disabled"}.')
         if params['disable_temporarily'] is not None:
-            self.spin_check_disable_until = time.time() + params['disable_temporarily']
+            duration = params['disable_temporarily']
+            self.spin_check_disable_until = time.time() + duration
+            self.log.info(f'Spin check disabled temporarily for {duration:.0f} seconds '
+                          f'(until {self.check_disable_until}).')
 
         return True, 'Params updated.'
 
@@ -921,6 +925,8 @@ class HWPGripperAgent:
                 'data': {
                     'gripper_action': action,
                     'shutdown_mode': int(self.shutdown_mode),
+                    'spin_check_enabled': int(self.spin_check_enabled),
+                    'spin_check_disable_until': self.spin_check_disable_until,
                 },
                 'block_name': 'gripper_action',
                 'timestamp': time.time()
@@ -929,7 +935,9 @@ class HWPGripperAgent:
             self.agent.publish_to_feed('gripper_action', data)
             session.data = {
                 'gripper_action': action,
-                'shutdown_mode': int(self.shutdown_mode),
+                'shutdown_mode': self.shutdown_mode,
+                'spin_check_enabled': self.spin_check_enabled,
+                'spin_check_disable_until': self.spin_check_disable_until,
                 'time': time.time()
             }
 
