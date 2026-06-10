@@ -1709,6 +1709,7 @@ class HWPSupervisor:
                     'pmx_action': self.hwp_state.pmx_action,
                     'gripper_action': self.hwp_state.gripper_action,
                     'shutdown_mode': int(self.shutdown_mode),
+                    'shutdown_enabled': int(self.shutdown_enabled),
                 },
             }
             self.agent.publish_to_feed('actions', data)
@@ -2169,8 +2170,9 @@ class HWPSupervisor:
         """
         if params['enable'] is not None:
             self.shutdown_enabled = params['enable']
+            self.log(f'Shutdown {"enabled" if self.shutdown_enabled else "disabled"}')
 
-        return True, f'Shutdown parameters updated: {self.shutdown_enabled}'
+        return True, 'Params updated.'
 
     def cancel_shutdown(self, session, params):
         """cancel_shutdown()
