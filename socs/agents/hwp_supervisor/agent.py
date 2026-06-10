@@ -1682,6 +1682,8 @@ class HWPSupervisor:
             session.data['actions'] = {
                 'pmx': self.hwp_state.pmx_action,
                 'gripper': self.hwp_state.gripper_action,
+                'shutdown_mode': self.shutdown_mode,
+                'shutdown_enabled': self.shutdown_enabled,
             }
 
             action = self.hwp_state.pmx_action
@@ -2168,7 +2170,7 @@ class HWPSupervisor:
         if params['enable'] is not None:
             self.shutdown_enabled = params['enable']
 
-        return True, 'Params updated.'
+        return True, f'Shutdown parameters updated: {self.shutdown_enabled}'
 
     def cancel_shutdown(self, session, params):
         """cancel_shutdown()
