@@ -2170,7 +2170,7 @@ class HWPSupervisor:
         """
         if params['enable'] is not None:
             self.shutdown_enabled = params['enable']
-            self.log(f'Shutdown {"enabled" if self.shutdown_enabled else "disabled"}')
+            self.log.info(f'Shutdown {"enabled" if self.shutdown_enabled else "disabled"}')
 
         return True, 'Params updated.'
 
