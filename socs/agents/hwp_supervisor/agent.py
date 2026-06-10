@@ -1654,6 +1654,8 @@ class HWPSupervisor:
                 'actions': {
                     'pmx': 'ok'  # 'ok', 'stop', or 'no_data'
                     'gripper': 'ok'  # 'ok', 'stop', or 'no_data'
+                    'shutdown_mode': False,
+                    'shutdown_enabled': True,
                 }}
         """
         pm = Pacemaker(1. / self.sleep_time)
@@ -1667,6 +1669,8 @@ class HWPSupervisor:
             'actions': {
                 'pmx': 'no_data',
                 'gripper': 'no_data',
+                'shutdown_mode': self.shutdown_mode,
+                'shutdown_enabled': self.shutdown_enabled,
             }
         }
 
