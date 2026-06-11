@@ -316,7 +316,9 @@ class UKKIDController:
    
     @ocs_agent.param("filename", default=None, type=str)
     @ocs_agent.param("f_guess_filename", default=None, type=str) 
-    @ocs_agent.param("f_guess_list", default=None, type=list) 
+    @ocs_agent.param("f_guess_list", default=None, type=list)
+    @ocs_agent.param("window_size", default=2.0, type=float)
+
     def det_res_freq_from_sweep_data(self, session, params=None):
         """
 
@@ -325,7 +327,9 @@ class UKKIDController:
         Args:
         "filename", default=None, type=str             # Filename for the input wideband sweep .csv. file. If none supplied, will use latest available in the working dir.
         f_guess_filename", default=None, type=str      # Filename for .json file containing the resonator frequency gueses. If none supplied, will use latest available in the working dir.
-        "f_guess_list", default=None, type=list        # Optionally supply a list of resonant frequency guesses, rather than picking up from a file     
+        "f_guess_list", default=None, type=list        # Optionally supply a list of resonant frequency guesses, rather than picking up from a file
+        "window_size", default=2.0, type=float         # Optional window size in MHz 
+       
         Notes:
 
         Determines accurate resonant frquencies from wideband sweep data + freq. guesses.    
@@ -347,7 +351,7 @@ class UKKIDController:
             
             self.log.info("Determining accurate resonant frequencies from wideband sweep data.")
 
-            window_size = 2.0e6 # Full width of window in Hz. Will need to tweak depending on reosnaotr seperation in test array.
+            window_size = params['window_size']*1.0e6 # Full width of window in Hz. Will need to tweak depending on reosnaotr seperation in test array.
             now = time.time()
             (out_full_path, out_rel_path) = self._create_return_working_directory(time.time())
 
@@ -1399,7 +1403,7 @@ class UKKIDController:
                
                return False, runtime_error_msg
 
-            spans = params['freq_span']*len(f_accurate_list)
+            spans = [params['freq_span']]*len(f_accurate_list)
             num_points = params['num_points']
             samples_per_point = params['samples_per_point']
 
