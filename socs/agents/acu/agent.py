@@ -281,6 +281,9 @@ class ACUAgent:
             self.hwp_rules.enabled = False
         startup_monitor_hwp = (startup and self.hwp_rules.configured)
 
+        # HVAC Manager
+        self.hvm = None
+
         # Exercise plan.
         self.exercise_plan = self.acu_config.get('exercise_plan')
 
@@ -458,6 +461,10 @@ class ACUAgent:
                                 self.set_shutter,
                                 blocking=False,
                                 aborter=self._simple_task_abort)
+        if self.datasets['hvac']:
+            agent.register_task('set_hvac',
+                                self.set_hvac,
+                                blocking=False)
         agent.register_task('update_hwp',
                             self.update_hwp,
                             blocking=False)
@@ -718,7 +725,7 @@ class ACUAgent:
         session.data.update((yield _get_status()))
         qual_pacer = Pacemaker(.1)
 
-        hvm = hvac.HvacManager()
+        self.hvm = hvac.HvacManager()
 
         last_resp_rate = None
         data_blocks = {}
@@ -784,13 +791,13 @@ class ACUAgent:
                 if k in not_data_keys:
                     continue
 
-                if k == 'Hvac' and len(v) > 0 and (hvm.grouped_fields is None):
+                if k == 'Hvac' and len(v) > 0 and (self.hvm.grouped_fields is None):
                     # Runs when first HVAC data are received. These
                     # fields aren't listed explicitly in soaculib so
                     # they're analyzed here.
-                    hvm.parse_fields(v)
-                    assert len(hvm.grouped_fields['unclassified']) == 0
-                    self.status_field_map.update(hvm.get_block_info())
+                    self.hvm.parse_fields(v)
+                    assert len(self.hvm.grouped_fields['unclassified']) == 0
+                    self.status_field_map.update(self.hvm.get_block_info())
 
                 for (key, value) in v.items():
                     try:
@@ -3573,6 +3580,68 @@ class ACUAgent:
             return False, message
 
         return False, 'Aborted in state {state}'
+
+    @ocs_agent.param('targets')
+    @ocs_agent.param('values')
+    @inlineCallbacks
+    def set_hvac(self, session, params):
+        """set_hvac(targets, values)
+
+        **Task** Set HVAC control parameters.
+
+        Args:
+          targets: a list of targets.
+          values: a list of values (or a single value, which will be broadcast).
+
+        """
+        error_count = 0
+        sup_targets = params['targets']
+        sup_values = params['values']
+        if not isinstance(sup_values, list):
+            sup_values = [sup_values] * len(sup_targets)
+        if len(sup_values) != len(sup_targets):
+            return False, 'Number of values not compatible with number of targets.'
+
+        # Expand any broadcast targets to specific targets.
+        tvs = []
+        for st, sv in zip(sup_targets, sup_values):
+            for broadcast_targets, group_key in [
+                    (['fans', 'fan'], 'fan_on'),
+                    (['boosters', 'booster'], 'booster_on'),
+                    (['heaters', 'heater'], 'heater_on'),
+            ]:
+                if st.lower() in broadcast_targets:
+                    self.log.info(f'Expanding target "{st}".')
+                    for t in self.hvm.grouped_fields[group_key]:
+                        tvs.append((t.cmd_base, sv))
+                    break
+            else:
+                tvs.append((st, sv))
+
+        # Construct the commands
+        cmds = []
+        for t, v in tvs:
+            c = self.hvm.get_command(t, v)
+            if c.get('error'):
+                self.log.warn(c['error'])
+                error_count += 1
+            else:
+                cmds.append(c)
+
+        # Execute the commands.
+        for c in cmds:
+            msg = f'Issuing: {c["command"]}' + (
+                '' if c.get('parameter') is None else
+                f' with parameter {c["parameter"]}')
+            self.log.info(msg)
+            result = (yield self.acu_control.Command(**c))
+            self.log.info(f'result: {result}')
+            # error check ...
+            yield dsleep(0.2)
+
+        if error_count > 0:
+            return False, "Some requests not processed."
+        return True, "All requests processed successfully."
 
     @ocs_agent.param('starting_index', type=int, default=0)
     def exercise(self, session, params):
