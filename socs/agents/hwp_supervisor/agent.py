@@ -1912,7 +1912,7 @@ class HWPSupervisor:
     @ocs_agent.param('brake_voltage', type=float, default=None)
     @ocs_agent.param('max_brake_duration', type=float, default=None)
     def brake(self, session, params):
-        """brake(freq_tol=0.05, freq_tol_duration=10, brake_voltage=10)
+        """brake(freq_tol=0.05, freq_tol_duration=10, brake_voltage=10, max_brake_duration=None)
 
         **Task** - Sets the control state to brake the HWP.
 
@@ -1928,6 +1928,9 @@ class HWPSupervisor:
         brake_voltage: float
             Voltage to use when braking the HWP.
             Defaults to ``brake_voltage`` from config.
+        max_brake_duration: float
+            Maximum duration (sec) for braking the HWP.
+            Defaults to ``max_brake_duration`` from config.
 
         Notes
         --------
