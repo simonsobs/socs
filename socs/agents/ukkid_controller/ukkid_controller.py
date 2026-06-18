@@ -28,6 +28,8 @@ sys.path.append(souk_readout_tools_path)
 
 stream_script_path = '/home/leechj/souk_readout_tools/src/souk_readout_tools/client/'
 
+
+# JL This needs to be updated
 if mock:
     import mock_readout_client as readout_client
 else:
@@ -39,10 +41,17 @@ else:
 import res_fns
 from resonator_fitter import interactive_fit_viewer, fit_summary_table, fit_summary_plot, fit_resonator,fit_summary_histograms,fit_summary_write_json
 
-config_file = '/home/leechj/souk_readout_tools/config.yaml'
-client = ReadoutClient(config_file=config_file)
+# Dir where the config files in config_file_dict are located.
+config_file_root_dir='/home/leechj/souk_readout_tools' 
+# This tells the agent which configi file to push to the server
+# depending on which kid_stream_id the agent was started with on the command line.
+# This will eventually have 28 entries for the 28 individual reduction pipelines.
+config_file_dict = {'ufm_kid1':'my_config_bun_p0.yaml','ufm_kid2':'my_config_bun_p1.yaml'}
+
+#config_file = '/home/leechj/souk_readout_tools/config.yaml'
+#client = ReadoutClient(config_file=config_file)
 # Push the configuration file above to the RFSoc before attempting anything else.
-client.push_config()
+#client.push_config()
     
 class UKKIDController:
     """Controller object for streaming data from and sending commands to UK KID RFSoc readout boards.
@@ -66,6 +75,10 @@ class UKKIDController:
         self._check_state = False
 
         self.kid_stream_id = args.kid_stream_id
+        self.config_file = config_file_dict[self.kid_stream_id]
+        self.client = ReadoutClient(config_file=config_file_root_dir+'/'+self.config_file)
+        self.client.push_config()
+
         # JL: This needs to eventually come from
         # an agent command line parameter
         # or be set in some config file somewhere.
@@ -189,7 +202,7 @@ class UKKIDController:
 
                 now = time.time()
                 # JL: Need to decide what fiedls are best to send here, thinning out by hand if necessaery.
-                full_status = client.get_info(['server','clock'])
+                full_status = self.client.get_info(['server','clock'])
                 json_status = json.dumps(full_status)
                 json_status_stripped =  json_status.replace('{','').replace('}','')
 
@@ -216,7 +229,7 @@ class UKKIDController:
         else:
             return False, 'check_state is not currently running.'
             
-    # Sends a client.get_system information() call to the RF Socs.
+    # Sends a self.client.get_system information() call to the RF Socs.
     # Tested at v1.1.1 
     def get_system_information(self, session, params=None):
         """
@@ -227,7 +240,7 @@ class UKKIDController:
             None
 
         Notes:
-          Will call client.get_info() to get full system information.   
+          Will call self.client.get_info() to get full system information.   
           Should be a quick task so does not needs its own aborter.
 
         """
@@ -240,7 +253,7 @@ class UKKIDController:
             self.log.info("Getting RFSoc system information...")
 
             now = time.time()
-            full_status = client.get_info()
+            full_status = self.client.get_info()
             json_status = json.dumps(full_status)
 
             # Write result string to session.data, the feed and the log.
@@ -258,7 +271,7 @@ class UKKIDController:
 
             return True, 'Obtained RFSoc system information.'
 
-   # Sends a client.get_initialise_server() call to the RFsocs.
+   # Sends a self.client.get_initialise_server() call to the RFsocs.
    # Tested at v1.1.1
     def initialise_server(self, session, params=None):
         """
@@ -269,7 +282,7 @@ class UKKIDController:
             None
 
         Notes:
-          Will call client.initialise_server()
+          Will call self.client.initialise_server()
           (or send mock string(s)). 
           Should be a quick task so does not needs its own aborter.
 
@@ -283,7 +296,7 @@ class UKKIDController:
             self.log.info("Sending RFSoc initialise_server...")
 
             now = time.time()
-            full_status = client._initialise_server()
+            full_status = self.client._initialise_server()
             json_status = json.dumps(full_status)
             # JL: This returns a string that looks like this
             # '{"status": "success"}'
@@ -512,7 +525,7 @@ class UKKIDController:
 
             self.log.info('Will use narrow band sweep filename ' + sweep_filename)
             self.log.info('Importing sweep data...')
-            s=client.import_sweep(sweep_filename)
+            s=self.client.import_sweep(sweep_filename)
             self.log.info('...done.')
 
             f,z,e = s['sweep_f'], s['sweep_i']+1j*s['sweep_q'], s['sweep_ei']+1j*s['sweep_eq']
@@ -597,11 +610,11 @@ class UKKIDController:
             stream_start_time = time.time()
  
             # Check how many tone frequencies are currently set, to pass to the receive_stream_g3.py below.
-            tone_freqs = client.get_tone_frequencies()
+            tone_freqs = self.client.get_tone_frequencies()
             num_freqs = len(tone_freqs)
             
             self.log.info("Enabling stream on RFSoc board.")
-            client.enable_stream()              
+            self.client.enable_stream()              
             self.log.info("Starting stream receive process.")
 
             (out_full_path, out_rel_path) = self._create_return_working_directory(time.time())    
@@ -709,7 +722,7 @@ class UKKIDController:
             self.log.info(f'Streaming process appears to have terminated cleanly with return code {ret_code}.')
             
         self.log.info('Disabling TCP/IP data streaming on RFSoc board.') 
-        client.disable_stream()
+        self.client.disable_stream()
         
         self.log.info("Returning from stream function.")
         message = {'block_name': 'stream_string',
@@ -839,7 +852,7 @@ class UKKIDController:
             # Firstly, check if a sweep is already in progress on the RFSoC.
             # It shouldn't be, but throw an error and return from function if there is.
             now = time.time() 
-            p = client.get_sweep_progress()
+            p = self.client.get_sweep_progress()
             if p==0.0:
                pass
             elif p != 1.0:
@@ -859,15 +872,15 @@ class UKKIDController:
 
             # Gather certain parameters from the RFSoc in order to calculate
             # sweep parameters.
-            client.pull_config()
-            info = client.get_system_information()
+            self.client.pull_config()
+            info = self.client.get_system_information()
             adcclk = info['adc_clk_hz']
             dacclk = adcclk
             dacduc = info['dac_duc_mixer_frequency_hz']
             dacnyq = info['nyquist_zone_dac0']             
-            udc = client.config['rf_frontend']['connected']
-            lo = client.config['rf_frontend']['tx_mixer_lo_frequency_hz']
-            sb = client.config['rf_frontend']['tx_mixer_sideband'] 
+            udc = self.client.config['rf_frontend']['connected']
+            lo = self.client.config['rf_frontend']['tx_mixer_lo_frequency_hz']
+            sb = self.client.config['rf_frontend']['tx_mixer_sideband'] 
             # Hardwired vales - numbe rof bytes per dac data point and fft window sizes.
             
             dacint = 2
@@ -935,7 +948,7 @@ class UKKIDController:
 
                 center_freqs = freqs + np.floor(sweep_points/2)*spacings/sweep_points
                 tone_amplitudes = np.ones(num_tones)*tone_amplitude # all set to the same makes sense for e.g. 1024 tone wideband sweeps.
-                tone_phases = client.generate_newman_phases(center_freqs)
+                tone_phases = self.client.generate_newman_phases(center_freqs)
 
                 param_report_msg = f'full_band_sweep: Supplied parameters center_freq_hz {center_freq_hz} step_size_hz {step_size_hz} num_tones {num_tones} samples_per_point {samples_per_point} ignore_phase_correction {ignore_phase_correction}  plot_data {plot_data}'
                 self.log.info(param_report_msg)
@@ -973,16 +986,16 @@ class UKKIDController:
            
 
             self.log.info('full_band_sweep: Setting tone frequences, ampltiudes and phases on RFSoc.')
-            client.set_tone_frequencies(center_freqs)
-            client.set_tone_amplitudes(tone_amplitudes)
-            client.set_tone_phases(tone_phases)
+            self.client.set_tone_frequencies(center_freqs)
+            self.client.set_tone_amplitudes(tone_amplitudes)
+            self.client.set_tone_phases(tone_phases)
 
             self.log.info('full_band_sweep: Checking for input/output ADC/DAC saturation and DSP overflow on RFSoc.')
             
             try:
-              outps = client.check_output_saturation()
-              inps  = client.check_input_saturation()
-              dspof = client.check_dsp_overflow()
+              outps = self.client.check_output_saturation()
+              inps  = self.client.check_input_saturation()
+              dspof = self.client.check_dsp_overflow()
     
               if outps['result']:
                 raise RuntimeError(f"full_band_sweep: Output saturation detected: {outps['details']}")
@@ -1013,7 +1026,7 @@ class UKKIDController:
             self.log.info('full_band_sweep: Performing sweep...')
 
             try:
-                response = client.perform_sweep(center_freqs,
+                response = self.client.perform_sweep(center_freqs,
                                     sweep_span,
                                     points = sweep_points,
                                     samples_per_point = samples_per_point,
@@ -1038,7 +1051,7 @@ class UKKIDController:
 
             
             while True:
-               p=client.get_sweep_progress()
+               p=self.client.get_sweep_progress()
                self.log.info(f'full_band_sweep: Sweep progress: {100*p:.3f}%')
                if p==1.0: break
                else: time.sleep(1.0)
@@ -1053,7 +1066,7 @@ class UKKIDController:
             if params['tone_powers_dbm'] != 'auto':
                params['tone_powers_dbm'] = float(params['tone_powers_dbm']) 
             
-            sweep_data = client.wideband_sweep(
+            sweep_data = self.client.wideband_sweep(
                 bandwidth_hz=params['bandwidth_hz'],               # None = defaults to 90% of full bandwidth
                 center_freq_hz=params['center_freq_hz'],             # None = defaults to center of band
                 step_size_hz=params['step_size_hz'],              # frequency step size
@@ -1068,12 +1081,12 @@ class UKKIDController:
             )
 
             
-            # sweep_data = client.wideband_sweep(apply_phase_correction=params['apply_phase_correction'])
+            # sweep_data = self.client.wideband_sweep(apply_phase_correction=params['apply_phase_correction'])
             #
             
             '''
             self.log.info('full_band_sweep: Parsing sweep data ...')
-            s = client.parse_sweep_data(client.get_sweep_data(),apply_phase_correction=not ignore_phase_correction)
+            s = self.client.parse_sweep_data(self.client.get_sweep_data(),apply_phase_correction=not ignore_phase_correction)
             f = s['sweep_f']
             z = s['sweep_i']+1j*s['sweep_q']
 
@@ -1095,7 +1108,7 @@ class UKKIDController:
             self.log.info('full_band_sweep: Saving sweep data to disk.')
             self.log.info('full_band_sweep: sweep_full_path '+ output_sweep_full_path)
             no_ext_output_sweep_full_path = output_sweep_full_path.replace('.'+filetype,'')
-            client.export_sweep(no_ext_output_sweep_full_path, sweep_data, filetype)
+            self.client.export_sweep(no_ext_output_sweep_full_path, sweep_data, filetype)
             self.log.info('full_band_sweep: Fullband sweep exported to:'+output_sweep_full_path)
 
             ##################################
@@ -1282,7 +1295,7 @@ class UKKIDController:
             # Firstly, check if a sweep is already in progress on the RFSoC.
             # It shouldn't be, but throw an error and return from function if there is.
             now = time.time() 
-            p = client.get_sweep_progress()
+            p = self.client.get_sweep_progress()
             if p==0.0:
                pass
             elif p != 1.0:
@@ -1369,18 +1382,18 @@ class UKKIDController:
             # JL Set the all equal to supplied tone_amplitude parameter for the time being
             # This may get modified in the future.
             tone_amplitudes = [params['tone_amplitude']]*len(f_accurate_list)
-            tone_phases = client.generate_newman_phases(f_accurate_list)
+            tone_phases = self.client.generate_newman_phases(f_accurate_list)
 
             self.log.info('narrow_band_sweep: Setting tone frequences, ampltiudes and phases on RFSoc.')
-            client.set_tone_frequencies(f_accurate_list)
-            client.set_tone_amplitudes(tone_amplitudes)
-            client.set_tone_phases(tone_phases)
+            self.client.set_tone_frequencies(f_accurate_list)
+            self.client.set_tone_amplitudes(tone_amplitudes)
+            self.client.set_tone_phases(tone_phases)
             self.log.info('narrow_band_sweep: Checking for input/output ADC/DAC saturation and DSP overflow on RFSoc.')
             
             try:
-              outps = client.check_output_saturation()
-              inps  = client.check_input_saturation()
-              dspof = client.check_dsp_overflow()
+              outps = self.client.check_output_saturation()
+              inps  = self.client.check_input_saturation()
+              dspof = self.client.check_dsp_overflow()
     
               if outps['result']:
                 raise RuntimeError(f"narrow_band_sweep: Output saturation detected: {outps['details']}")
@@ -1407,25 +1420,25 @@ class UKKIDController:
             num_points = params['num_points']
             samples_per_point = params['samples_per_point']
 
-            client.perform_sweep(f_accurate_list, spans, num_points, samples_per_point, 'up')
+            self.client.perform_sweep(f_accurate_list, spans, num_points, samples_per_point, 'up')
             
-            #while client.get_server_status()['message']['latest_sweep_data_valid'] == False:
-            #while client.get_info(['server'])['server']['latest_sweep_data_valid'] == False:
-            while client.get_info(['server'])[0]['latest_sweep_data_valid'] == False:
+            #while self.client.get_server_status()['message']['latest_sweep_data_valid'] == False:
+            #while self.client.get_info(['server'])['server']['latest_sweep_data_valid'] == False:
+            while self.client.get_info(['server'])[0]['latest_sweep_data_valid'] == False:
                  self.log.info('Waiting for scan to complete, sleeping for 1 second.')
                  time.sleep(1)
                      
             self.log.info('Getting sweep data...') 
-            raw_sweep = client.get_sweep_data()
+            raw_sweep = self.client.get_sweep_data()
             self.log.info('...done')
                      
             self.log.info('Parsing sweep data...')          
-            s = client.parse_sweep_data(raw_sweep)
+            s = self.client.parse_sweep_data(raw_sweep)
             self.log.info('...done')
 
             self.log.info('Exporting sweep data to ' + output_sweep_narrow_path +' ...')
             no_ext_output_sweep_narrow_path = output_sweep_narrow_path.replace('.'+filetype,'')
-            client.export_sweep(no_ext_output_sweep_narrow_path, s, filetype)   
+            self.client.export_sweep(no_ext_output_sweep_narrow_path, s, filetype)   
             self.log.info('...done')     
 
             #remove slope from phase
@@ -1572,7 +1585,7 @@ class UKKIDController:
             # At this point. f_accurate_list should defined.
             self.log.info('set_tone_frequencies: Will use tone frequencies of ' +str(f_accurate_list))
             self.log.info('set_tone_frequencies: Setting tone frequences on RFSoc.')
-            client.set_tone_frequencies(f_accurate_list)
+            self.client.set_tone_frequencies(f_accurate_list)
             
             self.log.info('set_tone_frequencies: complete.')
             # JL write something to the feed here?
@@ -1598,7 +1611,7 @@ class UKKIDController:
             
             self.log.info("get_tone_frequencies: Preparing to get tone frequencies for: kid_stream_id: " + self.kid_stream_id)
 
-            tone_freqs = client.get_tone_frequencies()
+            tone_freqs = self.client.get_tone_frequencies()
             self.log.info("get_tone_frequencies: Number of tones = %i " % len(tone_freqs))
             self.log.info("get_tone_frequencies: Tone frequencies " + str(tone_freqs))
             
@@ -1632,7 +1645,7 @@ class UKKIDController:
             
             self.log.info('set_tone_amplitudes: Will use tone amplitudes of ' +str(amp_list))
             self.log.info('set_tone_amplitudes: Setting tone  amplitudes on RFSoc.')
-            client.set_tone_amplitudes(amp_list)
+            self.client.set_tone_amplitudes(amp_list)
             
             self.log.info('set_tone_amplitudes: complete.')
             # JL write something to the feed here?
@@ -1666,7 +1679,7 @@ class UKKIDController:
             # the length of the supplied tone amplitude array
 
             self.log.info('get_tone_amplitudes: Getting tone  amplitudes on RFSoc.')
-            amp_list = client.get_tone_amplitudes()
+            amp_list = self.client.get_tone_amplitudes()
             self.log.info('get_tone_amplitudes: Got tone amplitudes of ' +str(amp_list))
             
             self.log.info('get_tone_amplitudes: complete.')
@@ -1701,7 +1714,7 @@ class UKKIDController:
 
             self.log.info('set_tone_powers: Will use tone powers of ' +str(pow_list))
             self.log.info('set_tone_powers: Setting tone  powers on RFSoc.')
-            client.set_tone_powers(pow_list)
+            self.client.set_tone_powers(pow_list)
             
             self.log.info('set_tone_powers: complete.')
             # JL write something to the feed here?
@@ -1731,7 +1744,7 @@ class UKKIDController:
             # the length of the supplied tone amplitude array                                                                                                                                                                                                                                                                                                             
 
             self.log.info('get_tone_powers: Getting tone powers on RFSoc.')
-            pow_list = client.get_tone_powers()
+            pow_list = self.client.get_tone_powers()
             self.log.info('get_tone_powers: Got tone powers of ' +str(pow_list))
             
             self.log.info('get_tone_powers: complete.')
