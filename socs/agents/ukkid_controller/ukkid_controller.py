@@ -13,7 +13,7 @@ import re
 import shutil
 
 # Set to True to run without RFSoc hardware i.e. in simulated mode for testing.
-mock = False
+mock = True
 
 from os import environ
 
@@ -28,12 +28,13 @@ sys.path.append(souk_readout_tools_path)
 
 stream_script_path = '/home/leechj/souk_readout_tools/src/souk_readout_tools/client/'
 
+from souk_readout_tools.client.readout_client import ReadoutClient
 
 # JL This needs to be updated
-if mock:
-    import mock_readout_client as readout_client
-else:
-    from souk_readout_tools.client.readout_client import ReadoutClient
+#if mock:
+#    import mock_readout_client as readout_client
+#else:
+#    from souk_readout_tools.client.readout_client import ReadoutClient
     # v1 #import readout_client
 
 # These modules should be present in souk_readout_tools_path...
@@ -75,8 +76,9 @@ class UKKIDController:
         self._check_state = False
 
         self.kid_stream_id = args.kid_stream_id
-        self.config_file = config_file_dict[self.kid_stream_id]
-        self.client = ReadoutClient(config_file=config_file_root_dir+'/'+self.config_file)
+        self.config_file = config_file_root_dir+'/'+config_file_dict[self.kid_stream_id]
+        
+        self.client = ReadoutClient(config_file=self.config_file,mock=mock)
         self.client.push_config()
 
         # JL: This needs to eventually come from
@@ -629,9 +631,9 @@ class UKKIDController:
  
             if mock:           
                mock_flag = "-m"
-               executable_list = [sys.executable, "receive_stream_g3.py",mock_flag,"-n",str(num_freqs),"-f",output_stream_relative_path,"-i",self.kid_stream_id,"-t",str(params['duration']),'-C',config_file]
+               executable_list = [sys.executable, "receive_stream_g3.py",mock_flag,"-n",str(num_freqs),"-f",output_stream_relative_path,"-i",self.kid_stream_id,"-t",str(params['duration']),'-C',self.config_file]
             else:
-               executable_list = [sys.executable, "receive_stream_g3.py","-n",str(num_freqs),"-f",output_stream_relative_path,"-i",self.kid_stream_id,"-t",str(params['duration']),'-C', config_file]
+               executable_list = [sys.executable, "receive_stream_g3.py","-n",str(num_freqs),"-f",output_stream_relative_path,"-i",self.kid_stream_id,"-t",str(params['duration']),'-C', self.config_file]
 
             
             # executable_list = [sys.executable, "receive_stream_g3.py",mock_flag,"-n",str(num_freqs),"-f",output_stream_relative_path,"-i",self.kid_stream_id,"-t",str(params['duration'])]
@@ -810,22 +812,22 @@ class UKKIDController:
               self.log.info("full_band_sweep: Will write sweep data to " + output_sweep_full_path)
             else:
               # Copy an example sweep file over to the output destination, then return from the function, without doing any real scan on the RFSoC.  
-              self.log.info("full_band_sweep: MOCKED - Will write sweep data to " + output_sweep_full_path)              
+              self.log.info("MOCK: full_band_sweep: Will write sweep data to " + output_sweep_full_path)              
               loop_time_seconds = 10.0
               
               shutil.copy('./example_full_band_sweep.csv',output_sweep_full_path)
-              self.log.info("full_band_sweep: sweep data written to " + output_sweep_full_path)
+              self.log.info("MOCK: full_band_sweep: sweep data written to " + output_sweep_full_path)
               if plot_data:  
                plot_filename =  output_sweep_full_path.replace(filetype,'')+'png'
                shutil.copy('./example_full_band_sweep.png',plot_filename)
-               self.log.info("full_band_sweep: sweep data PNG file written to " + plot_filename)
+               self.log.info("MOCK: full_band_sweep: sweep data PNG file written to " + plot_filename)
 
               now = time.time()            
               # Now just go into a loop to wait out the sweep time
               while((now - sweep_start_time) < loop_time_seconds ):
                now = time.time()
                sweep_active_seconds = (now - sweep_start_time)
-               sweep_status_string = "Data has been sweeping for %.1f seconds." % (now - sweep_start_time)
+               sweep_status_string = "MOCK: Data has been sweeping for %.1f seconds." % (now - sweep_start_time)
                  
                session.data = {"value": 'SESSION ' + sweep_status_string,
                             "timestamp": now}
@@ -837,11 +839,11 @@ class UKKIDController:
                self.agent.publish_to_feed('UKKID_feed', message)
               
                # Also send this string to the log - discuss whether appropriate.
-               self.log.info('LOG' + sweep_status_string) 
+               self.log.info(sweep_status_string) 
                time.sleep(1)
                now = time.time()
-               self.log.info('full_band_sweep: MOCKED Sweep complete.')
-               return True, 'full_band_sweep: MOCKED Sweep complete.'
+               self.log.info('MOCK: full_band_sweep: Sweep complete.')
+               return True, 'MOCK: full_band_sweep: Sweep complete.'
 
             '''
             #################################
