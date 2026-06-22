@@ -35,7 +35,7 @@ jobs:
         python-version: ${{ matrix.python }}
 
     - name: Clone socs
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Install socs
       run: |
@@ -80,7 +80,7 @@ jobs:
         python-version: 3.11
 
     - name: Clone socs
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Install socs
       run: |
@@ -116,7 +116,7 @@ jobs:
 
     # Coverage report doesn't work unless we have a checkout
     - name: Clone socs
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     # Download after checkout, else artifacts get deleted
     - name: Download coverage artifacts
