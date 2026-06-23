@@ -709,9 +709,9 @@ class HWPGripperAgent:
         return True, 'Cancelled shutdown mode'
 
     @ocs_agent.param('enable', type=bool, default=None)
-    @ocs_agent.param('disable_temporarily', type=float, default=None)
+    @ocs_agent.param('disable_duration', type=float, default=None)
     def update_spin_check(self, session, params=None):
-        """update_spin_check(enable=None)
+        """update_spin_check(enable=None, disable_duration=None)
 
         **Task** - Update HWP spin check parameters.
 
@@ -719,15 +719,15 @@ class HWPGripperAgent:
 
         Args:
           enable (bool): If True, enable HWP spin checks.
-            If False, disable HWP spin checks non-temporarily.
-          disable_temporarily (float):  If set, disable
+            If False, disable HWP spin checks until re-enabled or the agent is restarted.
+          disable_duration (float): A time in seconds. If set, disable
             HWP spin check for this number of seconds.
         """
         if params['enable'] is not None:
             self.spin_check_enabled = params['enable']
             self.log.info(f'Spin check {"enabled" if self.spin_check_enabled else "disabled"}.')
-        if params['disable_temporarily'] is not None:
-            duration = params['disable_temporarily']
+        if params['disable_duration'] is not None:
+            duration = params['disable_duration']
             self.spin_check_disable_until = time.time() + duration
             self.log.info(f'Spin check disabled temporarily for {duration:.0f} seconds '
                           f'(until {self.spin_check_disable_until}).')
