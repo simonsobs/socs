@@ -104,7 +104,7 @@ One should follow the "quick-start" installation instructions here...
 
 https://github.com/sr-cdf/souk_readout_tools
 
-### Configuration of souk_readout_tools,
+### Configuration of souk_readout_tools
 
 Overall configuration can be maintained either on the server side
 (i.e. on the RFSoc linux filespace) or on the client side (on your
@@ -122,7 +122,7 @@ directory.  You should edit it this to provide e.g. the IP addresses
 you have set op for the RFSocs on your particular install, as
 described in the souk_readout_tools documentation.
 
-## OCS system to use the ukkid_controller agent.
+## Configuration of the OCS system to use the ukkid_controller agent
 
 Withing whereever you have put your ocs-site-configs directory (mine
 is in ocs/ocs-site-configs directory).
@@ -263,11 +263,99 @@ services:
 ```
 
 Note there is no reference to the ukkid_controller agent, as this does
-not run a dockerised OCS agent but as a "bare python" script via...
+not run a dockerised OCS agent but as a "bare python" script i.e. via...
 
 ```
 ocs-agent-cli --agent ukkid_controller.py --entrypoint main --instance-id UKKIDController1
 ```
+
+## Obtaining the UKKID_controller.py agent
+
+Go to the Simons observatory socs repository here...
+
+https://github.com/simonsobs/socs
+
+Select the branch "ukkid_agent" from the pull down branch menu. 
+Clone this branch on the same machine as you have souk_readout_tools and your ocs system installed. The agent can be 
+found via
+
+```
+cd cd socs/socs/agents/ukkid_controller/
+ls
+```
+
+This will show the python code, this README.md and various support files.
+
+## Making the UKKID_controller.py agent available to your OCS install
+
+The way I am doing this (there may be a more elegent way) is to create a soflink from the default "agents" directory in your default OCS installed to point at the 
+ukkid_controller directory within the SOCS directory tree. On my system I had installed ocs in /home/leechj/ocs and socs in /home/leechj/socs, so I did.
+
+```
+cd ~/ocs/ocs/agents
+ln -s /home/leechj/socs/socs/agents/ukkid_controller ukkid_controller
+```
+
+so that you end up with the soft-link as follows...
+
+
+```
+leechj@aslxdaq35:~/ocs/ocs/agents$ ls -lrt
+total 32
+-rw-rw-r-- 1 leechj leechj    0 Feb 25  2025 __init__.py
+drwxrwxr-x 2 leechj leechj 4096 Feb 25  2025 aggregator
+drwxrwxr-x 2 leechj leechj 4096 Feb 25  2025 registry
+drwxrwxr-x 2 leechj leechj 4096 Feb 25  2025 influxdb_publisher
+drwxrwxr-x 2 leechj leechj 4096 Feb 25  2025 host_manager
+drwxrwxr-x 2 leechj leechj 4096 Feb 25  2025 fake_data
+drwxrwxr-x 2 leechj leechj 4096 Feb 25  2025 barebones
+drwxrwxr-x 3 leechj leechj 4096 Apr 17  2025 my_barebones
+drwxrwxr-x 3 leechj leechj 4096 Mar 16 17:42 ukkid_controller_bak_20260330
+lrwxrwxrwx 1 leechj leechj   46 Mar 30 14:32 ukkid_controller -> /home/leechj/socs/socs/agents/ukkid_controller
+```
+
+
+## Tweaking UKKID_controller.py agent to work on your system.
+
+(This is hacky at the moment and will be tidied up in the future.)
+
+
+Change directory to where you have installed the ukkid_controller agent above. E.g.
+
+```
+cd /home/leechj/socs/socs/agents/ukkid_controller
+```
+
+Open in a text editor and change the following variables to the appropriate locations on your computer. You should only need to edit the variables 
+souk_readout_tools_install_dir and config_file_dict. The latter should be set up to match that set up in the section "Configuration of souk_readout_tools" above.
+
+```
+##################
+# Set to where you installed souk_readout_tools
+souk_readout_tools_install_dir = '/home/leechj/souk_readout_tools'
+#############
+# Set to True to run without RFSoc hardware i.e. in simulated mode for testing.
+mock = True
+#############
+# Where the site packages have been installed by the python virtual enivroment - should contain a dir called souk_readout_tools
+souk_readout_tools_path = os.path.join(souk_readout_tools_install_dir,'client_venv/lib/python3.10/site-packages')
+# Should contain the script client_scripts/receive_stream_g3.py
+stream_script_path =  os.path.join(souk_readout_tools_install_dir,'src/souk_readout_tools/client/')
+# Output directory where you want your data files to get written to
+data_out_dir = os.path.join(souk_readout_tools_install_dir,'src/souk_readout_tools/client/client_scripts/tmp/')
+# Directory where the config files specified in the config_file_dict dictionary below are located.
+config_file_root_dir = souk_readout_tools_install_dir 
+# This next variable tells the agent which config file to push to the server depending on which kid_stream_id the agent was started with on the command line.
+# This will eventually have 28 entries for the 28 individual reduction pipelines.
+# For single pipline running, with one ukkid_controller.py agent running at a time, we only need the first entry, and it should the filename of
+# your souk_readout_tools config .yaml file which lives in config_file_root_dir specified above.
+config_file_dict = {'ufm_kid1':'my_config_bun_p0.yaml','ufm_kid2':'my_config_bun_p1.yaml'}
+##################
+```
+
+If you set the mock variable to be True, the agent will run in simulated mode and you do not need a connected hardware RFSoc. Set to False if you want to run 
+real hardware (the IP address etc. should be set up in souk_readout_tools config.yaml file specfied in config_file_dict).
+
 
 ## Running the UKKID controller agent without additional hardware (mocked mode)
 
