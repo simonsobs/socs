@@ -1,6 +1,5 @@
 import time
 import txaio
-# For json formatting of status strings.
 import json
 import sys
 import subprocess
@@ -11,49 +10,37 @@ import numpy as np
 import glob
 import re
 import shutil
-
-# Set to True to run without RFSoc hardware i.e. in simulated mode for testing.
-mock = True
-
 from os import environ
-
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-# JL: append the parent directory to the path so we can import the readout_client module
-#v1
-#souk_readout_tools_path = '/home/leechj/souk_readout_tools/src/souk_readout_tools/client/'
-souk_readout_tools_path = '/home/leechj/souk_readout_tools/client_venv/lib/python3.10/site-packages'
+##################
+# Set to where you installed souk_readout_tools
+souk_readout_tools_install_dir = '/home/leechj/souk_readout_tools'
+#############
+# Set to True to run without RFSoc hardware i.e. in simulated mode for testing.
+mock = True
+#############
+# Where the site packages have been installed by the python virtual enivroment - should contain a dir called souk_readout_tools
+souk_readout_tools_path = os.path.join(souk_readout_tools_install_dir,'client_venv/lib/python3.10/site-packages')
+# Should contain the script client_scripts/receive_stream_g3.py
+stream_script_path =  os.path.join(souk_readout_tools_install_dir,'src/souk_readout_tools/client/')
+# Output directory where you want your data files to get written to
+data_out_dir = os.path.join(souk_readout_tools_install_dir,'src/souk_readout_tools/client/client_scripts/tmp/')
+# Directory where the config files specified in the config_file_dict dictionary below are located.
+config_file_root_dir = souk_readout_tools_install_dir 
+# This next variable tells the agent which config file to push to the server depending on which kid_stream_id the agent was started with on the command line.
+# This will eventually have 28 entries for the 28 individual reduction pipelines.
+# For single pipline running, with one ukkid_controller.py agent running at a time, we only need the first entry, and it should the filename of
+# your souk_readout_tools config .yaml file which lives in config_file_root_dir specified above.
+config_file_dict = {'ufm_kid1':'my_config_bun_p0.yaml','ufm_kid2':'my_config_bun_p1.yaml'}
+##################
+
 sys.path.append(souk_readout_tools_path)
-
-stream_script_path = '/home/leechj/souk_readout_tools/src/souk_readout_tools/client/'
-
 from souk_readout_tools.client.readout_client import ReadoutClient
-
-# JL This needs to be updated
-#if mock:
-#    import mock_readout_client as readout_client
-#else:
-#    from souk_readout_tools.client.readout_client import ReadoutClient
-    # v1 #import readout_client
-
-# These modules should be present in souk_readout_tools_path...
-# REMINDER These python files need to be inserted by hand at the moment.  
 import res_fns
 from resonator_fitter import interactive_fit_viewer, fit_summary_table, fit_summary_plot, fit_resonator,fit_summary_histograms,fit_summary_write_json
 
-# Dir where the config files in config_file_dict are located.
-config_file_root_dir='/home/leechj/souk_readout_tools' 
-# This tells the agent which configi file to push to the server
-# depending on which kid_stream_id the agent was started with on the command line.
-# This will eventually have 28 entries for the 28 individual reduction pipelines.
-config_file_dict = {'ufm_kid1':'my_config_bun_p0.yaml','ufm_kid2':'my_config_bun_p1.yaml'}
-
-#config_file = '/home/leechj/souk_readout_tools/config.yaml'
-#client = ReadoutClient(config_file=config_file)
-# Push the configuration file above to the RFSoc before attempting anything else.
-#client.push_config()
-    
 class UKKIDController:
     """Controller object for streaming data from and sending commands to UK KID RFSoc readout boards.
 
@@ -74,10 +61,8 @@ class UKKIDController:
         self.log = agent.log
         self.lock = TimeoutLock()
         self._check_state = False
-
         self.kid_stream_id = args.kid_stream_id
         self.config_file = config_file_root_dir+'/'+config_file_dict[self.kid_stream_id]
-        
         self.client = ReadoutClient(config_file=self.config_file,mock=mock)
         self.client.push_config()
 
@@ -85,7 +70,7 @@ class UKKIDController:
         # an agent command line parameter
         # or be set in some config file somewhere.
         # Output data files and directories will be written below this directory.
-        self.top_level_output_dir ='/home/leechj/souk_readout_tools/src/souk_readout_tools/client/client_scripts/tmp/'
+        self.top_level_output_dir = data_out_dir
         # Create this dir if it doesn't exist.                                                                                                                                                                                                                                 
         isExist = os.path.exists(self.top_level_output_dir)
         if not isExist:
