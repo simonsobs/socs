@@ -2203,11 +2203,13 @@ class HWPSupervisor:
 
         **Task** - Update HWP shutdown parameters.
 
-        All arguments are optional.
-
-        Args:
-          enable (bool): If True, enable HWP shutdown checks.
-          If False, disable HWP shutdown non-temporarily.
+        Args
+        -------
+        enable : bool
+            If True, enable HWP shutdown checks. If False, disables the
+            shutdown checks until re-enabled or the agent is restarted.
+            This will not revert the shutdown mode to normal if the agent is
+            already in the shutdown mode. Use cancel_shutdown to do so.
 
         """
         if params['enable'] is not None:
