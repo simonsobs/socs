@@ -210,7 +210,7 @@ thing with ```-docker``` appended. This section
 ```
 
 declares that you will run up one instance of the UKKIDcontroller,
-and that the command line argumenet ```--mode check_state``` and
+and that the command line argument ```--mode check_state``` and
 ```--kid_stream_id ufm_kid1``` will be passed to it behind the scenes.
 
 The other key configuration .yaml file in this directory is
