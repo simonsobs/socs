@@ -49,7 +49,7 @@ on the RFSoC's ARM cores.
  On a standard Ubuntu linux installation (at the time of writing
  Ubuntu 22.04 LTS) the following prerequisites are required.
 
-1. An Observatory Control System (OCS) installation. 
+1. An Observatory Control System (OCS) installation.
 
 2. souk_readout_tools. This is the python code for the readout client
 described above (note this repository also contains the code for the
@@ -282,7 +282,7 @@ services:
       - INSTANCE_ID=influxagent
     volumes:
       - ${OCS_CONFIG_DIR}:/config:ro
-  # New barebones agent    
+  # New barebones agent
   ocs-barebones-agent:
     image: ocs-barebones-agent
     hostname: aslxdaq35-docker
@@ -311,8 +311,8 @@ Go to the Simons Observatory socs repository here...
 
 https://github.com/simonsobs/socs
 
-Select the branch "ukkid_agent" from the pull down branch menu. 
-Clone this branch onto the same machine as you have souk_readout_tools and your ocs system installed. The agent can be 
+Select the branch "ukkid_agent" from the pull down branch menu.
+Clone this branch onto the same machine as you have souk_readout_tools and your ocs system installed. The agent can be
 found via
 
 ```
@@ -324,7 +324,7 @@ This will show the python code ukkid_controller.py, this README.md and various s
 
 ## Making the UKKID_controller.py agent available to your OCS install
 
-The way I am doing this (there may be a more elegant way) is to create a soflink from the default "agents" directory in your default OCS installed to point at the 
+The way I am doing this (there may be a more elegant way) is to create a soflink from the default "agents" directory in your default OCS installed to point at the
 ukkid_controller directory within the SOCS directory tree. On my system I had installed ocs in /home/leechj/ocs and socs in /home/leechj/socs, so I did.
 
 ```
@@ -361,7 +361,7 @@ Change directory to where you have installed the ukkid_controller agent above. E
 cd /home/leechj/socs/socs/agents/ukkid_controller
 ```
 
-Open in a text editor and change the following variables to the appropriate locations on your computer. You should only need to edit the variables 
+Open in a text editor and change the following variables to the appropriate locations on your computer. You should only need to edit the variables
 souk_readout_tools_install_dir and config_file_dict. The latter should be set up to match that set up in the section "Configuration of souk_readout_tools" above.
 
 ```
@@ -379,7 +379,7 @@ stream_script_path =  os.path.join(souk_readout_tools_install_dir,'src/souk_read
 # Output directory where you want your data files to get written to
 data_out_dir = os.path.join(souk_readout_tools_install_dir,'src/souk_readout_tools/client/client_scripts/tmp/')
 # Directory where the config files specified in the config_file_dict dictionary below are located.
-config_file_root_dir = souk_readout_tools_install_dir 
+config_file_root_dir = souk_readout_tools_install_dir
 # This next variable tells the agent which config file to push to the server depending on which kid_stream_id the agent was started with on the command line.
 # This will eventually have 28 entries for the 28 individual reduction pipelines.
 # For single pipline running, with one ukkid_controller.py agent running at a time, we only need the first entry, and it should the filename of
@@ -388,7 +388,7 @@ config_file_dict = {'ufm_kid1':'my_config_bun_p0.yaml','ufm_kid2':'my_config_bun
 ##################
 ```
 
-If you set the mock variable to be True, the agent will run in simulated mode and you do not need a connected hardware RFSoC. Set to False if you want to run 
+If you set the mock variable to be True, the agent will run in simulated mode and you do not need a connected hardware RFSoC. Set to False if you want to run
 real hardware. In that case the IP address etc. should be set up in souk_readout_tools config.yaml file specfied in config_file_dict.
 
 ## Running the UKKID controller agent without additional hardware (mocked mode)
@@ -434,7 +434,7 @@ Note that "process_name": "mock_readout_server" in the above dictionary confirms
 ### 4) Activate virtual environment for souk_readout_tools, open a python interpreter, create a client object.
 
 ```
-cd souk_readout_tools 
+cd souk_readout_tools
 source client_venv/bin/activate
 python3
 ```
@@ -474,7 +474,7 @@ When the "check_state" process is running, this should just repeatedly display t
 2026-06-25T15:28:12+0100 [observatory.UKKIDController1.feeds.UKKID_feed] [{'status_string': {'block_name': 'status_string', 'data': {'value': ['[{"ready": true, "process_name": "mock_readout_server", "ip_addresses": "10.179.136.4", "pipeline_id": 0, "pipeline_dirs": {}, "pwd": "/home/leechj/socs/socs/agents/ukkid_controller", "sys_executable": "/usr/bin/python3", "sys_argv": ["/home/leechj/.local/bin/ocs-agent-cli", "--agent", "ukkid_controller.py", "--entrypoint", "main", "--instance-id", "UKKIDController1"], "uname": "aslxdaq35 Linux 6.8.0-94-generic #96~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Fri Jan 16 13:19:05 UTC 2 x86_64", "python_version": "3.10.12 (main, Mar  3 2026, 11:56:32) [GCC 11.4.0]", "server_version": "1.3.0", "config_file": "/home/leechj/souk_readout_tools/my_config_bun_p0.yaml", "initialisation_level": "pipeline", "current_time_unix_s": 1782397692.04318, "current_time_iso": "2026-06-25T14:28:12.043180+00:00", "server_start_unix_s": 1782397422.099668, "server_start_iso": "2026-06-25T14:23:42.099668+00:00", "server_uptime_s": 269.9435119628906, "board_uptime_s": null, "request_clients": 1, "request_client_addrs": [], "stream_clients": 0, "stream_client_addrs": [], "streaming": false, "triggered_streaming": false, "sweeping": false, "task_count": 0, "latest_sweep_data_valid": false, "firmware_interface_exists": true, "firmware_interface_ready": true, "firmware_fast_interface_exists": true, "firmware_fast_interface_ready": true, "mock": true}, {"ready": true, "source": "internal", "all_locked": true, "chips": []}]']}, 'timestamps': [1782397692.0431514]}}, {'agent_address': 'observatory.UKKIDController1', 'agg_params': {'frame_length': 600}, 'feed_name': 'UKKID_feed', 'address': 'observatory.UKKIDController1.feeds.UKKID_feed', 'record': True, 'session_id': '1782397422.0926147', 'agent_class': 'UKKIDController'}]
 ```
 
-### 6) Start tailing the log file. 
+### 6) Start tailing the log file.
 
 ```
 cd ~/log/ocs/
@@ -487,7 +487,7 @@ Can use ```grep -v``` (invert match) to remove things you don't want e.g.
 tail -f observatory.UKKIDController1.log |grep -v heartbeat |grep -v autobahn
 ```
 
-### 7) Go back to the python terminal, try a standard "cold-start" observing procedure. 
+### 7) Go back to the python terminal, try a standard "cold-start" observing procedure.
 
 From the python terminal in (4) above, do...
 
