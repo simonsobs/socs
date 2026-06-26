@@ -13,6 +13,8 @@ WORKDIR /sodetlib
 RUN pip3 install -U pip
 RUN pip3 install -e .
 RUN pip3 install -r requirements.txt
+# Pin version until base image is on a more modern Python version
+RUN pip3 install setuptools-scm==9.2.2
 
 ENV OCS_CONFIG_DIR=/config
 
