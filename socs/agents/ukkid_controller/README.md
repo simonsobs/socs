@@ -53,7 +53,7 @@ on the RFSoC's ARM cores.
 
 2. souk_readout_tools. This is the python code for the readout client
 described above (note this repository also contains the code for the
-readout server software that runs on the RFSoCs). **Use branch dev/1.3.0**
+readout server software that runs on the RFSoCs). **Use branch main**
 for compatibility with the ukkid_controller agent.
 
 3. The ukkid_controller agent itself - i.e. everything within the
@@ -395,6 +395,8 @@ real hardware. In that case the IP address etc. should be set up in souk_readout
 
 You should perform each of the following steps in a separate terminal (or GNU screen / tmux).
 
+
+
 ### 1) Ensure that "mock = True" is set in your ukkid_controller.py file (see above).
 
 ### 2) Check the required OCS dockers are running
@@ -431,11 +433,31 @@ file (see below).
 
 Note that "process_name": "mock_readout_server" in the above dictionary confirms we are running in mocked mode.
 
-### 4) Activate virtual environment for souk_readout_tools, open a python interpreter, create a client object.
+### 4) Open a python interpreter, create a client object.
+
+(N.B. This step currently assumes you have a set up similar to my
+particular machine - you installed OCS into your default python
+environment, and souk_readout_tools into a seperate virtual
+environment. So the python3 interpreter here is started in the default
+environment (where you can import ocs) and then the
+ukkid_controller.py agent script has the hack line to add
+
+```
+souk_readout_tools_path = os.path.join(souk_readout_tools_install_dir,'client_venv/lib/python3.10/site-packages')
+```
+
+to your python path via 
+
+```
+sys.path.append(souk_readout_tools_path)
+```
+
+ If you have installed souk_readout_tools and ocs into the same python environemnt
+(either your default one, or a virtual one), this hack is unnessary.
+
 
 ```
 cd souk_readout_tools 
-source client_venv/bin/activate
 python3
 ```
 
