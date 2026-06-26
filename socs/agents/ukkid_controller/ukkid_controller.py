@@ -22,7 +22,7 @@ souk_readout_tools_install_dir = '/home/leechj/souk_readout_tools'
 mock = True
 #############
 # Where the site packages have been installed by the python virtual enivroment - should contain a dir called souk_readout_tools
-souk_readout_tools_path = os.path.join(souk_readout_tools_install_dir,'client_venv/lib/python3.10/site-packages')
+souk_readout_tools_path = os.path.join(souk_readout_tools_install_dir,'client_venv/lib/python3.10/site-packages/')
 # Should contain the script client_scripts/receive_stream_g3.py
 stream_script_path =  os.path.join(souk_readout_tools_install_dir,'src/souk_readout_tools/client/')
 # Output directory where you want your data files to get written to
@@ -38,8 +38,8 @@ config_file_dict = {'ufm_kid1':'my_config_bun_p0.yaml','ufm_kid2':'my_config_bun
 
 sys.path.append(souk_readout_tools_path)
 from souk_readout_tools.client.readout_client import ReadoutClient
-import res_fns
-from resonator_fitter import interactive_fit_viewer, fit_summary_table, fit_summary_plot, fit_resonator,fit_summary_histograms,fit_summary_write_json
+from souk_readout_tools.client import res_fns
+from souk_readout_tools.client.resonator_fitter import interactive_fit_viewer, fit_summary_table, fit_summary_plot, fit_resonator,fit_summary_histograms,fit_summary_write_json
 
 class UKKIDController:
     """Controller object for streaming data from and sending commands to UK KID RFSoc readout boards.
