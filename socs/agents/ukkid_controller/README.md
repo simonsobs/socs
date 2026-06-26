@@ -53,7 +53,7 @@ on the RFSoC's ARM cores.
 
 2. souk_readout_tools. This is the python code for the readout client
 described above (note this repository also contains the code for the
-readout server software that runs on the RFSoCs). **Use branch dev/1.3.0**
+readout server software that runs on the RFSoCs). **Use branch dev/1.5.0**
 for compatibility with the ukkid_controller agent.
 
 3. The ukkid_controller agent itself - i.e. everything within the
@@ -107,7 +107,7 @@ One should follow the "quick-start" installation instructions here...
 
 https://github.com/sr-cdf/souk_readout_tools
 
-**Be sure to select branch dev/1.3.0 from the pull down menu on github before cloning this repository.**
+**Be sure to select branch dev/1.5.0 from the pull down menu on github before cloning this repository.**
 
 ### ukkid_controller agent
 
