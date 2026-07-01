@@ -1067,7 +1067,6 @@ def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
     # Ensure we have the minumum number of points
     if points_per_nod < MIN_POINTS_PER_NOD:
         points_per_nod = MIN_POINTS_PER_NOD
-    print(points_per_nod)
 
     step_time = nod_period / points_per_nod  # Divide nod into points_per_nod points.
 
