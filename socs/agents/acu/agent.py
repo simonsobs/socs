@@ -355,8 +355,8 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=False)
-        agent.register_process('generate_sin_el_nod',
-                               self.generate_sin_el_nod,
+        agent.register_process('generate_el_nod',
+                               self.generate_el_nod,
                                self._simple_process_stop,
                                blocking=False,
                                startup=False)
@@ -2417,27 +2417,24 @@ class ACUAgent:
                                              'event': 2}})
         return ret_val
 
-    @ocs_agent.param('az', type=float)
-    @ocs_agent.param('el_endpoint1', type=float, default=None)
-    @ocs_agent.param('el_endpoint2', type=float, default=None)
+    @ocs_agent.param('el_depth', type=float, default=None)
     @ocs_agent.param('el_freq', type=float, default=None)
     @ocs_agent.param('num_nods', type=int, default=None)
     @ocs_agent.param('start_time', type=float, default=None)
+    @ocs_agent.param('step_time', type=float, default=0.1)
     @inlineCallbacks
-    def generate_sin_el_nod(self, session, params):
-        """generate_sin_el_nod(az, \
-                               el_endpoint1=None, el_endpoint2=None, \
-                               el_speed=None, el_freq=None, \
-                               num_nods=None, start_time=None, \
-                               scan_upload_length=None)
+    def generate_el_nod(self, session, params):
+        """generate_el_nod(el_depth=None, el_speed=None, el_freq=None, \
+                           num_nods=None, start_time=None, \
+                           scan_upload_length=None)
 
         **Process** - Scan generator, currently only works for
         constant-velocity az scans with fixed elevation.
 
         Parameters:
-            az (float): the azimuth where the nod will take place.
-            el_endpoint1 (float): first endpoint of elevation motion.
-            el_endpoint2 (float): second endpoint of the elevation motion.
+            el_depth (float): The number of degrees from the current
+            el to nod to. Can be negative.
+            Positive el_depth nods updwards, downwards for negative el_depth.
             el_freq (float): frequency of the elevation nods.
             num_nods (int or None): if not None, limits the nods to
                 the specified number of sinusoidal nods. The
@@ -2452,12 +2449,16 @@ class ACUAgent:
                 The default is to compute a minimum time based on the
                 scan parameters and the ACU ramp-up algorithm; this is
                 typically 5-10 seconds.
+            step_time (float): time, in seconds, between points on the
+                constant-velocity parts of the motion.  The default is
+                None, which will cause an appropriate value to be
+                chosen automatically (typically 0.1 to 1.0).
 
         Notes:
           Note that all parameters are optional except for
-          az, el_endpoint1 and el_endpoint2.  If only those two parameters
-          are passed, the Process will scan between those endpoints,
-          with the elevation axis held in Stop, indefinitely (until
+          el_depth and el_freq.  If only those two parameters
+          are passed, the Process will nod with that depth and frequency,
+          with the azimuth axis held in Stop, indefinitely (until
           Process .stop method is called)..
 
         """
@@ -2468,23 +2469,21 @@ class ACUAgent:
 
         self.log.info('User scan params: {params}', params=params)
 
-        az = params['az']
-        el_endpoint1 = params['el_endpoint1']
-        el_endpoint2 = params['el_endpoint2']
+        az = self.data['status']['summary']['Azimuth_current_position']
+        el = self.data['status']['summary']['Elevation_current_position']
+
+        el_depth = params['el_depth']
+
+        el_endpoint1 = el
+        el_endpoint2 = el + el_depth
 
         # Params with defaults configured ...
         el_freq = params['el_freq']
         if el_freq is None:
             el_freq = self.scan_params['el_freq']
 
-        # Do we need to limit the elevation accel in some way...?
-
-        # If el is not specified, drop in the current elevation.
-        if el_endpoint1 is None or el_endpoint2 is None:
-            raise ValueError("El endpoints must be specified for el nod!")
-
-        if el_endpoint1 == el_endpoint2:
-            raise ValueError("El endpoints must not be the same for el nod!")
+        if el_depth == 0:
+            raise ValueError("El depth must not be equal to 0 for el nod!")
 
         # Could probably use a condition for if the el endpoints are too close?
 
@@ -2496,7 +2495,7 @@ class ACUAgent:
         init_el = el_endpoint1
 
         scan_params = {k: params.get(k) for k in [
-            'num_nods', 'start_time']
+            'num_nods', 'start_time', 'step_time']
             if params.get(k) is not None}
 
         self.log.info('The scan_params: {scan_params}', scan_params=scan_params)
@@ -2547,8 +2546,7 @@ class ACUAgent:
         # Prepare the point generator.
         free_form = True
         track_axes = ['el']
-        g = sh.generate_sin_el_nod(az=az,
-                                   el_endpoint1=el_endpoint1,
+        g = sh.generate_sin_el_nod(az=az, el_endpoint1=el_endpoint1,
                                    el_endpoint2=el_endpoint2,
                                    el_freq=el_freq,
                                    **scan_params)
@@ -2558,12 +2556,17 @@ class ACUAgent:
                               'event': 1,
                               'init_time': init_time,
                               }
+
         scan_params_bundle.update({
             'az1': az,
+            'az2': az,
+            'az_vel': 0,
+            'az_accel': 0,
             'el1': el_endpoint1,
             'el2': el_endpoint2,
             'el_freq': el_freq,
-            'type': 'sin_el_nod',
+            'type': 4,
+            'turnaround_type': 0,
             'track_axes': ','.join(track_axes),
         })
 
@@ -3371,7 +3374,7 @@ class ACUAgent:
         if not self._get_sun_policy('map_valid'):
             return False, 'Sun Safety Map not computed or stale; run the monitor_sun process.'
 
-        n = max(2, int(np.ceil((el2 - el1) / 1.)))
+        n = max(2, int(np.ceil((abs(el2 - el1)) / 1.)))
         els = np.linspace(el1, el2, n)
 
         info = self.sun.check_trajectory(els * 0 + az, els)
