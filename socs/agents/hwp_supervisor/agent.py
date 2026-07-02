@@ -1549,6 +1549,7 @@ class HWPSupervisor:
         self.shutdown_no_data_timeout = args.shutdown_no_data_timeout
         self.shutdown_delay = args.shutdown_delay
         self.shutdown_mode = False
+        self.shutdown_enabled = not args.disable_shutdown
 
         self.agent.register_feed('actions', record=True)
 
@@ -1681,6 +1682,8 @@ class HWPSupervisor:
                 'actions': {
                     'pmx': 'ok'  # 'ok', 'stop', or 'no_data'
                     'gripper': 'ok'  # 'ok', 'stop', or 'no_data'
+                    'shutdown_mode': False,
+                    'shutdown_enabled': True,
                 }}
         """
         pm = Pacemaker(1. / self.sleep_time)
@@ -1694,6 +1697,8 @@ class HWPSupervisor:
             'actions': {
                 'pmx': 'no_data',
                 'gripper': 'no_data',
+                'shutdown_mode': self.shutdown_mode,
+                'shutdown_enabled': self.shutdown_enabled,
             }
         }
 
@@ -1709,18 +1714,21 @@ class HWPSupervisor:
             session.data['actions'] = {
                 'pmx': self.hwp_state.pmx_action,
                 'gripper': self.hwp_state.gripper_action,
+                'shutdown_mode': self.shutdown_mode,
+                'shutdown_enabled': self.shutdown_enabled,
             }
 
             action = self.hwp_state.pmx_action
             if action == 'ok':
                 last_okay_time = time.time()
-            elif action == 'no_data' and self.shutdown_no_data_timeout >= 0:
+            elif self.shutdown_enabled and action == 'no_data' \
+                    and self.shutdown_no_data_timeout >= 0:
                 if (time.time() - last_okay_time) > \
                         self.shutdown_no_data_timeout + self.shutdown_delay:
                     if not self.shutdown_mode:
                         self.agent.start('disable_driver_board', params={})
                         self.shutdown_mode = True
-            elif action == 'stop':
+            elif self.shutdown_enabled and action == 'stop':
                 if (time.time() - last_okay_time) > self.shutdown_delay:
                     if not self.shutdown_mode:
                         self.agent.start('disable_driver_board', params={})
@@ -1733,6 +1741,7 @@ class HWPSupervisor:
                     'pmx_action': self.hwp_state.pmx_action,
                     'gripper_action': self.hwp_state.gripper_action,
                     'shutdown_mode': int(self.shutdown_mode),
+                    'shutdown_enabled': int(self.shutdown_enabled),
                 },
             }
             self.agent.publish_to_feed('actions', data)
@@ -2188,6 +2197,27 @@ class HWPSupervisor:
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
+    @ocs_agent.param('enable', type=bool, default=None)
+    def update_shutdown(self, session, params):
+        """update_shutdown(enable=None)
+
+        **Task** - Update HWP shutdown parameters.
+
+        Args
+        -------
+        enable : bool
+            If True, enable HWP shutdown checks. If False, disables the
+            shutdown checks until re-enabled or the agent is restarted.
+            This will not revert the shutdown mode to normal if the agent is
+            already in the shutdown mode. Use cancel_shutdown to do so.
+
+        """
+        if params['enable'] is not None:
+            self.shutdown_enabled = params['enable']
+            self.log.info(f'Shutdown {"enabled" if self.shutdown_enabled else "disabled"}')
+
+        return True, 'Params updated.'
+
     def cancel_shutdown(self, session, params):
         """cancel_shutdown()
         **Task** - Cancels shutdown mode
@@ -2333,6 +2363,10 @@ def make_parser(parser=None):
         help="Maximum duration (sec) for brake task",
     )
     pgroup.add_argument(
+        '--disable-shutdown', action='store_true',
+        help="Disable shutdown before startup.",
+    )
+    pgroup.add_argument(
         '--shutdown-no-data-timeout', type=float, default=15 * 60,
         help="Time(sec) after which a 'no_data' action should trigger a shutdown"
     )
@@ -2368,6 +2402,7 @@ def main(args=None):
     agent.register_task('disable_driver_board', hwp.disable_driver_board)
     agent.register_task('power_cycle_gripper', hwp.power_cycle_gripper)
     agent.register_task('abort_action', hwp.abort_action)
+    agent.register_task('update_shutdown', hwp.update_shutdown)
     agent.register_task('cancel_shutdown', hwp.cancel_shutdown)
 
     runner.run(agent, auto_reconnect=True)
