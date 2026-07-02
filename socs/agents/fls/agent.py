@@ -111,20 +111,12 @@ class FLSAgent:
             # Read the scan parameters
             scan_params = self.dlcsmart.check_scan_params()
 
-            scan_mode = scan_params[0]
-            if "#t" in scan_mode:
-                self.scan_mode = 'fast'
-            elif "#f" in scan_mode:
-                self.scan_mode = 'precise'
-            else:
-                self.log.warn('Could not interpret scan mode')
-                self.scan_mode = scan_mode
-
-            self.scan_min_freq = scan_params[1]
-            self.scan_max_freq = scan_params[2]
-            scan_step = scan_params[3]
-            self.scan_step = abs(scan_step)
-            self.scan_direction = np.sign(scan_step)
+            self.scan_mode = scan_params['scan_mode']
+            self.scan_min_freq = scan_params['scan_min_frequency']
+            self.scan_max_freq = scan_params['scan_max_frequency']
+            self.scan_step = scan_params['scan_step']
+            self.scan_direction = scan_params['scan_direction']
+            self.scan_int_time = scan_params['integration_time']
 
         self.initialized = True
 
@@ -196,17 +188,8 @@ class FLSAgent:
                     time.sleep(1)
                     continue
 
-                self.set_freq = data['set_frequency']
                 self.actual_freq = data['actual_frequency']
-                self.tx_bias_amp = data['bias_voltage']
-                self.tx_bias_offset = data['bias_offset']
-                self.scan_mode = data['scan_mode']
-                self.scan_min_freq = data['scan_min_frequency']
-                self.scan_max_freq = data['scan_max_frequency']
-                self.scan_step = data['scan_step']
-                self.scan_direction = data['scan_direction']
-                self.lasers_on = data['lasers_on']
-                self.integration_time = data['integration_time']
+                self.photocurrent = data['photocurrent']
 
                 sampling_data = {}
                 for key, val in data.items():
@@ -236,6 +219,44 @@ class FLSAgent:
             return True, 'requested to stop taking sampling data.'
         else:
             return False, 'acq is not currently running.'
+
+    @ocs_agent.param("_")
+    def query_laser_status(self, session, params):
+        """
+        query_laser_status()
+
+        **Task** - Query the bias voltage, bias offset, and laser power status
+        """
+        status = dlcsmart.query_laser_status()
+
+        self.log.info(f"Bias voltage is {status['bias_voltage']}.")
+        self.log.info(f"Bias offset is {status['bias_offset']}.")
+        self.log.info(f"Laser power is {status['lasers_on']}.")
+
+        session.data = status
+        return True, "Queried laser status."
+
+    @ocs_agent.param("_")
+    def query_scan_params(self, session, params):
+        """
+        query_scan_params()
+
+        **Task** - Query the latest scan parameters
+        """
+        scan_params = dlcsmart.check_scan_params()
+
+        self.log.info(f"Scan mode is {scan_params['scan_mode']}.")
+        self.log.info(f"Scan minimum frequency is {scan_params['scan_min_frequency']} GHz.")
+        self.log.info(f"Scan maximum frequency is {scan_params['scan_max_frequency']} GHz.")
+        self.log.info(f"Scan step size is {scan_params['scan_step']} GHz.")
+        if scan_params['scan_direction'] > 0:
+            self.log.info("Scan direction is increasing.")
+        elif scan_params['scan_direction'] < 0:
+            self.log.info("Scan direction is decreasing.")
+        self.log.info(f"Scan integration time is {scan_params['integration_time']} ms.")
+
+        session.data = scan_params
+        return True, "Queried scan parameters."
 
     @ocs_agent.param('state', type=str, choices=['on', 'off'])
     def toggle_laser_power(self, session, params):
@@ -459,17 +480,17 @@ class FLSAgent:
                 self.dlcsmart.param_set("frequency:scan-mode-fast", "#t")
                 time.sleep(0.1)
                 csp2 = self.dlcsmart.check_scan_params()
-                fast_check_2 = csp2[0]
-                if "#f" in fast_check_2:
+                fast_check_2 = csp2['scan_mode']
+                if "precise" in fast_check_2:
                     self.log.warn("Scan is not in fast mode on attempt 2, so scan cannot be "
                                   "commanded via the Agent. Please set scan mode to fast in "
                                   "the GUI.")
                     return False, "Could not start a scan because scan mode could not be set to fast."
-            min_freq_check = csp[1]
-            max_freq_check = csp[2]
-            freq_step_check = abs(csp[3])
-            start_dir_check = np.sign(csp[3])
-            int_time_check = csp[4]
+            min_freq_check = csp['scan_min_frequency']
+            max_freq_check = csp['scan_max_frequency']
+            freq_step_check = csp['scan_step']
+            start_dir_check = csp['scan_direction']
+            int_time_check = csp['integration_time']
             if min_freq_check != min_freq:
                 self.log.warn(f"Minimum frequency set to {min_freq_check}, not {min_freq}.")
             if max_freq_check != max_freq:
@@ -535,6 +556,8 @@ def main(args=None):
 
     fls_agent = FLSAgent(agent, args.ip, args.port)
     agent.register_task('initialize', fls_agent.initialize, startup=init_params)
+    agent.register_task('query_laser_status', fls_agent.query_laser_status)
+    agent.register_task('query_scan_params', fls_agent.query_scan_params)
     agent.register_task('toggle_laser_power', fls_agent.toggle_laser_power,
                         aborter=fls_agent._abort_laser_power)
     agent.register_task('set_bias', fls_agent.set_bias)

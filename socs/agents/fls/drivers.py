@@ -239,8 +239,19 @@ class DLCSmart(TCPInterface):
         sstep = self.param_ref("frequency:frequency-step")
         sint = self.param_ref("lockin:integration-time")
 
-        data = (fast, float(smin), float(smax), float(sstep), float(sint))
-        return data
+        if "#t" in fast:
+            scan_mode = 'fast'
+        elif "#f" in fast:
+            scan_mode = 'precise'
+
+        values = {'scan_mode': scan_mode,
+                  'scan_min_frequency': float(smin),
+                  'scan_max_frequency': float(smax),
+                  'scan_step': abs(sstep),
+                  'scan_direction': int(np.sign(sstep)),
+                  'integration_time': float(sint),
+                  }
+        return values
 
     def stop_scan(self):
         """
@@ -268,33 +279,31 @@ class DLCSmart(TCPInterface):
     def sampling(self):
         """
         Query the following values:
-          - Set frequency (GHz)
           - Actual frequency (GHz)
           - Photocurrent (nA)
+        For general continuous acquisition.
+        """
+        self.command("lockin:lock-in-reset")
+        time.sleep(0.001)
+
+        act_frequency = self.param_ref("frequency:frequency-act")
+        photocurrent = self.param_ref("lockin:lock-in-value-nanoamp")
+
+        values = {'actual_frequency': act_frequency,
+                  'photocurrent': photocurrent,
+                  }
+        return values
+
+    def query_laser_status(self):
+        """
+        Query the following values:
           - Bias voltage (V)
           - Bias offset (V)
           - Laser emission on (boolean)
-          - Scan mode ('fast' or 'precise')
-          - Scan minimum frequency (GHz)
-          - Scan maximum frequency (GHz)
-          - Scan step size (GHz)
-          - Scan direction (1 for increasing frequency, -1 for decreasing frequency)
-          - Scan integration time (ms)
-        For general monitoring purposes.
+        For push-button monitoring purposes.
         """
         self.command("lockin:lock-in-reset")
-        time.sleep(0.3)
-
-        # Photocurrent
-        photocurrent = self.param_ref("lockin:lock-in-value-nanoamp")
-        if '#t' in photocurrent:
-            photocurrent = photocurrent.strip('( #t)')
-        else:
-            photocurrent = 999999.
-
-        # Set and actual frequency
-        set_frequency = self.param_ref("frequency:frequency-set")
-        act_frequency = self.param_ref("frequency:frequency-act")
+        time.sleep(0.001)
 
         # Bias voltage and offset
         bias = self.check_bias()
@@ -306,27 +315,11 @@ class DLCSmart(TCPInterface):
         elif "#f" in laser_status:
             lasers_on = False
 
-        # Scan parameters
-        scan_params = self.check_scan_params()
-        if "#t" in scan_params[0]:
-            scan_mode = 'fast'
-        elif "#f" in scan_params[0]:
-            scan_mode = 'precise'
-
-        value_dict = {'set_frequency': float(set_frequency),
-                      'actual_frequency': float(act_frequency),
-                      'photocurrent': float(photocurrent),
-                      'bias_voltage': float(bias[0]),
-                      'bias_offset': float(bias[1]),
-                      'lasers_on': lasers_on,
-                      'scan_mode': scan_mode,
-                      'scan_min_frequency': float(scan_params[1]),
-                      'scan_max_frequency': float(scan_params[2]),
-                      'scan_step': abs(scan_params[3]),
-                      'scan_direction': int(np.sign(scan_params[3])),
-                      'integration_time': float(scan_params[4]),
-                      }
-        return value_dict
+        values = {'bias_voltage': float(bias[0]),
+                  'bias_offset': float(bias[1]),
+                  'lasers_on': lasers_on,
+                  }
+        return values
 
     def get_scan_data(self):
         """
