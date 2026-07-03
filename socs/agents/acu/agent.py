@@ -2725,25 +2725,37 @@ class ACUAgent:
                         faults[k] = True
 
                 if mode != 'abort':
-                    # Reasons we might decide to abort ...
-                    if current_modes['Az'] == 'ProgramTrack':
-                        got_progtrack = True
-                    else:
-                        if got_progtrack:
-                            self.log.warn('Unexpected exit from ProgramTrack mode!')
-                            if mode == 'stop':
-                                prog_track_err = True
-                            mode = 'abort'
-                        elif now - start_time > MAX_PROGTRACK_SET_TIME:
-                            self.log.warn('Failed to set ProgramTrack mode in a timely fashion.')
-                            mode = 'abort'
+                    # Reasons we might decide to abort or stop ...
+
+                    # First we'll check that each axis we expect to be in ProgramTrack mode,
+                    # is indeed still in ProgramTrack mode.
+                    for ax in track_axes:
+                        # Convert between track axes names and status field names.
+                        track_axes_names = {'az': 'Az', 'el': 'El'}  # There's probably a better way to convert these.
+                        if current_modes[track_axes_names[ax]] == 'ProgramTrack':
+                            got_progtrack = True
+                        else:
+                            if got_progtrack:
+                                self.log.warn('Unexpected exit from ProgramTrack mode!')
+                                if mode == 'stop':
+                                    prog_track_err = True
+                                mode = 'abort'
+                            elif now - start_time > MAX_PROGTRACK_SET_TIME:
+                                self.log.warn('Failed to set ProgramTrack mode in a timely fashion.')
+                                mode = 'abort'
+
+                    # If we've attempted to upload points does the ACU actually have them?
                     if not got_points_in and (first_upload_time is not None) \
                        and (now - first_upload_time > 10):
                         self.log.warn('ACU seems to be dumping our track. Vel too high?')
                         mode = 'abort'
+
+                    # Have we left Remote mode?
                     if current_modes['Remote'] == 0:
                         self.log.warn('ACU no longer in remote mode!')
                         mode = 'abort'
+
+                    # Have we requested a stop?
                     if session.status == 'stopping' and mode not in ['stop', 'abort']:
                         mode = 'stop'
                         stop_message = 'User-requested stop.'
