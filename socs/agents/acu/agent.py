@@ -2417,7 +2417,7 @@ class ACUAgent:
                                              'event': 2}})
         return ret_val
 
-    @ocs_agent.param('el_depth', type=float, default=None)
+    @ocs_agent.param('el_depth', type=float)
     @ocs_agent.param('el_freq', type=float, default=None)
     @ocs_agent.param('num_nods', type=int, default=None)
     @ocs_agent.param('start_time', type=float, default=None)
@@ -2428,27 +2428,27 @@ class ACUAgent:
                            num_nods=None, start_time=None, \
                            scan_upload_length=None)
 
-        **Process** - Scan generator, currently only works for
-        constant-velocity az scans with fixed elevation.
+        **Process** - Scan generator. Generates sinusoidal elevation nods
+        at the current azimuth and elevation of the platform. Nods are generated
+        with frequency equal to el_freq and amplitude equal to el_depth.
+        For a given el_depth, the platform will nod from the current elevation to
+        current elevation + el_depth.
+
+        This function publishes scan_params to the feed with scan_type = 4 .
 
         Parameters:
             el_depth (float): The number of degrees from the current
-            el to nod to. Can be negative.
-            Positive el_depth nods updwards, downwards for negative el_depth.
-            el_freq (float): frequency of the elevation nods.
+                el to nod to. Can be negative.
+                Positive el_depth nods updwards, downwards for negative el_depth.
+            el_freq (float or None): frequency of the elevation nods.
+                If None, scan_params['el_freq'] is used.
             num_nods (int or None): if not None, limits the nods to
                 the specified number of sinusoidal nods. The
                 process will exit without error once that has
                 completed.
             start_time (float or None): a unix timestamp giving the
                 time at which the scan should begin.  The default is
-                None, which means the scan will start immediately (but
-                taking into account the value of wait_to_start).
-            wait_to_start (float): number of seconds to wait before
-                starting a scan, in the case that start_time is None.
-                The default is to compute a minimum time based on the
-                scan parameters and the ACU ramp-up algorithm; this is
-                typically 5-10 seconds.
+                None, which means the scan will start immediately.
             step_time (float): time, in seconds, between points on the
                 constant-velocity parts of the motion.  The default is
                 None, which will cause an appropriate value to be
@@ -2492,15 +2492,14 @@ class ACUAgent:
         el_endpoint1, _untweaked_el = _f(el_endpoint1), el_endpoint1
         if abs(el_endpoint1 - _untweaked_el) > 0.1:
             return False, "Current elevation (%.4f) is well outside limits." % _untweaked_el
-        init_el = el_endpoint1
 
         scan_params = {k: params.get(k) for k in [
             'num_nods', 'start_time', 'step_time']
             if params.get(k) is not None}
+        step_time = scan_params['step_time']
 
         self.log.info('The scan_params: {scan_params}', scan_params=scan_params)
 
-        # Before any motion, check for sun safety. WE GOTTA MAKE THIS FOR NODS UGH
         ok, msg = self._check_nod_sunsafe(az, el_endpoint1, el_endpoint2)
         if ok:
             self.log.info('Sun safety check: {msg}', msg=msg)
@@ -2518,30 +2517,12 @@ class ACUAgent:
         if not ok:
             return False, msg
 
-        # Seek to starting position.  Note "legs" will always include
-        # at least 2 points; first point being current (az, el).
-        self.log.info(f'Moving to start position, az={az}, el={init_el}')
-        legs, msg = yield self._get_sunsafe_moves(az, init_el)
-        if msg is not None:
-            self.log.error(msg)
-            return False, msg
-        hwp_safe, msg = yield self._check_hwpsafe_legs(legs)
-        if not hwp_safe:
-            msg = f'Move to start position not permitted: {msg}'
-            self.log.info('{msg}', msg=msg)
-            return False, msg
-
         # Also validate the scan generally -- need to be movable in el.
         hwp_safe, msg = yield self._check_hwpsafe(el_endpoint1, el_endpoint2, axes=['el'])
         if not hwp_safe:
             msg = f'El-nod not permitted: {msg}'
             self.log.info(msg)
             return False, msg
-
-        for leg_az, leg_el in legs[1:]:
-            ok, msg = yield self._go_to_axes(session, az=leg_az, el=leg_el)
-            if not ok:
-                return False, f'Start position seek failed with message: {msg}'
 
         # Prepare the point generator.
         free_form = True
@@ -2576,7 +2557,7 @@ class ACUAgent:
                                     'data': scan_params_bundle})
 
         ret_val = (yield self._run_track(
-            session=session, point_gen=g, step_time=16 * el_freq,
+            session=session, point_gen=g, step_time=step_time,
             track_axes=track_axes, free_form=free_form, unabort_failure=True))
 
         self.agent.publish_to_feed('scan_params',
@@ -2691,7 +2672,7 @@ class ACUAgent:
             last_mode = None
             last_upload_az = None
             start_time = time.time()
-            got_progtrack = False
+            got_progtrack = {ax: False for ax in track_axes}
             faults = {}
             got_points_in = False
             first_upload_time = None
@@ -2713,7 +2694,7 @@ class ACUAgent:
                 # points but ACU is quietly dumping them because the
                 # vel is too high.
                 got_points_in = got_points_in \
-                    or (got_progtrack and free_positions < FULL_STACK)
+                    or (any(got_progtrack.values()) and free_positions < FULL_STACK)
 
                 if last_mode != mode:
                     self.log.info(f'scan mode={mode}, line_buffer={len(point_prov)}, track_free={free_positions}')
@@ -2733,15 +2714,15 @@ class ACUAgent:
                         # Convert between track axes names and status field names.
                         track_axes_names = {'az': 'Az', 'el': 'El'}  # There's probably a better way to convert these.
                         if current_modes[track_axes_names[ax]] == 'ProgramTrack':
-                            got_progtrack = True
+                            got_progtrack[ax] = True
                         else:
-                            if got_progtrack:
-                                self.log.warn('Unexpected exit from ProgramTrack mode!')
+                            if got_progtrack[ax]:
+                                self.log.warn(f'Unexpected exit from ProgramTrack mode on {ax} axis!')
                                 if mode == 'stop':
                                     prog_track_err = True
                                 mode = 'abort'
                             elif now - start_time > MAX_PROGTRACK_SET_TIME:
-                                self.log.warn('Failed to set ProgramTrack mode in a timely fashion.')
+                                self.log.warn(f'Failed to set ProgramTrack mode in a timely fashion on {ax} axis.')
                                 mode = 'abort'
 
                     # If we've attempted to upload points does the ACU actually have them?
