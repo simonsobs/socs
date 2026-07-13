@@ -1,7 +1,6 @@
 import glob
 import json
 import os
-import pdb
 import re
 import shutil
 import signal
@@ -265,8 +264,8 @@ class UKKIDController:
 
             return True, 'Obtained RFSoc system information.'
 
-   # Sends a self.client.get_initialise_server() call to the RFsocs.
-   # Tested at v1.1.1
+    # Sends a self.client.get_initialise_server() call to the RFsocs.
+    # Tested at v1.1.1
     def initialise_server(self, session, params=None):
         """
 
@@ -518,7 +517,7 @@ class UKKIDController:
             s = self.client.import_sweep(sweep_filename)
             self.log.info('...done.')
 
-            f, z, e = s['sweep_f'], s['sweep_i'] + 1j * s['sweep_q'], s['sweep_ei'] + 1j * s['sweep_eq']
+            f, z = s['sweep_f'], s['sweep_i'] + 1j * s['sweep_q']
 
             self.log.info('Fitting resonator parameters...')
             fit_results = [fit_resonator(f[:, i], z[:, i],
@@ -808,7 +807,6 @@ class UKKIDController:
                 # Now just go into a loop to wait out the sweep time
                 while ((now - sweep_start_time) < loop_time_seconds):
                     now = time.time()
-                    sweep_active_seconds = (now - sweep_start_time)
                     sweep_status_string = "MOCK: Data has been sweeping for %.1f seconds." % (now - sweep_start_time)
 
                     session.data = {"value": 'SESSION ' + sweep_status_string,
@@ -1111,7 +1109,7 @@ class UKKIDController:
                 plot_filename = output_sweep_full_path.replace(filetype, '') + 'png'
                 self.log.info('full_band_sweep: Generating quick look plot, writing to ' + plot_filename)
 
-                fig = plot_sweep(sweep_data, format='magphase', title='Frequency Sweep')
+                plot_sweep(sweep_data, format='magphase', title='Frequency Sweep')
                 plt.savefig(plot_filename, dpi=300)
                 self.log.info('full_band_sweep: Plot saved to ' + plot_filename)
                 '''
@@ -1255,7 +1253,6 @@ class UKKIDController:
                 # Now just go into a loop to wait out the sweep time
                 while ((now - sweep_start_time) < loop_time_seconds):
                     now = time.time()
-                    sweep_active_seconds = (now - sweep_start_time)
                     sweep_status_string = "Data has been sweeping for %.1f seconds." % (now - sweep_start_time)
 
                     session.data = {"value": 'SESSION ' + sweep_status_string,
@@ -1408,7 +1405,7 @@ class UKKIDController:
 
             # while self.client.get_server_status()['message']['latest_sweep_data_valid'] == False:
             # while self.client.get_info(['server'])['server']['latest_sweep_data_valid'] == False:
-            while self.client.get_info(['server'])[0]['latest_sweep_data_valid'] == False:
+            while self.client.get_info(['server'])[0]['latest_sweep_data_valid'] is False:
                 self.log.info('Waiting for scan to complete, sleeping for 1 second.')
                 time.sleep(1)
 
@@ -1529,9 +1526,6 @@ class UKKIDController:
                     self.log.error(error_msg)
                     session.data = {"value": error_msg,
                                     "timestamp": now}
-                    message = {'block_name': 'narrow_band_sweep_string',
-                               'timestamp': now,
-                               'data': {'value': error_msg}}
                     return False, error_msg
 
             if f_accurate_list is None:
@@ -1549,18 +1543,12 @@ class UKKIDController:
                     self.log.error(error_msg)
                     session.data = {"value": error_msg,
                                     "timestamp": now}
-                    message = {'block_name': 'narrow_band_sweep_string',
-                               'timestamp': now,
-                               'data': {'value': error_msg}}
                     return False, error_msg
                 except KeyError:
                     error_msg = 'Expected key f_accurate_list not found in json file: ' + params['f_accurate_filename']
                     self.log.error(error_msg)
                     session.data = {"value": error_msg,
                                     "timestamp": now}
-                    message = {'block_name': 'narrow_band_sweep_string',
-                               'timestamp': now,
-                               'data': {'value': error_msg}}
                     return False, error_msg
                 self.log.info('Accurate Frequencies extracted from ' + f_accurate_filename)
 
