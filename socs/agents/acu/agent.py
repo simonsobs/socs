@@ -3593,6 +3593,17 @@ class ACUAgent:
           targets: a list of targets.
           values: a list of values (or a single value, which will be broadcast).
 
+        Here are examples of target names:
+        - "Fan Yoke Traverse A Electronic Space"
+        - "Booster Yoke Traverse M Servo Space"
+        - "Heater" (to turn heater on/off)
+        - "Temperature Yoke Traverse" (the heater setpoint)
+
+        If a value matches "on" or "off", then it will be treated as a
+        request to turn the device on or off.  Otherwise, the value
+        will be interpreted as a "setpoint" specification (i.e. a fan
+        speed (%), or a thermostat temperature (degrees C).
+
         """
         error_count = 0
         sup_targets = params['targets']
