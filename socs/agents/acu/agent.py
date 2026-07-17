@@ -7,7 +7,6 @@ from enum import Enum
 import numpy as np
 import ocs
 import soaculib as aculib
-import soaculib.status_keys as status_keys
 import twisted.web.client as tclient
 import yaml
 from autobahn.twisted.util import sleep as dsleep
@@ -20,7 +19,7 @@ from twisted.internet.defer import DeferredList, inlineCallbacks
 
 from socs.agents.acu import avoidance
 from socs.agents.acu import drivers as sh
-from socs.agents.acu import exercisor, hvac, hwp_iface
+from socs.agents.acu import exercisor, hvac, hwp_iface, status_keys
 
 #: The number of free ProgramTrack positions, when stack is empty.
 FULL_STACK = 10000
