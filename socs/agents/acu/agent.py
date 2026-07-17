@@ -3695,12 +3695,12 @@ class ACUAgent:
           values: a list of values (or a single value, which will be broadcast).
 
         The targets can be drawn from the ACU internal names, e.g.:
-        
+
             - "Q2011 DAPS 6"
             - "Main Lighting"
 
         Or from aliases defined in the agent config, e.g.:
-        
+
             - "Smurf Crate 2"
             - "Lights Main"
 
