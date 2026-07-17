@@ -335,6 +335,35 @@ For more syntax details see :class:`HWPInterlocks
 <socs.agents.acu.hwp_iface.MotionRule>`.
 
 
+Power Distribution
+------------------
+
+The LAT ACU exposes control of power switches for Smurf crates and
+lighting. Define groups of aliases to provide formatting for ocs-web;
+these aliases also become eligible targets for the ``set_power`` task.
+
+The alias block in the soaculib config file should look like this:
+
+.. code-block:: yaml
+
+  power_distribution_aliases:
+    'Smurf Crates':
+      'Smurf Crate 1': 'Q2009 DAPS 4'
+      'Smurf Crate 2': 'Q2011 DAPS 6'
+      'Smurf Crate 3': 'Q2010 DAPS 5'
+      'Smurf Crate 4': 'Q2013 DAPS 8'
+      'Smurf Crate 5': 'Q2007 DAPS 2'
+      'Smurf Crate 6': 'Q2006 DAPS 1'
+      'Smurf Crate 7': 'Q2012 DAPS 7'
+      'Unused3': 'Q2008 DAPS 3'
+    'Lights':
+      'Lights Main': 'Main Lighting'
+      'Lights Process': 'Lights 42 Process Space'
+      'Lights Electronic': 'Lights 44 Electronic Space'
+      'Lights IS1': 'Lights 45 Instrument Space 1'
+      'Lights IS2': 'Lights 46 Instrument Space 2'
+
+
 Exercisor Mode
 --------------
 

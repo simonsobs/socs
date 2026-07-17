@@ -134,6 +134,7 @@ MONITOR_STRUCTURE = [
     ('ACU_hvac_data', 'hvac_data', None, 10.),
     ('ACU_hvac_ctrl', 'hvac_ctrl', None, None),
     ('ACU_hvac_faults', 'hvac_faults', None, None),
+    ('ACU_power_dist', 'power_distribution', None, 10),
 ]
 
 
@@ -208,6 +209,7 @@ class ACUAgent:
             'shutter': _dsets.get('shutter_dataset'),
             'pointing': _dsets.get('pointing_dataset'),
             'hvac': _dsets.get('hvac_dataset'),
+            'power_dist': _dsets.get('power_dist_dataset'),
         }
         for k, v in self.datasets.items():
             if v is not None:
@@ -283,6 +285,9 @@ class ACUAgent:
 
         # HVAC Manager
         self.hvm = None
+
+        # Power Distribution field names (alias -> status key)
+        self.power_dist_aliases = self.acu_config.get('power_distribution_aliases')
 
         # Exercise plan.
         self.exercise_plan = self.acu_config.get('exercise_plan')
@@ -465,6 +470,10 @@ class ACUAgent:
             agent.register_task('set_hvac',
                                 self.set_hvac,
                                 blocking=False)
+        if self.datasets['power_dist']:
+            agent.register_task('set_power',
+                                self.set_power,
+                                blocking=False)
         agent.register_task('update_hwp',
                             self.update_hwp,
                             blocking=False)
@@ -569,6 +578,11 @@ class ACUAgent:
               "Booster EL Housing on": false,
               ...
             },
+            "PowerDistribution": {
+              "Lights 42 Process Space": false,
+              "Lights 44 Electronic Space": false,
+              ...
+            },
             "StatusResponseRate": 19.237531827325963,
             "PlatformType": "satp",
             "IgnoredAxes": [],
@@ -577,6 +591,18 @@ class ACUAgent:
                 180,
                 40
               ]
+            },
+            "PowerDistributionAliases": {
+               "Smurf Crates": {
+                 "Smurf Crate 1": "Q2009 DAPS 4",
+                 "Smurf Crate 2": "Q2011 DAPS 6",
+                 ...
+               },
+               "Lights": {
+                 "Lights Main": "Main Lighting",
+                 "Lights Process": "Lights 42 Process Space",
+                 ...
+               },
             },
             "DefaultScanParams": {
               "az_speed": 2.0,
@@ -605,6 +631,7 @@ class ACUAgent:
                         'StatusResponseRate': 0.,
                         'IgnoredAxes': self.ignore_axes,
                         'NamedPositions': self.named_positions,
+                        'PowerDistributionAliases': self.power_dist_aliases,
                         'connected': False}
         not_data_keys = list(session.data.keys())
 
@@ -713,6 +740,7 @@ class ACUAgent:
                     ('shutter', 'StatusShutter'),
                     ('pointing', 'CmdPointingCorrection'),
                     ('hvac', 'Hvac'),
+                    ('power_dist', 'PowerDistribution'),
             ]:
                 if self.datasets[short]:
                     output[collection] = (
@@ -3652,6 +3680,70 @@ class ACUAgent:
 
         if error_count > 0:
             return False, "Some requests not processed."
+        return True, "All requests processed successfully."
+
+    @ocs_agent.param('targets')
+    @ocs_agent.param('values')
+    @inlineCallbacks
+    def set_power(self, session, params):
+        """set_power(targets, values)
+
+        **Task** Set Power Distribution (breakers).
+
+        Args:
+          targets: a list of targets.
+          values: a list of values (or a single value, which will be broadcast).
+
+        The targets can be drawn from the ACU internal names, e.g.:
+
+            - "Q2011 DAPS 6"
+            - "Main Lighting"
+
+        Or from aliases defined in the agent config, e.g.:
+
+            - "Smurf Crate 2"
+            - "Lights Main"
+
+        Values must either "on" or "off".
+
+        """
+        error_count = 0
+        sup_targets = params['targets']
+        sup_values = params['values']
+        if not isinstance(sup_values, list):
+            sup_values = [sup_values] * len(sup_targets)
+        if len(sup_values) != len(sup_targets):
+            return False, 'Number of values not compatible with number of targets.'
+
+        # Convert any aliaes to ACU names.
+        tvs = []
+        for st, sv in zip(sup_targets, sup_values):
+            assert sv.lower() in ['on', 'off']
+            for _, submap in self.power_dist_aliases.items():
+                if st in submap:
+                    tvs.append((submap[st], sv))
+                    break
+            else:
+                tvs.append((st, sv))
+
+        # Construct the commands
+        cmds = [{'identifier': 'Datasets.PowerDistribution',
+                'command': f'Switch {v} {t}'}
+                for t, v in tvs]
+
+        # Execute the commands.
+        for c in cmds:
+            msg = f'Issuing: {c["command"]}' + (
+                '' if c.get('parameter') is None else
+                f' with parameter {c["parameter"]}')
+            self.log.info(msg)
+            result = (yield self.acu_control.Command(**c))
+            self.log.info(f'result: {result}')
+            # error check ...
+            yield dsleep(0.2)
+
+        if error_count > 0:
+            return False, "Some requests not processed / not successful."
         return True, "All requests processed successfully."
 
     @ocs_agent.param('starting_index', type=int, default=0)
