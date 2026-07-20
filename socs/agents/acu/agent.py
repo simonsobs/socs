@@ -362,6 +362,11 @@ class ACUAgent:
                                self._simple_process_stop,
                                blocking=False,
                                startup=False)
+        agent.register_process('generate_el_nod',
+                               self.generate_el_nod,
+                               self._simple_process_stop,
+                               blocking=False,
+                               startup=False)
         agent.register_process('idle_reset',
                                self.idle_reset,
                                self._simple_process_stop,
@@ -2446,6 +2451,156 @@ class ACUAgent:
                                              'event': 2}})
         return ret_val
 
+    @ocs_agent.param('el_depth', type=float)
+    @ocs_agent.param('el_freq', type=float, default=None)
+    @ocs_agent.param('num_nods', type=int, default=None)
+    @ocs_agent.param('start_time', type=float, default=None)
+    @ocs_agent.param('step_time', type=float, default=0.1)
+    @inlineCallbacks
+    def generate_el_nod(self, session, params):
+        """generate_el_nod(el_depth=None, el_speed=None, el_freq=None, \
+                           num_nods=None, start_time=None, \
+                           scan_upload_length=None)
+
+        **Process** - Scan generator. Generates sinusoidal elevation nods
+        at the current azimuth and elevation of the platform. Nods are generated
+        with frequency equal to el_freq and amplitude equal to el_depth.
+        For a given el_depth, the platform will nod from the current elevation to
+        current elevation + el_depth.
+
+        This function publishes scan_params to the feed with scan_type = 4 .
+
+        Parameters:
+            el_depth (float): The number of degrees from the current
+                el to nod to. Can be negative.
+                Positive el_depth nods updwards, downwards for negative el_depth.
+            el_freq (float or None): frequency of the elevation nods.
+                If None, scan_params['el_freq'] is used.
+            num_nods (int or None): if not None, limits the nods to
+                the specified number of sinusoidal nods. The
+                process will exit without error once that has
+                completed.
+            start_time (float or None): a unix timestamp giving the
+                time at which the scan should begin.  The default is
+                None, which means the scan will start immediately.
+            step_time (float): time, in seconds, between points on the
+                constant-velocity parts of the motion.  The default is
+                None, which will cause an appropriate value to be
+                chosen automatically (typically 0.1 to 1.0).
+
+        Notes:
+          Note that all parameters are optional except for
+          el_depth and el_freq.  If only those two parameters
+          are passed, the Process will nod with that depth and frequency,
+          with the azimuth axis held in Stop, indefinitely (until
+          Process .stop method is called)..
+
+        """
+        init_time = time.time()  # for params feed.
+
+        if self._get_sun_policy('motion_blocked'):
+            return False, "Motion blocked; Sun avoidance in progress."
+
+        self.log.info('User scan params: {params}', params=params)
+
+        az = self.data['status']['summary']['Azimuth_current_position']
+        el = self.data['status']['summary']['Elevation_current_position']
+
+        el_depth = params['el_depth']
+
+        el_endpoint1 = el
+        el_endpoint2 = el + el_depth
+
+        # Params with defaults configured ...
+        el_freq = params['el_freq']
+        if el_freq is None:
+            el_freq = self.scan_params['el_freq']
+
+        if el_depth == 0:
+            raise ValueError("El depth must not be equal to 0 for el nod!")
+
+        # Could probably use a condition for if the el endpoints are too close?
+
+        # If requested el is just outside acceptable range, tweak it in.
+        _f, _ = self._get_limit_func('elevation')
+        el_endpoint1, _untweaked_el = _f(el_endpoint1), el_endpoint1
+        if abs(el_endpoint1 - _untweaked_el) > 0.1:
+            return False, "Current elevation (%.4f) is well outside limits." % _untweaked_el
+
+        scan_params = {k: params.get(k) for k in [
+            'num_nods', 'start_time', 'step_time']
+            if params.get(k) is not None}
+        step_time = scan_params['step_time']
+
+        self.log.info('The scan_params: {scan_params}', scan_params=scan_params)
+
+        ok, msg = self._check_nod_sunsafe(az, el_endpoint1, el_endpoint2)
+        if ok:
+            self.log.info('Sun safety check: {msg}', msg=msg)
+        else:
+            self.log.error('Sun safety check fails: {msg}', msg=msg)
+            return False, 'Scan is not Sun Safe.'
+
+        # Clear faults.
+        self.log.info('Clearing faults to prepare for motion.')
+        yield self.acu_control.clear_faults()
+        yield dsleep(1)
+
+        # Verify we're good to move
+        ok, msg = yield self._check_ready_motion(session)
+        if not ok:
+            return False, msg
+
+        # Also validate the scan generally -- need to be movable in el.
+        hwp_safe, msg = yield self._check_hwpsafe(el_endpoint1, el_endpoint2, axes=['el'])
+        if not hwp_safe:
+            msg = f'El-nod not permitted: {msg}'
+            self.log.info(msg)
+            return False, msg
+
+        # Prepare the point generator.
+        free_form = True
+        track_axes = ['el']
+        g = sh.generate_sin_el_nod(az=az, el_endpoint1=el_endpoint1,
+                                   el_endpoint2=el_endpoint2,
+                                   el_freq=el_freq,
+                                   **scan_params)
+
+        scan_params_bundle = {'session_id': session.session_id,
+                              'schema': 1,
+                              'event': 1,
+                              'init_time': init_time,
+                              }
+
+        scan_params_bundle.update({
+            'az1': az,
+            'az2': az,
+            'az_vel': 0,
+            'az_accel': 0,
+            'el1': el_endpoint1,
+            'el2': el_endpoint2,
+            'el_freq': el_freq,
+            'type': 4,
+            'turnaround_type': 0,
+            'track_axes': ','.join(track_axes),
+        })
+
+        self.agent.publish_to_feed('scan_params',
+                                   {'timestamp': time.time(),
+                                    'block_name': 'info',
+                                    'data': scan_params_bundle})
+
+        ret_val = (yield self._run_track(
+            session=session, point_gen=g, step_time=step_time,
+            track_axes=track_axes, free_form=free_form, unabort_failure=True))
+
+        self.agent.publish_to_feed('scan_params',
+                                   {'timestamp': time.time(),
+                                    'block_name': 'exit',
+                                    'data': {'session_id': session.session_id,
+                                             'event': 2}})
+        return ret_val
+
     @inlineCallbacks
     def _run_track(self, session, point_gen, step_time, stop_accel=0.5, track_axes=['az'],
                    point_batch_count=None, free_form=False, unabort_failure=False):
@@ -2551,7 +2706,7 @@ class ACUAgent:
             last_mode = None
             last_upload_az = None
             start_time = time.time()
-            got_progtrack = False
+            got_progtrack = {ax: False for ax in track_axes}
             faults = {}
             got_points_in = False
             first_upload_time = None
@@ -2573,7 +2728,7 @@ class ACUAgent:
                 # points but ACU is quietly dumping them because the
                 # vel is too high.
                 got_points_in = got_points_in \
-                    or (got_progtrack and free_positions < FULL_STACK)
+                    or (any(got_progtrack.values()) and free_positions < FULL_STACK)
 
                 if last_mode != mode:
                     self.log.info(f'scan mode={mode}, line_buffer={len(point_prov)}, track_free={free_positions}')
@@ -2585,25 +2740,37 @@ class ACUAgent:
                         faults[k] = True
 
                 if mode != 'abort':
-                    # Reasons we might decide to abort ...
-                    if current_modes['Az'] == 'ProgramTrack':
-                        got_progtrack = True
-                    else:
-                        if got_progtrack:
-                            self.log.warn('Unexpected exit from ProgramTrack mode!')
-                            if mode == 'stop':
-                                prog_track_err = True
-                            mode = 'abort'
-                        elif now - start_time > MAX_PROGTRACK_SET_TIME:
-                            self.log.warn('Failed to set ProgramTrack mode in a timely fashion.')
-                            mode = 'abort'
+                    # Reasons we might decide to abort or stop ...
+
+                    # First we'll check that each axis we expect to be in ProgramTrack mode,
+                    # is indeed still in ProgramTrack mode.
+                    for ax in track_axes:
+                        # Convert between track axes names and status field names.
+                        track_axes_names = {'az': 'Az', 'el': 'El'}  # There's probably a better way to convert these.
+                        if current_modes[track_axes_names[ax]] == 'ProgramTrack':
+                            got_progtrack[ax] = True
+                        else:
+                            if got_progtrack[ax]:
+                                self.log.warn(f'Unexpected exit from ProgramTrack mode on {ax} axis!')
+                                if mode == 'stop':
+                                    prog_track_err = True
+                                mode = 'abort'
+                            elif now - start_time > MAX_PROGTRACK_SET_TIME:
+                                self.log.warn(f'Failed to set ProgramTrack mode in a timely fashion on {ax} axis.')
+                                mode = 'abort'
+
+                    # If we've attempted to upload points does the ACU actually have them?
                     if not got_points_in and (first_upload_time is not None) \
                        and (now - first_upload_time > 10):
                         self.log.warn('ACU seems to be dumping our track. Vel too high?')
                         mode = 'abort'
+
+                    # Have we left Remote mode?
                     if current_modes['Remote'] == 0:
                         self.log.warn('ACU no longer in remote mode!')
                         mode = 'abort'
+
+                    # Have we requested a stop?
                     if session.status == 'stopping' and mode not in ['stop', 'abort']:
                         mode = 'stop'
                         stop_message = 'User-requested stop.'
@@ -3219,6 +3386,30 @@ class ACUAgent:
             msg = 'Scan is safe for %.1f hours' % (info['sun_time'] / 3600)
         else:
             msg = 'Scan will be unsafe in %.1f hours' % (info['sun_time'] / 3600)
+
+        return safe, msg
+
+    def _check_nod_sunsafe(self, az, el1, el2):
+        """This will return True if active avoidance is disabled.  If active
+        avoidance is enabled, then it will only return true if the
+        planned El-nod seems to currently be sun-safe.
+
+        """
+        if not self._get_sun_policy('sunsafe_moves'):
+            return True, 'Sun-safety checking is not enabled.'
+
+        if not self._get_sun_policy('map_valid'):
+            return False, 'Sun Safety Map not computed or stale; run the monitor_sun process.'
+
+        n = max(2, int(np.ceil((abs(el2 - el1)) / 1.)))
+        els = np.linspace(el1, el2, n)
+
+        info = self.sun.check_trajectory(els * 0 + az, els)
+        safe = info['sun_time'] >= self.sun_params['policy']['min_sun_time']
+        if safe:
+            msg = 'El-nod is safe for %.1f hours' % (info['sun_time'] / 3600)
+        else:
+            msg = 'El-nod will be unsafe in %.1f hours' % (info['sun_time'] / 3600)
 
         return safe, msg
 
