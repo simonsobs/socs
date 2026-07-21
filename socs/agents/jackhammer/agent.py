@@ -1,5 +1,6 @@
 import argparse
 import os
+import traceback
 
 import txaio
 from ocs import ocs_agent, site_config
@@ -69,15 +70,22 @@ class JackhammerAgent:
                 'status': 'running',
                 'slots': params.get('slots'),
                 'reboot': not params['no_reboot'],
+                'error': None,
             }
 
-            hammer(
-                slots=params.get('slots'),
-                no_reboot=params['no_reboot'],
-                no_dump=params['no_dump'],
-                skip_setup=params['skip_setup'],
-                dump_rogue=params['dump_rogue'],
-            )
+            try:
+                hammer(
+                    slots=params.get('slots'),
+                    no_reboot=params['no_reboot'],
+                    no_dump=params['no_dump'],
+                    skip_setup=params['skip_setup'],
+                    dump_rogue=params['dump_rogue'],
+                )
+            except Exception as e:
+                self.log.error("Hammer failed: {error}", error=e)
+                session.data['status'] = 'error'
+                session.data['error'] = traceback.format_exc()
+                return False, f"Hammer failed: {e}"
 
             session.data['status'] = 'done'
 
