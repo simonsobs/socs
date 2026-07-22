@@ -23,11 +23,11 @@ class JackhammerAgent:
 
     @ocs_agent.param('slots', default=None)
     @ocs_agent.param('no_reboot', default=False, type=bool)
-    @ocs_agent.param('no_dump', default=False, type=bool)
+    @ocs_agent.param('dump_logs', default=False, type=bool)
     @ocs_agent.param('skip_setup', default=False, type=bool)
     @ocs_agent.param('dump_rogue', default=False, type=bool)
     def hammer(self, session, params):
-        """hammer(slots=None, no_reboot=False, no_dump=False, \
+        """hammer(slots=None, no_reboot=False, dump_logs=False, \
                   skip_setup=False, dump_rogue=False)
 
         **Task** - Execute the jackhammer hammer sequence to reset and
@@ -44,8 +44,8 @@ class JackhammerAgent:
             the sys_config.
         no_reboot : bool
             If True, perform a soft reset without rebooting the carriers.
-        no_dump : bool
-            If True, skip dumping docker logs before hammering.
+        dump_logs : bool
+            If True, dump docker logs before hammering.
         skip_setup : bool
             If True, skip pysmurf setup after reboot.
         dump_rogue : bool
@@ -80,7 +80,7 @@ class JackhammerAgent:
                 result = hammer(
                     slots=params['slots'],
                     no_reboot=params['no_reboot'],
-                    no_dump=params['no_dump'],
+                    no_dump=not params['dump_logs'],
                     skip_setup=params['skip_setup'],
                     dump_rogue=params['dump_rogue'],
                 )
