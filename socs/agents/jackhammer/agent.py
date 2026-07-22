@@ -34,6 +34,9 @@ class JackhammerAgent:
         reconfigure SMuRF slots. This replicates the ``jackhammer hammer``
         CLI command.
 
+        Individual slot failures are isolated so that the remaining
+        slots can still complete successfully.
+
         Parameters
         ----------
         slots : list of int, optional
@@ -50,13 +53,14 @@ class JackhammerAgent:
 
         Notes
         -----
-        The session data object reports the current step of the hammer
-        sequence::
+        The session data object reports per-slot results::
 
             >>> response.session['data']
-            {'status': 'done',
-             'slots': [2, 3],
-             'reboot': True}
+            {'slots': [2, 3],
+             'reboot': True,
+             'succeeded_slots': [2],
+             'failed_slots': {3: 'EPICS connection timed out ...'},
+             'error': None}
         """
         from sodetlib.hammers.jackhammer import hammer
 
@@ -67,11 +71,13 @@ class JackhammerAgent:
             session.data = {
                 'slots': params.get('slots'),
                 'reboot': not params['no_reboot'],
+                'succeeded_slots': [],
+                'failed_slots': {},
                 'error': None,
             }
 
             try:
-                hammer(
+                result = hammer(
                     slots=params['slots'],
                     no_reboot=params['no_reboot'],
                     no_dump=params['no_dump'],
@@ -83,7 +89,20 @@ class JackhammerAgent:
                 session.data['error'] = traceback.format_exc()
                 return False, f"Hammer failed: {e}"
 
-        return True, f"Successfully hammered slots {params.get('slots')}"
+            session.data['succeeded_slots'] = result['succeeded']
+            session.data['failed_slots'] = result['failed']
+
+        succeeded = result['succeeded']
+        failed = result['failed']
+
+        if not succeeded:
+            return False, f"All slots failed: {failed}"
+        if failed:
+            return True, (
+                f"Partial success: slots {succeeded} succeeded, "
+                f"slots {list(failed.keys())} failed"
+            )
+        return True, f"Successfully hammered slots {succeeded}"
 
 
 def main(args=None):
