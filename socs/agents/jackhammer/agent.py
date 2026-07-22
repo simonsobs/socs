@@ -1,4 +1,3 @@
-import argparse
 import os
 import time
 import traceback
@@ -110,7 +109,7 @@ class JackhammerAgent:
 def main(args=None):
     # set up logging
     txaio.use_twisted()
-    log = txaio.make_logger()
+    _ = txaio.make_logger()
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     args = site_config.parse_args(agent_class='JackhammerAgent',
