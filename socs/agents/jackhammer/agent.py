@@ -117,7 +117,8 @@ def main(args=None):
     agent, runner = ocs_agent.init_site_agent(args)
     p = JackhammerAgent(agent)
 
-    agent.register_task('hammer', p.hammer)
+    # restrict access to level 2
+    agent.register_task('hammer', p.hammer, min_privs=2)
 
     runner.run(agent, auto_reconnect=True)
 
