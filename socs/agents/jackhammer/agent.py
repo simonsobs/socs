@@ -65,7 +65,6 @@ class JackhammerAgent:
                 return False, "Could not acquire lock"
 
             session.data = {
-                'status': 'running',
                 'slots': params.get('slots'),
                 'reboot': not params['no_reboot'],
                 'error': None,
@@ -73,7 +72,7 @@ class JackhammerAgent:
 
             try:
                 hammer(
-                    slots=params.get('slots'),
+                    slots=params['slots'],
                     no_reboot=params['no_reboot'],
                     no_dump=params['no_dump'],
                     skip_setup=params['skip_setup'],
@@ -81,20 +80,10 @@ class JackhammerAgent:
                 )
             except Exception as e:
                 self.log.error("Hammer failed: {error}", error=e)
-                session.data['status'] = 'error'
                 session.data['error'] = traceback.format_exc()
                 return False, f"Hammer failed: {e}"
 
-            session.data['status'] = 'done'
-
-        reboot_str = "soft" if params['no_reboot'] else "hard"
-        return True, f"Successfully {reboot_str}-hammered slots {params.get('slots')}"
-
-
-def add_agent_args(parser=None):
-    if parser is None:
-        parser = argparse.ArgumentParser()
-    return parser
+        return True, f"Successfully hammered slots {params.get('slots')}"
 
 
 def main(args=None):
@@ -103,9 +92,7 @@ def main(args=None):
     log = txaio.make_logger()
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
-    parser = add_agent_args()
     args = site_config.parse_args(agent_class='JackhammerAgent',
-                                  parser=parser,
                                   args=args)
 
     agent, runner = ocs_agent.init_site_agent(args)
