@@ -6,8 +6,6 @@ import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
-txaio.use_twisted()
-
 
 class JackhammerAgent:
     """Agent to execute the sodetlib jackhammer hammer sequence.
@@ -100,6 +98,9 @@ def add_agent_args(parser=None):
 
 
 def main(args=None):
+    # set up logging
+    txaio.use_twisted()
+    log = txaio.make_logger()
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     parser = add_agent_args()
