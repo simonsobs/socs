@@ -1,7 +1,7 @@
 import argparse
 import os
-import traceback
 import time
+import traceback
 
 import txaio
 from ocs import ocs_agent, site_config
