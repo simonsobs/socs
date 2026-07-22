@@ -1,6 +1,7 @@
 import argparse
 import os
 import traceback
+import time
 
 import txaio
 from ocs import ocs_agent, site_config
@@ -74,6 +75,7 @@ class JackhammerAgent:
                 'succeeded_slots': [],
                 'failed_slots': {},
                 'error': None,
+                'timestamp': time.time(),
             }
 
             try:
