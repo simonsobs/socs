@@ -1,14 +1,17 @@
+import argparse
 import os
 import time
 import traceback
 
+import epics
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
 
 class JackhammerAgent:
-    """Agent to execute the sodetlib jackhammer hammer sequence.
+    """Agent to execute the sodetlib jackhammer hammer sequence and
+    monitor the configured status of each SMuRF slot.
 
     Parameters
     ----------
@@ -20,6 +23,15 @@ class JackhammerAgent:
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
+        self._monitor_running = False
+
+        # get slots from config file
+        from sodetlib.hammers.jackhammer import sys_config
+        self.slot_order = list(sys_config['slot_order'])
+
+        self.agent.register_feed('system_configured',
+                                 record=True,
+                                 buffer_time=0)
 
     @ocs_agent.param('slots', default=None)
     @ocs_agent.param('no_reboot', default=False, type=bool)
@@ -105,18 +117,128 @@ class JackhammerAgent:
             )
         return True, f"Successfully hammered slots {succeeded}"
 
+    @ocs_agent.param('_')
+    def monitor(self, session, params):
+        """monitor()
+
+        **Process** - Continuously monitor the configuration status of
+        each SMuRF slot by querying two EPICS registers:
+
+        - ``AMCc.SmurfApplication.SystemConfigured`` — whether setup
+          has completed successfully.
+        - ``AMCc.SmurfApplication.ConfiguringInProgress`` — whether
+          setup is currently running.
+
+        Notes
+        -----
+        The session data object reports per-slot status::
+
+            >>> response.session['data']
+            {'timestamp': 1721234567.0,
+             'slots': {
+                 2: {'configured': True, 'configuring': False},
+                 3: {'configured': False, 'configuring': True},
+                 5: {'configured': None, 'configuring': None},
+             }}
+
+        For each register, ``True``/``False`` reflect the register
+        value and ``None`` means the EPICS query timed out (slot
+        unreachable).
+        """
+        self._monitor_running = True
+        session.data = {}
+
+        while self._monitor_running:
+            slot_status = {}
+            start = time.time()
+            feed_data = {
+                'block_name': 'system_configured',
+                'timestamp': start,
+                'data': {},
+            }
+
+            for slot in self.slot_order:
+                epics_root = f'smurf_server_s{slot}'
+                pv_configured = f'{epics_root}:AMCc:SmurfApplication:SystemConfigured'
+                pv_configuring = f'{epics_root}:AMCc:SmurfApplication:ConfiguringInProgress'
+
+                val_configured = epics.caget(pv_configured, timeout=5)
+                val_configuring = epics.caget(pv_configuring, timeout=5)
+
+                if val_configured is None:
+                    configured = None
+                    feed_data['data'][f'configured_s{slot}'] = -1
+                else:
+                    configured = bool(int(val_configured))
+                    feed_data['data'][f'configured_s{slot}'] = int(configured)
+
+                if val_configuring is None:
+                    configuring = None
+                    feed_data['data'][f'configuring_s{slot}'] = -1
+                else:
+                    configuring = bool(int(val_configuring))
+                    feed_data['data'][f'configuring_s{slot}'] = int(configuring)
+
+                slot_status[slot] = {
+                    'configured': configured,
+                    'configuring': configuring,
+                }
+
+            session.data = {
+                'timestamp': feed_data['timestamp'],
+                'slots': slot_status,
+            }
+
+            if feed_data['data']:
+                self.agent.publish_to_feed('system_configured', feed_data)
+
+            self.log.debug(
+                "Slot status: {status}", status=slot_status
+            )
+
+            # aim for 10s between samples
+            wait = 10 - (time.time() - start)
+            if wait > 0:
+                time.sleep(wait)
+
+        return True, 'Monitor exited cleanly.'
+
+    def _stop_monitor(self, session, params):
+        self._monitor_running = False
+        session.set_status('stopping')
+        return True, 'Stopping monitor.'
+
+
+def add_agent_args(parser_in=None):
+    if parser_in is None:
+        parser_in = argparse.ArgumentParser()
+    pgroup = parser_in.add_argument_group('Agent Options')
+    pgroup.add_argument('--no-processes', action='store_true',
+                        default=False,
+                        help="Do not auto-start the monitor process.")
+    return parser_in
+
 
 def main(args=None):
     # set up logging
     txaio.use_twisted()
-    _ = txaio.make_logger()
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
+    parser = add_agent_args()
     args = site_config.parse_args(agent_class='JackhammerAgent',
+                                  parser=parser,
                                   args=args)
+
+    startup = not args.no_processes
 
     agent, runner = ocs_agent.init_site_agent(args)
     p = JackhammerAgent(agent)
+
+    agent.register_process('monitor',
+                           p.monitor,
+                           p._stop_monitor,
+                           blocking=False,
+                           startup=startup)
 
     # restrict access to level 2
     agent.register_task('hammer', p.hammer, min_privs=2)
