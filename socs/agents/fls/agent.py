@@ -167,7 +167,7 @@ class FLSAgent:
 
             self.take_data = True
 
-            pm = Pacemaker(1 / 3, quantize=False)
+            pm = Pacemaker(3, quantize=False)
             while self.take_data:
                 pm.sleep()
                 if time.time() - last_time > 1:
@@ -201,6 +201,8 @@ class FLSAgent:
                 pub_data = {'timestamp': time.time(),
                             'block_name': 'sampling_data',
                             'data': sampling_data}
+
+                print(pub_data)
 
                 self.agent.publish_to_feed('sampling_data', pub_data)
 

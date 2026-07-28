@@ -247,8 +247,8 @@ class DLCSmart(TCPInterface):
         values = {'scan_mode': scan_mode,
                   'scan_min_frequency': float(smin),
                   'scan_max_frequency': float(smax),
-                  'scan_step': abs(sstep),
-                  'scan_direction': int(np.sign(sstep)),
+                  'scan_step': abs(float(sstep)),
+                  'scan_direction': int(np.sign(float(sstep))),
                   'integration_time': float(sint),
                   }
         return values
@@ -288,9 +288,10 @@ class DLCSmart(TCPInterface):
 
         act_frequency = self.param_ref("frequency:frequency-act")
         photocurrent = self.param_ref("lockin:lock-in-value-nanoamp")
+        photocurrent = photocurrent.strip('() #tf')
 
-        values = {'actual_frequency': act_frequency,
-                  'photocurrent': photocurrent,
+        values = {'actual_frequency': float(act_frequency),
+                  'photocurrent': float(photocurrent),
                   }
         return values
 
