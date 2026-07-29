@@ -14,6 +14,10 @@ RUN useradd -d /home/cryo -M cryo -u 1000 && \
     mkdir /home/cryo && \
     chown cryo:smurf /home/cryo
 
+# Set up user/group for suprsync agent database permission compatability
+RUN groupadd group1002 -g 1002 && \
+    useradd -m user1010 -u 1010 -g 1002
+
 # Install packages
 # suprsync agent - rsync
 # labjack agent - wget, libusb-1.0-0-dev, udev

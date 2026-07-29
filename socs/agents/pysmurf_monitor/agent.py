@@ -150,7 +150,7 @@ class PysmurfMonitor(DatagramProtocol):
             feed_name = f'{stream_id}_meta'
 
             if feed_name not in self.agent.feeds:
-                self.agent.register_feed(feed_name, record=True, buffer_time=0)
+                self.agent.register_feed(feed_name, record=True, buffer_time=1)
 
             feed_data = {'block_name': field_name,
                          'timestamp': data['time'],

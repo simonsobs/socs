@@ -94,7 +94,7 @@ def mock_372_msg():
 
 
 # Tests
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_init_lakeshore(agent):
     """Run init_lakeshore, mocking a connection and the 372 messaging.
@@ -111,7 +111,7 @@ def test_ls372_init_lakeshore(agent):
     assert res[0] is True
 
 
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_init_lakeshore_already_initialized(agent):
     """Initializing an already initialized LS372_Agent should just return True.
@@ -126,32 +126,16 @@ def test_ls372_init_lakeshore_already_initialized(agent):
 
 # If we don't patch the reactor out, it'll mess up pytest when stop is called
 @mock.patch('socs.agents.lakeshore372.agent.reactor', mock.MagicMock())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_failed_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_init_lakeshore_failed_connection(agent):
-    """Leaving off the connection Mock, if the connection fails the init task
-    should fail and return False.
-
-    """
+    """If the connection fails the init task should fail and return False."""
     session = create_session('init_lakeshore')
     res = agent.init_lakeshore(session, None)
     assert res[0] is False
 
 
-# If we don't patch the reactor out, it'll mess up pytest when stop is called
-@mock.patch('socs.agents.lakeshore372.agent.reactor', mock.MagicMock())
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_failed_connection())
-@mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
-def test_ls372_init_lakeshore_unhandled_error(agent):
-    """If we cause an unhandled exception during connection init task should
-    also fail and return False.
-
-    """
-    session = create_session('init_lakeshore')
-    res = agent.init_lakeshore(session, None)
-    assert res[0] is False
-
-
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_init_lakeshore_auto_acquire(agent):
     """If we initalize and pass the auto_acquire param, we should expect the
@@ -165,7 +149,7 @@ def test_ls372_init_lakeshore_auto_acquire(agent):
 
 
 # enable_control_chan
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_enable_control_chan(agent):
     """Normal operation of 'enable_control_chan' task."""
@@ -179,7 +163,7 @@ def test_ls372_enable_control_chan(agent):
 
 
 # disable_control_chan
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_disable_control_chan(agent):
     """Normal operation of 'disable_control_chan' task."""
@@ -193,7 +177,7 @@ def test_ls372_disable_control_chan(agent):
 
 
 # acq
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_acq(agent):
     """Test running the 'acq' Process once."""
@@ -210,7 +194,7 @@ def test_ls372_acq(agent):
     assert session.data['fields']['Channel_01']['R'] == 108.278
 
 
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_acq_w_control_chan(agent):
     """Test running the 'acq' Process once with control channel active."""
@@ -230,7 +214,7 @@ def test_ls372_acq_w_control_chan(agent):
     assert session.data['fields']['control']['R'] == 0.0
 
 
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_acq_w_sample_heater(agent):
     """Test running the 'acq' Process once with sample heater active."""
@@ -245,7 +229,7 @@ def test_ls372_acq_w_sample_heater(agent):
 
 
 # stop_acq
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_stop_acq_not_running(agent):
     """'stop_acq' should return False if acq Process isn't running."""
@@ -258,7 +242,7 @@ def test_ls372_stop_acq_not_running(agent):
     assert res[0] is False
 
 
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_stop_acq_while_running(agent):
     """'stop_acq' should return True if acq Process is running."""
@@ -276,7 +260,7 @@ def test_ls372_stop_acq_while_running(agent):
 
 
 # set_heater_range
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_heater_range_sample_heater(agent):
     """Set sample heater to different range than currently set. Normal
@@ -293,7 +277,7 @@ def test_ls372_set_heater_range_sample_heater(agent):
     assert res[0] is True
 
 
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_heater_range_still_heater(agent):
     """Set still heater to different range than currently set. Normal
@@ -310,7 +294,7 @@ def test_ls372_set_heater_range_still_heater(agent):
     assert res[0] is True
 
 
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_heater_range_identical_range(agent):
     """Set heater to same range as currently set. Should not change range, just
@@ -333,7 +317,7 @@ def test_ls372_set_heater_range_identical_range(agent):
 
 
 # set_excitation_mode
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_excitation_mode(agent):
     """Normal operation of 'set_excitation_mode' task."""
@@ -348,7 +332,7 @@ def test_ls372_set_excitation_mode(agent):
 
 
 # set_excitation
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_excitation(agent):
     """Normal operation of 'set_excitation' task."""
@@ -362,7 +346,7 @@ def test_ls372_set_excitation(agent):
     assert res[0] is True
 
 
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_excitation_already_set(agent):
     """Setting to already set excitation value."""
@@ -377,7 +361,7 @@ def test_ls372_set_excitation_already_set(agent):
 
 
 # get_excitation
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_get_excitation(agent):
     session = create_session('get_excitation')
@@ -391,7 +375,7 @@ def test_ls372_get_excitation(agent):
 
 
 # set_resistance_range
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_resistance_range(agent):
     session = create_session('get_resistance_range')
@@ -404,7 +388,7 @@ def test_ls372_set_resistance_range(agent):
     assert res[0] is True
 
 
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_resistance_range_current_range(agent):
     session = create_session('get_resistance_range')
@@ -419,7 +403,7 @@ def test_ls372_set_resistance_range_current_range(agent):
 
 
 # get_resistance_range
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_get_resistance_range_current_range(agent):
     session = create_session('get_resistance_range')
@@ -434,7 +418,7 @@ def test_ls372_get_resistance_range_current_range(agent):
 
 
 # set_dwell
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_dwell(agent):
     session = create_session('set_dwell')
@@ -449,7 +433,7 @@ def test_ls372_set_dwell(agent):
 
 
 # get_dwell
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_get_dwell(agent):
     session = create_session('get_dwell')
@@ -464,7 +448,7 @@ def test_ls372_get_dwell(agent):
 
 
 # set_pid
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_pid(agent):
     """Normal operation of 'set_pid' task."""
@@ -479,7 +463,7 @@ def test_ls372_set_pid(agent):
 
 
 # set_active_channel
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_active_channel(agent):
     """Normal operation of 'set_active_channel' task."""
@@ -494,7 +478,7 @@ def test_ls372_set_active_channel(agent):
 
 
 # set_autoscan
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_autoscan_on(agent):
     """Normal operation of 'set_autoscan' task."""
@@ -508,7 +492,7 @@ def test_ls372_set_autoscan_on(agent):
     assert res[0] is True
 
 
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_autoscan_off(agent):
     """Normal operation of 'set_autoscan' task."""
@@ -529,7 +513,7 @@ def test_ls372_set_autoscan_off(agent):
 
 
 # set_output_mode
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_output_mode_still(agent):
     """Normal operation of 'set_output_mode' task for the still heater."""
@@ -543,7 +527,7 @@ def test_ls372_set_output_mode_still(agent):
     assert res[0] is True
 
 
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_output_mode_sample(agent):
     """Normal operation of 'set_output_mode' task for the sample heater."""
@@ -558,7 +542,7 @@ def test_ls372_set_output_mode_sample(agent):
 
 
 # set_heater_output
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_heater_output_still(agent):
     """Normal operation of 'set_heater_output' task for the still heater."""
@@ -572,7 +556,7 @@ def test_ls372_set_heater_output_still(agent):
     assert res[0] is True
 
 
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_heater_output_sample(agent):
     """Normal operation of 'set_heater_output' task for the sample heater."""
@@ -587,7 +571,7 @@ def test_ls372_set_heater_output_sample(agent):
 
 
 # set_still_output
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_set_still_output(agent):
     """Normal operation of 'set_still_output' task."""
@@ -602,7 +586,7 @@ def test_ls372_set_still_output(agent):
 
 
 # get_still_output
-@mock.patch('socs.Lakeshore.Lakeshore372._establish_socket_connection', mock_connection())
+@mock.patch('socs.tcp.TCPInterface._connect', mock_connection())
 @mock.patch('socs.Lakeshore.Lakeshore372.LS372.msg', mock_372_msg())
 def test_ls372_get_still_output(agent):
     """Normal operation of 'get_still_output' task."""

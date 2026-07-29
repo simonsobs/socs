@@ -810,21 +810,47 @@ class ControlState:
     class Brake:
         """
         Configure the PID and PMX agents to actively brake the HWP
+
+        Attributes
+        -----------
+        freq_tol : float
+            Tolerance of frequency to consider hwp is stopped
+        freq_tol_duration : float
+            Duration in seconds that the frequency must be within the tolerance
+        brake_voltage: float
+            Voltage to use when braking the HWP
+        max_brake_duration : float
+            Maximum duration of time to brake in seconds
         """
         freq_tol: float
         freq_tol_duration: float
         brake_voltage: float
+        max_brake_duration: float
 
     @dataclass
     class WaitForBrake:
         """
         Waits until the HWP has slowed before shutting off PMX
 
+        Attributes
+        -----------
+        freq_tol : float
+            Tolerance of frequency to consider hwp is stopped.
+        freq_tol_duration : float
+            Duration in seconds that the frequency must be within the tolerance
         min_freq : float
             Frequency (Hz) below which the PMX should be shut off.
+            Defaults to 0.5.
+        max_duration : float
+            Maximum duration of time to brake in seconds
+        start_time : float
+            Time that the state was entered
         """
-        min_freq: float
-        prev_freq: float = None
+        freq_tol: float
+        freq_tol_duration: float
+        min_freq: float = 0.5
+        max_duration: Optional[float] = None
+        start_time: float = field(default_factory=time.time)
 
     @dataclass
     class PmxOff:
@@ -1349,15 +1375,24 @@ class ControlStateMachine:
 
                 time.sleep(10)
                 self.action.set_state(ControlState.WaitForBrake(
-                    min_freq=0.5,
-                    prev_freq=hwp_state.enc_freq,
+                    freq_tol=state.freq_tol,
+                    freq_tol_duration=state.freq_tol_duration,
+                    max_duration=state.max_brake_duration,
                 ))
 
             elif isinstance(state, ControlState.WaitForBrake):
-                f0 = query_pid_state()['current_freq']
+                f0 = query_pid_state().get('current_freq', 999)
                 time.sleep(5)
-                f1 = query_pid_state()['current_freq']
-                if f0 < 0.5 or (f1 > f0):
+                f1 = query_pid_state().get('current_freq', f0)
+
+                stop_mode = False
+                if state.max_duration is not None:
+                    if time.time() - state.start_time > state.max_duration:
+                        stop_mode = True
+                        self.log.info("Duration of WaitForBrake has exceeded "
+                                      f"max duration of {state.max_duration} seconds.")
+
+                if stop_mode or (f0 < state.min_freq) or (f1 > f0):
                     self.log.info("Turning off PMX and putting PCU in stop mode")
                     self.run_and_validate(clients.pmx.set_off)
                     self.run_and_validate(
@@ -1366,8 +1401,8 @@ class ControlStateMachine:
                     )
                     self.action.set_state(ControlState.WaitForTargetFreq(
                         target_freq=0,
-                        freq_tol=0.05,
-                        freq_tol_duration=30,
+                        freq_tol=state.freq_tol,
+                        freq_tol_duration=state.freq_tol_duration,
                     ))
                     return
 
@@ -1502,9 +1537,19 @@ class HWPSupervisor:
         self.gripper_power_agent_type = args.gripper_power_agent_type
         self.gripper_iboot_outlets = args.gripper_iboot_outlets
 
+        self.spin_up_freq_tol = args.spin_up_freq_tol
+        self.spin_up_freq_tol_duration = args.spin_up_freq_tol_duration
+        self.spin_down_freq_tol = args.spin_down_freq_tol
+        self.spin_down_freq_tol_duration = args.spin_down_freq_tol_duration
+        self.brake_freq_tol = args.brake_freq_tol
+        self.brake_freq_tol_duration = args.brake_freq_tol_duration
+        self.brake_voltage = args.brake_voltage
+        self.max_brake_duration = args.max_brake_duration
+
         self.shutdown_no_data_timeout = args.shutdown_no_data_timeout
         self.shutdown_delay = args.shutdown_delay
         self.shutdown_mode = False
+        self.shutdown_enabled = not args.disable_shutdown
 
         self.agent.register_feed('actions', record=True)
 
@@ -1637,6 +1682,8 @@ class HWPSupervisor:
                 'actions': {
                     'pmx': 'ok'  # 'ok', 'stop', or 'no_data'
                     'gripper': 'ok'  # 'ok', 'stop', or 'no_data'
+                    'shutdown_mode': False,
+                    'shutdown_enabled': True,
                 }}
         """
         pm = Pacemaker(1. / self.sleep_time)
@@ -1650,6 +1697,8 @@ class HWPSupervisor:
             'actions': {
                 'pmx': 'no_data',
                 'gripper': 'no_data',
+                'shutdown_mode': self.shutdown_mode,
+                'shutdown_enabled': self.shutdown_enabled,
             }
         }
 
@@ -1665,18 +1714,21 @@ class HWPSupervisor:
             session.data['actions'] = {
                 'pmx': self.hwp_state.pmx_action,
                 'gripper': self.hwp_state.gripper_action,
+                'shutdown_mode': self.shutdown_mode,
+                'shutdown_enabled': self.shutdown_enabled,
             }
 
             action = self.hwp_state.pmx_action
             if action == 'ok':
                 last_okay_time = time.time()
-            elif action == 'no_data' and self.shutdown_no_data_timeout >= 0:
+            elif self.shutdown_enabled and action == 'no_data' \
+                    and self.shutdown_no_data_timeout >= 0:
                 if (time.time() - last_okay_time) > \
                         self.shutdown_no_data_timeout + self.shutdown_delay:
                     if not self.shutdown_mode:
                         self.agent.start('disable_driver_board', params={})
                         self.shutdown_mode = True
-            elif action == 'stop':
+            elif self.shutdown_enabled and action == 'stop':
                 if (time.time() - last_okay_time) > self.shutdown_delay:
                     if not self.shutdown_mode:
                         self.agent.start('disable_driver_board', params={})
@@ -1689,6 +1741,7 @@ class HWPSupervisor:
                     'pmx_action': self.hwp_state.pmx_action,
                     'gripper_action': self.hwp_state.gripper_action,
                     'shutdown_mode': int(self.shutdown_mode),
+                    'shutdown_enabled': int(self.shutdown_enabled),
                 },
             }
             self.agent.publish_to_feed('actions', data)
@@ -1760,8 +1813,8 @@ class HWPSupervisor:
         return True, 'Stopping spin control process'
 
     @ocs_agent.param('target_freq', type=float)
-    @ocs_agent.param('freq_tol', type=float, default=0.05)
-    @ocs_agent.param('freq_tol_duration', type=float, default=10)
+    @ocs_agent.param('freq_tol', type=float, default=None)
+    @ocs_agent.param('freq_tol_duration', type=float, default=None)
     def pid_to_freq(self, session, params):
         """pid_to_freq(target_freq=2.0, freq_tol=0.05, freq_tol_duration=10)
 
@@ -1775,9 +1828,11 @@ class HWPSupervisor:
             looking at the cryostat from the sky.
         freq_tol : float
             Frequency threshold (Hz) for determining when the HWP is at the target frequency.
+            Defaults to ``spin_up_freq_tol`` from config.
         freq_tol_duration : float
             Duration (seconds) for which the HWP must be within ``freq_tol`` of the
             ``target_freq`` to be considered successful.
+            Defaults to ``spin_up_freq_tol_duration`` from config.
 
         Notes
         --------
@@ -1793,6 +1848,17 @@ class HWPSupervisor:
                 'success': True}
             }
         """
+        freq_tol = (
+            params["freq_tol"]
+            if params["freq_tol"] is not None
+            else self.spin_up_freq_tol
+        )
+        freq_tol_duration = (
+            params["freq_tol_duration"]
+            if params["freq_tol_duration"] is not None
+            else self.spin_up_freq_tol_duration
+        )
+
         if params['target_freq'] >= 0:
             d = '1' if self.forward_is_cw else '0'
         else:
@@ -1800,8 +1866,8 @@ class HWPSupervisor:
 
         state = ControlState.PIDToFreq(
             target_freq=np.abs(params['target_freq']),
-            freq_tol=params['freq_tol'],
-            freq_tol_duration=params['freq_tol_duration'],
+            freq_tol=freq_tol,
+            freq_tol_duration=freq_tol_duration,
             direction=d
         )
         action = self.control_state_machine.request_new_action(state)
@@ -1850,11 +1916,12 @@ class HWPSupervisor:
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
-    @ocs_agent.param('freq_tol', type=float, default=0.05)
-    @ocs_agent.param('freq_tol_duration', type=float, default=10)
-    @ocs_agent.param('brake_voltage', type=float, default=10.)
+    @ocs_agent.param('freq_tol', type=float, default=None)
+    @ocs_agent.param('freq_tol_duration', type=float, default=None)
+    @ocs_agent.param('brake_voltage', type=float, default=None)
+    @ocs_agent.param('max_brake_duration', type=float, default=None)
     def brake(self, session, params):
-        """brake(freq_tol=0.05, freq_tol_duration=10, brake_voltage=10)
+        """brake(freq_tol=0.05, freq_tol_duration=10, brake_voltage=10, max_brake_duration=None)
 
         **Task** - Sets the control state to brake the HWP.
 
@@ -1862,11 +1929,17 @@ class HWPSupervisor:
         -------
         freq_tol : float
             Frequency tolerance (Hz) for determining when the HWP is at the target frequency.
+            Defaults to ``brake_freq_tol`` from config.
         freq_tol_duration : float
             Duration (seconds) for which the HWP must be within ``freq_tol`` of the
             ``target_freq`` to be considered successful.
+            Defaults to ``brake_freq_tol_duration`` from config.
         brake_voltage: float
             Voltage to use when braking the HWP.
+            Defaults to ``brake_voltage`` from config.
+        max_brake_duration: float
+            Maximum duration (sec) for braking the HWP.
+            Defaults to ``max_brake_duration`` from config.
 
         Notes
         --------
@@ -1882,18 +1955,40 @@ class HWPSupervisor:
                 'success': True}
             }
         """
+        freq_tol = (
+            params["freq_tol"]
+            if params["freq_tol"] is not None
+            else self.brake_freq_tol
+        )
+        freq_tol_duration = (
+            params["freq_tol_duration"]
+            if params["freq_tol_duration"] is not None
+            else self.brake_freq_tol_duration
+        )
+        brake_voltage = (
+            params["brake_voltage"]
+            if params["brake_voltage"] is not None
+            else self.brake_voltage
+        )
+        max_brake_duration = (
+            params["max_brake_duration"]
+            if params["max_brake_duration"] is not None
+            else self.max_brake_duration
+        )
+
         state = ControlState.Brake(
-            freq_tol=params['freq_tol'],
-            freq_tol_duration=params['freq_tol_duration'],
-            brake_voltage=params['brake_voltage'],
+            freq_tol=freq_tol,
+            freq_tol_duration=freq_tol_duration,
+            brake_voltage=brake_voltage,
+            max_brake_duration=max_brake_duration,
         )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
     @ocs_agent.param('wait_stop', type=bool, default=False)
-    @ocs_agent.param('freq_tol', type=float, default=0.05)
-    @ocs_agent.param('freq_tol_duration', type=float, default=30)
+    @ocs_agent.param('freq_tol', type=float, default=None)
+    @ocs_agent.param('freq_tol_duration', type=float, default=None)
     def pmx_off(self, session, params):
         """pmx_off(wait_stop=False, freq_tol=0.05, freq_tol_duration=30)
 
@@ -1905,8 +2000,10 @@ class HWPSupervisor:
             Whether to wait until hwp stops.
         freq_tol : float
             Tolerance of frequency to consider hwp is stopped.
+            Defaults to ``spin_down_freq_tol`` from config.
         freq_tol_duration : float
             Duration in seconds that the frequency must be within the tolerance
+            Defaults to ``spin_down_freq_tol_duration`` from config.
 
         Notes
         --------
@@ -1922,10 +2019,21 @@ class HWPSupervisor:
                 'success': True}
             }
         """
+        freq_tol = (
+            params["freq_tol"]
+            if params["freq_tol"] is not None
+            else self.spin_down_freq_tol
+        )
+        freq_tol_duration = (
+            params["freq_tol_duration"]
+            if params["freq_tol_duration"] is not None
+            else self.spin_down_freq_tol_duration
+        )
+
         state = ControlState.PmxOff(
             wait_stop=params['wait_stop'],
-            freq_tol=params['freq_tol'],
-            freq_tol_duration=params['freq_tol_duration'],
+            freq_tol=freq_tol,
+            freq_tol_duration=freq_tol_duration,
         )
         action = self.control_state_machine.request_new_action(state)
         action.sleep_until_complete(session=session)
@@ -2089,6 +2197,27 @@ class HWPSupervisor:
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
+    @ocs_agent.param('enable', type=bool, default=None)
+    def update_shutdown(self, session, params):
+        """update_shutdown(enable=None)
+
+        **Task** - Update HWP shutdown parameters.
+
+        Args
+        -------
+        enable : bool
+            If True, enable HWP shutdown checks. If False, disables the
+            shutdown checks until re-enabled or the agent is restarted.
+            This will not revert the shutdown mode to normal if the agent is
+            already in the shutdown mode. Use cancel_shutdown to do so.
+
+        """
+        if params['enable'] is not None:
+            self.shutdown_enabled = params['enable']
+            self.log.info(f'Shutdown {"enabled" if self.shutdown_enabled else "disabled"}')
+
+        return True, 'Params updated.'
+
     def cancel_shutdown(self, session, params):
         """cancel_shutdown()
         **Task** - Cancels shutdown mode
@@ -2202,6 +2331,42 @@ def make_parser(parser=None):
              "cw or ccw is defined when hwp is viewed from the sky side."
     )
     pgroup.add_argument(
+        '--spin-up-freq-tol', type=float, default=0.05,
+        help="Frequency tolerance (Hz) for pid_to_freq task",
+    )
+    pgroup.add_argument(
+        '--spin-up-freq-tol-duration', type=float, default=10.0,
+        help="Frequency tolerance duration (sec) for pid_to_freq task",
+    )
+    pgroup.add_argument(
+        '--spin-down-freq-tol', type=float, default=0.05,
+        help="Frequency tolerance (Hz) for pmx_off task",
+    )
+    pgroup.add_argument(
+        '--spin-down-freq-tol-duration', type=float, default=30.0,
+        help="Frequency tolerance duration (sec) for pmx_off task",
+    )
+    pgroup.add_argument(
+        '--brake-freq-tol', type=float, default=0.05,
+        help="Frequency tolerance (Hz) for brake task",
+    )
+    pgroup.add_argument(
+        '--brake-freq-tol-duration', type=float, default=10.0,
+        help="Frequency tolerance duration (sec) for brake task",
+    )
+    pgroup.add_argument(
+        '--brake-voltage', type=float, default=10.0,
+        help="Voltage to use when braking the HWP",
+    )
+    pgroup.add_argument(
+        '--max-brake-duration', type=float, default=None,
+        help="Maximum duration (sec) for brake task",
+    )
+    pgroup.add_argument(
+        '--disable-shutdown', action='store_true',
+        help="Disable shutdown before startup.",
+    )
+    pgroup.add_argument(
         '--shutdown-no-data-timeout', type=float, default=15 * 60,
         help="Time(sec) after which a 'no_data' action should trigger a shutdown"
     )
@@ -2237,6 +2402,7 @@ def main(args=None):
     agent.register_task('disable_driver_board', hwp.disable_driver_board)
     agent.register_task('power_cycle_gripper', hwp.power_cycle_gripper)
     agent.register_task('abort_action', hwp.abort_action)
+    agent.register_task('update_shutdown', hwp.update_shutdown)
     agent.register_task('cancel_shutdown', hwp.cancel_shutdown)
 
     runner.run(agent, auto_reconnect=True)

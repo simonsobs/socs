@@ -161,6 +161,9 @@ class FLSAgent:
                  'scan_direction': 1,
                  'integration_time': 299.3421
                  'timestamp': 1771277799.562098}
+
+            In cases where the DLC Smart reads an invalid value for photocurrent, the
+            photocurrent will be recorded as 999999.
         """
         with self.lock.acquire_timeout(0, job='acq') as acquired:
             if not acquired:

@@ -15,6 +15,8 @@ A few important things to know about the behavior of the interface class:
   ``self.comm`` will be ``None``.
 * The connection will be reset when ``send()`` is called if this happens.
   An exception will be raised if it still cannot connect.
+* The connection will be reset when an error is encountered when sending
+  and optionally reset when receiving.
 * The interface is built to mimic ``socket.send()`` and ``socket.recv()``, but
   uses ``socket.sendall()`` in its implementation, so all bytes in the included
   message are sent to the socket.

@@ -4,7 +4,7 @@ FROM simonsobs/so_smurf_base:v0.0.9
 # sodetlib Install
 #################################################################
 WORKDIR /
-RUN git clone --branch v0.6.5 --depth 1 https://github.com/simonsobs/sodetlib.git
+RUN git clone --branch v0.6.7 --depth 1 https://github.com/simonsobs/sodetlib.git
 # allow versioneer to determine sodetlib version safely
 USER cryo
 RUN git config --global --add safe.directory /sodetlib
@@ -13,6 +13,8 @@ WORKDIR /sodetlib
 RUN pip3 install -U pip
 RUN pip3 install -e .
 RUN pip3 install -r requirements.txt
+# Pin version until base image is on a more modern Python version
+RUN pip3 install setuptools-scm==9.2.2
 
 ENV OCS_CONFIG_DIR=/config
 
