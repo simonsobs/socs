@@ -176,7 +176,7 @@ class WiregridActuatorAgent:
                 return False, msg
 
         # Initial slow & small moving
-        ret, msg, LSonoff = move_func(5, speedrate=0.2)
+        ret, msg, LSonoff = move_func(10, speedrate=0.2)
         # Check the status of the initial moving
         if not ret:
             msg = '_insert_eject()[{}]: ERROR!: in the initail moving | {} '\
