@@ -140,18 +140,8 @@ class FLSAgent:
             The data collected are stored in session data in the structure::
 
                 >> response.session['data']
-                {'set_frequency': 110.0,
-                 'actual_frequency': 109.3425,
+                {'actual_frequency': 109.3425,
                  'photocurrent': 0.1124,
-                 'bias_voltage': 0.999834227,
-                 'bias_offset': -0.498235892,
-                 'lasers_on': True,
-                 'scan_mode': 'fast',
-                 'scan_min_frequency': 120.0,
-                 'scan_max_frequency': 180.0,
-                 'scan_step': 0.05,
-                 'scan_direction': 1,
-                 'integration_time': 299.3421
                  'timestamp': 1771277799.562098}
 
             In cases where the DLC Smart reads an invalid value for photocurrent, the
@@ -369,7 +359,7 @@ class FLSAgent:
                     return False, "Bias not successfully set."
         return True, f"Bias successfully set to {bias_to_set}."
 
-    @ocs_agent.param('integration_time', type=float)
+    @ocs_agent.param('integration_time', type=float, check=lambda x: 0.5 < x <= 3000)
     def set_integration_time(self, session, params):
         """
         set_integration_time(integration_time)
@@ -415,7 +405,7 @@ class FLSAgent:
     @ocs_agent.param('max_frequency', type=float, check=lambda x: MIN_FREQ <= x < MAX_FREQ)
     @ocs_agent.param('start_direction', type=int, choices=[-1, 1])
     @ocs_agent.param('frequency_step', type=float, default=0.05, check=lambda x: x >= 0.01)
-    @ocs_agent.param('int_time', type=float, default=300., check=lambda x: 0.5 < x <= 3000)
+    @ocs_agent.param('int_time', type=float, default=700., check=lambda x: 0.5 < x <= 3000)
     def run_frequency_sweeps(self, session, params):
         """
         run_frequency_sweeps(min_frequency, max_frequency, start_direction, \
@@ -432,7 +422,8 @@ class FLSAgent:
             frequency_step (float): Step size between frequencies during the sweep (GHz).
                                     Must be at least 0.01 GHz.
             int_time (float): Integration time for each step of the sweep (ms). Default
-                              chooses the last set integration time.
+                              value is 700 ms, which ensures at least one data point per
+                              step.
         Note:
             This task only sends commands to the DLC Smart, it does not wait for the end of
             the frequency sweep. As a result, it returns quickly, and the user needs to call
