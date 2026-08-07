@@ -41,6 +41,7 @@ agents = {
     'RTSPCameraAgent': {'module': 'socs.agents.rtsp_camera.agent', 'entry_point': 'main'},
     'ScpiPsuAgent': {'module': 'socs.agents.scpi_psu.agent', 'entry_point': 'main'},
     'SmurfFileEmulator': {'module': 'socs.agents.smurf_file_emulator.agent', 'entry_point': 'main'},
+    'SmurfHammerAgent': {'module': 'socs.agents.smurf_hammer.agent', 'entry_point': 'main'},
     'SmurfStreamSimulator': {'module': 'socs.agents.smurf_stream_simulator.agent', 'entry_point': 'main'},
     'SmurfTimingCardAgent': {'module': 'socs.agents.smurf_timing_card.agent', 'entry_point': 'main'},
     'SRSCG635Agent': {'module': 'socs.agents.srs_cg635.agent', 'entry_point': 'main'},
