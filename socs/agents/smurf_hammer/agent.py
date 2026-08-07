@@ -9,7 +9,7 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 
 
-class JackhammerAgent:
+class SmurfHammerAgent:
     """Agent to execute the sodetlib jackhammer hammer sequence and
     monitor the configured status of each SMuRF slot.
 
@@ -225,14 +225,14 @@ def main(args=None):
     txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     parser = add_agent_args()
-    args = site_config.parse_args(agent_class='JackhammerAgent',
+    args = site_config.parse_args(agent_class='SmurfHammerAgent',
                                   parser=parser,
                                   args=args)
 
     startup = not args.no_processes
 
     agent, runner = ocs_agent.init_site_agent(args)
-    p = JackhammerAgent(agent)
+    p = SmurfHammerAgent(agent)
 
     agent.register_process('monitor',
                            p.monitor,
