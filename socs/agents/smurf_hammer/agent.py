@@ -241,7 +241,8 @@ def main(args=None):
                            startup=startup)
 
     # restrict access to level 2
-    agent.register_task('hammer', p.hammer, min_privs=2)
+    # TODO: not supported yet
+    #agent.register_task('hammer', p.hammer, min_privs=2)
 
     runner.run(agent, auto_reconnect=True)
 
