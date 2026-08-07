@@ -999,6 +999,112 @@ def generate_type2_scan(az_endpoint1, az_endpoint2, az_speed,
                                turnaround_method=turnaround_method)
 
 
+def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
+                        el_freq=.15,
+                        num_batches=None,
+                        num_nods=None,
+                        start_time=None,
+                        wait_to_start=10.,
+                        step_time=0.05,
+                        batch_size=500):
+    """Python generator to produce times, azimuth and elevation positions,
+    azimuth and elevation velocities, azimuth and elevation flags for
+    arbitrarily long sin el nods.
+
+    Parameters:
+        el_endpoint1 (float): elevation endpoint for the scan start
+        el_endpoint2 (float): second elevation endpoint of the scan. For
+            constant az scans, this must be equal to el_endpoint1.
+        el_freq(float): frequency of the elevation nods in Hz.
+        num_batches (int or None): sets the number of batches for the
+            generator to create. Default value is None (interpreted as infinite
+            batches).
+        num_nods (int or None): if not None, limits the points
+          returned to the specified number of el nods (one nod is one full sine wave).
+        start_time (float or None): a ctime at which to start the scan.
+            Default is None, which is interpreted as starting now +
+            wait_to_start.
+        wait_to_start (float): number of seconds to wait between
+            start_time and when the scan actually starts. Default is 10 seconds.
+        step_time (float): time between points on the constant-velocity
+            parts of the motion. Default value is 1.0 seconds. Minimum value is
+            0.05 seconds.
+        batch_size (int): number of values to produce in each iteration.
+            Default is 500. Batch size is reset to the length of one leg of the
+            motion if num_batches is not None.
+
+    Yields:
+        points (list): a list of TrackPoint objects.  Raises
+          StopIteration once exit condition, if defined, is met.
+
+    """
+
+    MIN_STEP_TIME = 0.05  # in seconds.
+    MIN_POINTS_PER_NOD = 16
+    # Get el throw.
+    el_throw = (el_endpoint2 - el_endpoint1) / 2
+    el_cent = (el_endpoint1 + el_endpoint2) / 2.
+
+    if start_time is None:
+        t0 = time.time() + wait_to_start
+    else:
+        t0 = start_time
+
+    t = 0
+    el = el_endpoint1
+
+    # Ensure the step_time isn't too low.
+    if step_time < MIN_STEP_TIME:
+        step_time = MIN_STEP_TIME
+
+    nod_period = 1. / el_freq
+    points_per_nod = round(nod_period / step_time)
+
+    # Tweak points per nod to the closest multiple of 4.
+    # For clean sine/cos waves.
+    points_per_nod = round(points_per_nod / 4) * 4
+
+    # Ensure we have the minumum number of points
+    if points_per_nod < MIN_POINTS_PER_NOD:
+        points_per_nod = MIN_POINTS_PER_NOD
+
+    step_time = nod_period / points_per_nod  # Divide nod into points_per_nod points.
+
+    def check_completed_nods():
+        return num_nods is None or t * el_freq < num_nods
+
+    def get_el(_t):
+        return (el_cent - el_throw * np.cos(_t * el_freq * 2 * np.pi),
+                el_throw * el_freq * 2 * np.pi * np.sin(_t * el_freq * 2 * np.pi))
+
+    # Set up templates for the ts, els, and el_vels for each nod.
+    # Each nod is identical in el and el_vel,
+    # we just need to update the times as we complete nods.
+    template_nod_ts = step_time * np.arange(points_per_nod)
+    template_nod_els, template_nod_el_vels = get_el(template_nod_ts)
+
+    # Upload full nods until we've completed num_nods.
+    while check_completed_nods():
+        # Create a point_block for the entire nod using our templates.
+        point_block = [TrackPoint(timestamp=nod_t + t + t0,
+                                  az=az, el=el, az_vel=0, el_vel=el_vel,
+                                  az_flag=0, el_flag=1, group_flag=1)
+                       for nod_t, el, el_vel in
+                       zip(template_nod_ts, template_nod_els, template_nod_el_vels)]
+
+        # Set the group flag of the last point to 0 so the entire nod gets uploaded at once.
+        point_block[-1].group_flag = 0
+
+        # Update the time.
+        t += 1. / el_freq
+        yield point_block
+
+    # Yield one final point with 0 velocities.
+    yield [TrackPoint(timestamp=t + t0,
+                      az=az, el=el, az_vel=0, el_vel=0,
+                      az_flag=0, el_flag=1, group_flag=0)]
+
+
 def plan_scan(az_end1, az_end2, el, v_az=1, a_az=1, az_start=None,
               scan_type=1):
     """Determine some important parameters for running a ProgramTrack
