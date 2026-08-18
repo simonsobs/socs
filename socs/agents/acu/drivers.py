@@ -1001,12 +1001,10 @@ def generate_type2_scan(az_endpoint1, az_endpoint2, az_speed,
 
 def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
                         el_freq=.15,
-                        num_batches=None,
                         num_nods=None,
                         start_time=None,
                         wait_to_start=10.,
-                        step_time=0.05,
-                        batch_size=500):
+                        step_time=0.05):
     """Python generator to produce times, azimuth and elevation positions,
     azimuth and elevation velocities, azimuth and elevation flags for
     arbitrarily long sin el nods.
@@ -1016,9 +1014,6 @@ def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
         el_endpoint2 (float): second elevation endpoint of the scan. For
             constant az scans, this must be equal to el_endpoint1.
         el_freq(float): frequency of the elevation nods in Hz.
-        num_batches (int or None): sets the number of batches for the
-            generator to create. Default value is None (interpreted as infinite
-            batches).
         num_nods (int or None): if not None, limits the points
           returned to the specified number of el nods (one nod is one full sine wave).
         start_time (float or None): a ctime at which to start the scan.
@@ -1029,9 +1024,6 @@ def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
         step_time (float): time between points on the constant-velocity
             parts of the motion. Default value is 1.0 seconds. Minimum value is
             0.05 seconds.
-        batch_size (int): number of values to produce in each iteration.
-            Default is 500. Batch size is reset to the length of one leg of the
-            motion if num_batches is not None.
 
     Yields:
         points (list): a list of TrackPoint objects.  Raises
@@ -1071,7 +1063,7 @@ def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
     step_time = nod_period / points_per_nod  # Divide nod into points_per_nod points.
 
     def check_completed_nods():
-        return num_nods is None or t * el_freq < num_nods
+        return num_nods is None or num_completed_nods < num_nods
 
     def get_el(_t):
         return (el_cent - el_throw * np.cos(_t * el_freq * 2 * np.pi),
@@ -1084,6 +1076,7 @@ def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
     template_nod_els, template_nod_el_vels = get_el(template_nod_ts)
 
     # Upload full nods until we've completed num_nods.
+    num_completed_nods = 0
     while check_completed_nods():
         # Create a point_block for the entire nod using our templates.
         point_block = [TrackPoint(timestamp=nod_t + t + t0,
@@ -1098,6 +1091,8 @@ def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
         # Update the time.
         t += 1. / el_freq
         yield point_block
+
+        num_completed_nods += 1
 
     # Yield one final point with 0 velocities.
     yield [TrackPoint(timestamp=t + t0,

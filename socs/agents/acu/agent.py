@@ -2485,15 +2485,14 @@ class ACUAgent:
                 None, which means the scan will start immediately.
             step_time (float): time, in seconds, between points on the
                 constant-velocity parts of the motion.  The default is
-                None, which will cause an appropriate value to be
-                chosen automatically (typically 0.1 to 1.0).
+                0.1 seconds.
 
         Notes:
           Note that all parameters are optional except for
-          el_depth and el_freq.  If only those two parameters
-          are passed, the Process will nod with that depth and frequency,
-          with the azimuth axis held in Stop, indefinitely (until
-          Process .stop method is called)..
+          el_depth. If only those el_depth is passed, the Process will nod with that
+          depth and theel_freq specified in the scan_params (if it is specified)
+          indefinitely (until Process .stop method is called).
+          The azimuth axis held in Stop while the elevation nods are executed.
 
         """
         init_time = time.time()  # for params feed.
@@ -2516,10 +2515,8 @@ class ACUAgent:
         if el_freq is None:
             el_freq = self.scan_params['el_freq']
 
-        if el_depth == 0:
-            raise ValueError("El depth must not be equal to 0 for el nod!")
-
-        # Could probably use a condition for if the el endpoints are too close?
+        if abs(el_depth) < 0.1:
+            raise ValueError("El depth amplitude must be greater than 0.1 for el nod!")
 
         # If requested el is just outside acceptable range, tweak it in.
         _f, _ = self._get_limit_func('elevation')
@@ -2530,7 +2527,7 @@ class ACUAgent:
         scan_params = {k: params.get(k) for k in [
             'num_nods', 'start_time', 'step_time']
             if params.get(k) is not None}
-        step_time = scan_params['step_time']
+        step_time = 0.1 if 'step_time' not in scan_params.keys() else scan_params['step_time']
 
         self.log.info('The scan_params: {scan_params}', scan_params=scan_params)
 
@@ -2745,9 +2742,7 @@ class ACUAgent:
                     # First we'll check that each axis we expect to be in ProgramTrack mode,
                     # is indeed still in ProgramTrack mode.
                     for ax in track_axes:
-                        # Convert between track axes names and status field names.
-                        track_axes_names = {'az': 'Az', 'el': 'El'}  # There's probably a better way to convert these.
-                        if current_modes[track_axes_names[ax]] == 'ProgramTrack':
+                        if current_modes[ax.capitalize()] == 'ProgramTrack':
                             got_progtrack[ax] = True
                         else:
                             if got_progtrack[ax]:
