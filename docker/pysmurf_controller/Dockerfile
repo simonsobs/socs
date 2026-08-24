@@ -1,5 +1,16 @@
 FROM simonsobs/so_smurf_base:v0.0.9
 
+# Download and extract just the Docker CLI binary
+RUN curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-24.0.2.tgz \
+    | tar -xz -C /tmp \
+    && mv /tmp/docker/docker /usr/local/bin/ \
+    && rm -rf /tmp/docker
+
+# Create the docker group
+ARG DOCKER_GID=999
+RUN groupadd -g ${DOCKER_GID} docker && \
+    usermod -aG docker cryo
+
 #################################################################
 # sodetlib Install
 #################################################################
