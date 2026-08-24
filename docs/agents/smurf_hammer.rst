@@ -50,10 +50,6 @@ To suppress the auto-starting monitor process::
      'instance-id': 'smurf-hammer',
      'arguments': ['--no-processes']},
 
-If managed by ``HostManager``, this agent should be run on the host (not in a
-Docker container) because it needs access to the Docker daemon to start and
-stop SMuRF containers during the hammer sequence.
-
 Description
 --------------
 
