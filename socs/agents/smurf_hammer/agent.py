@@ -157,13 +157,17 @@ class SmurfHammerAgent:
                 'data': {},
             }
 
+            pv_names = []
             for slot in self.slot_order:
                 epics_root = f'smurf_server_s{slot}'
-                pv_configured = f'{epics_root}:AMCc:SmurfApplication:SystemConfigured'
-                pv_configuring = f'{epics_root}:AMCc:SmurfApplication:ConfiguringInProgress'
+                pv_names.append(f'{epics_root}:AMCc:SmurfApplication:SystemConfigured')
+                pv_names.append(f'{epics_root}:AMCc:SmurfApplication:ConfiguringInProgress')
 
-                val_configured = epics.caget(pv_configured, timeout=5)
-                val_configuring = epics.caget(pv_configuring, timeout=5)
+            values = epics.caget_many(pv_names, timeout=5, connection_timeout=5)
+
+            for i, slot in enumerate(self.slot_order):
+                val_configured = values[2 * i]
+                val_configuring = values[2 * i + 1]
 
                 if val_configured is None:
                     configured = None
