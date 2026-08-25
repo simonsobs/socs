@@ -237,7 +237,7 @@ def main(args=None):
     agent.register_process('monitor',
                            p.monitor,
                            p._stop_monitor,
-                           blocking=False,
+                           blocking=True,
                            startup=startup)
 
     agent.register_task('hammer', p.hammer)
