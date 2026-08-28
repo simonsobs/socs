@@ -163,7 +163,11 @@ class SmurfHammerAgent:
                 pv_names.append(f'{epics_root}:AMCc:SmurfApplication:SystemConfigured')
                 pv_names.append(f'{epics_root}:AMCc:SmurfApplication:ConfiguringInProgress')
 
-            values = epics.caget_many(pv_names, timeout=5, connection_timeout=5)
+            try:
+                values = epics.caget_many(pv_names, timeout=5, connection_timeout=5)
+            except Exception as e:
+                self.log.error(f"EPICS query failed with: {e}")
+                values = [None] * len(pv_names)
 
             for i, slot in enumerate(self.slot_order):
                 val_configured = values[2 * i]
