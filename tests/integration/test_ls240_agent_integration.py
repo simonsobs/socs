@@ -35,6 +35,7 @@ initial_responses = {'*IDN?': 'LSCI,MODEL240,LSA240S,1.3',
 emulator = create_device_emulator(initial_responses, relay_type='serial')
 
 
+@pytest.mark.serial
 @pytest.mark.integtest
 def test_ls240_init_lakeshore(wait_for_crossbar, emulator, run_agent, client):
     resp = client.init_lakeshore()
@@ -44,6 +45,7 @@ def test_ls240_init_lakeshore(wait_for_crossbar, emulator, run_agent, client):
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.serial
 @pytest.mark.integtest
 def test_ls240_start_acq(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
@@ -88,6 +90,7 @@ def test_ls240_start_acq(wait_for_crossbar, emulator, run_agent, client):
                                        OpCode.SUCCEEDED.value]
 
 
+@pytest.mark.serial
 @pytest.mark.integtest
 def test_ls240_set_values(wait_for_crossbar, emulator, run_agent, client):
     client.init_lakeshore()
@@ -108,6 +111,7 @@ def test_ls240_set_values(wait_for_crossbar, emulator, run_agent, client):
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.serial
 @pytest.mark.integtest
 def test_ls240_upload_cal_curve(wait_for_crossbar, emulator, run_agent, client,
                                 tmp_path):

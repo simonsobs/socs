@@ -19,12 +19,7 @@ emulator = create_device_emulator({'*IDN?': 'LSCI,MODEL425,LSA425T,1.3'},
                                   relay_type='serial')
 
 
-@pytest.mark.integtest
-def test_testing(wait_for_crossbar):
-    """Just a quick test to make sure we can bring up crossbar."""
-    assert True
-
-
+@pytest.mark.serial
 @pytest.mark.integtest
 def test_ls425_init_lakeshore(wait_for_crossbar, emulator, run_agent, client):
     # init_lakeshore runs at startup
@@ -35,6 +30,7 @@ def test_ls425_init_lakeshore(wait_for_crossbar, emulator, run_agent, client):
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.serial
 @pytest.mark.integtest
 def test_ls425_auto_start_acq(wait_for_crossbar, emulator, run_agent_acq, client):
     # init_lakeshore runs at startup
@@ -53,6 +49,7 @@ def test_ls425_auto_start_acq(wait_for_crossbar, emulator, run_agent_acq, client
     assert resp.session['op_code'] == OpCode.RUNNING.value
 
 
+@pytest.mark.serial
 @pytest.mark.integtest
 def test_ls425_start_acq(wait_for_crossbar, emulator, run_agent, client):
     responses = {'*IDN?': 'LSCI,MODEL425,LSA425T,1.3',
@@ -79,6 +76,7 @@ def test_ls425_start_acq(wait_for_crossbar, emulator, run_agent, client):
     assert resp.session['op_code'] in [OpCode.STOPPING.value, OpCode.SUCCEEDED.value]
 
 
+@pytest.mark.serial
 @pytest.mark.integtest
 def test_ls425_operational_status(wait_for_crossbar, emulator, run_agent, client):
     responses = {'OPST?': '132'}
@@ -89,6 +87,7 @@ def test_ls425_operational_status(wait_for_crossbar, emulator, run_agent, client
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.serial
 @pytest.mark.integtest
 def test_ls425_zero_calibration(wait_for_crossbar, emulator, run_agent, client):
     responses = {'ZCLEAR': '',
@@ -100,6 +99,7 @@ def test_ls425_zero_calibration(wait_for_crossbar, emulator, run_agent, client):
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.serial
 @pytest.mark.integtest
 def test_ls425_any_command(wait_for_crossbar, emulator, run_agent, client):
     responses = {'UNIT 2': '',

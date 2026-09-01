@@ -21,7 +21,6 @@ Dependencies
 
 The pysmurf controller requires the following packages:
 
-    - `pysmurf <https://github.com/slaclab/pysmurf>`_
     - `sodetlib <https://github.com/simonsobs/sodetlib>`_
     - `sotodlib <https://github.com/simonsobs/sotodlib>`_
 
@@ -29,7 +28,6 @@ These can be installed via pip:
 
 .. code-block:: bash
 
-    $ python -m pip install 'pysmurf-slac @ git+https://github.com/slaclab/pysmurf.git@main'
     $ python -m pip install 'sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master'
     $ python -m pip install 'sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master'
 

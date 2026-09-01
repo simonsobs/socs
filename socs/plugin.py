@@ -8,6 +8,7 @@ agents = {
     'DS378Agent': {'module': 'socs.agents.devantech_dS378.agent', 'entry_point': 'main'},
     'FPGAAgent': {'module': 'socs.agents.holo_fpga.agent', 'entry_point': 'main'},
     'FlowmeterAgent': {'module': 'socs.agents.ifm_sbn246_flowmeter.agent', 'entry_point': 'main'},
+    'FLSAgent': {'module': 'socs.agents.fls.agent', 'entry_point': 'main'},
     'FTSAerotechAgent': {'module': 'socs.agents.fts_aerotech.agent', 'entry_point': 'main'},
     'GalilAxisAgent': {'module': 'socs.agents.galil_axis.agent', 'entry_point': 'main'},
     'GeneratorAgent': {'module': 'socs.agents.generator.agent', 'entry_point': 'main'},

@@ -36,6 +36,7 @@ def http_mock():
     return app.run("127.0.0.1", 5000)
 
 
+@pytest.mark.http
 @pytest.mark.integtest
 def test_ucsc_radiometer_acq(wait_for_crossbar, http_mock, run_agent, client):
     with http_mock:

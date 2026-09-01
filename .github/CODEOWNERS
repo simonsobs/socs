@@ -1,0 +1,6 @@
+# Cover dependabot generated PRs
+.github/** @BrianJKoopman
+/Dockerfile @BrianJKoopman
+/pyproject.toml @BrianJKoopman
+/requirements.txt @BrianJKoopman
+/requirements/* @BrianJKoopman

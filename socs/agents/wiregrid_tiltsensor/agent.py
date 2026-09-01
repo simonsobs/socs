@@ -114,7 +114,7 @@ class WiregridTiltSensorAgent:
                 try:
                     msg, angles = self.tiltsensor.get_angle()
                     self.log.debug(f'self.tiltsensor.get_angle(): {msg}')
-                except (ValueError, RuntimeError) as e:
+                except (ValueError, RuntimeError, TypeError) as e:
                     self.log.warn(e)
                     msg = 'Failed to get angle. -> Reconnect to the sensor'
                     self.log.warn(msg)

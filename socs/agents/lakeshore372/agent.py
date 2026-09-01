@@ -162,6 +162,36 @@ class LS372_Agent:
 
         return True, 'Lakeshore module initialized.'
 
+    def _wait_for_channel_change(self, active_channel, previous_channel):
+        pause_time = active_channel.get_pause()
+        self.log.debug("Pause time for {c}: {p}",
+                       c=active_channel.channel_num,
+                       p=pause_time)
+
+        dwell_time = active_channel.get_dwell()
+        self.log.debug("User set dwell_time_delay: {p}",
+                       p=self.dwell_time_delay)
+
+        # Check user set dwell time isn't too long
+        if self.dwell_time_delay > dwell_time:
+            self.log.warn("WARNING: User set dwell_time_delay of "
+                          + "{delay} s is larger than channel "
+                          + "dwell time of {chan_time} s. If "
+                          + "you are autoscanning this will "
+                          + "cause no data to be collected. "
+                          + "Reducing dwell time delay to {s} s.",
+                          delay=self.dwell_time_delay,
+                          chan_time=dwell_time,
+                          s=dwell_time - 1)
+            total_time = pause_time + dwell_time - 1
+        else:
+            total_time = pause_time + self.dwell_time_delay
+
+        for i in range(total_time):
+            self.log.debug("Sleeping for {t} more seconds...",
+                           t=total_time - i)
+            time.sleep(1)
+
     @ocs_agent.param('sample_heater', default=False, type=bool)
     @ocs_agent.param('run_once', default=False, type=bool)
     def acq(self, session, params=None):
@@ -222,48 +252,40 @@ class LS372_Agent:
                                       f"currently held by {self._lock.job}.")
                         continue
 
-                active_channel = self.module.get_active_channel()
+                try:
+                    # The 372 reports the last updated measurement repeatedly
+                    # during the "pause change time", this results in several
+                    # stale datapoints being recorded. To get around this we
+                    # query the pause time and skip data collection during it
+                    # if the channel has changed (as it would if autoscan is
+                    # enabled.)
+                    active_channel = self.module.get_active_channel()
 
-                # The 372 reports the last updated measurement repeatedly
-                # during the "pause change time", this results in several
-                # stale datapoints being recorded. To get around this we
-                # query the pause time and skip data collection during it
-                # if the channel has changed (as it would if autoscan is
-                # enabled.)
-                if previous_channel != active_channel:
-                    if previous_channel is not None:
-                        pause_time = active_channel.get_pause()
-                        self.log.debug("Pause time for {c}: {p}",
-                                       c=active_channel.channel_num,
-                                       p=pause_time)
+                    if previous_channel != active_channel:
+                        if previous_channel is not None:
+                            self._wait_for_channel_change(
+                                active_channel,
+                                previous_channel)
 
-                        dwell_time = active_channel.get_dwell()
-                        self.log.debug("User set dwell_time_delay: {p}",
-                                       p=self.dwell_time_delay)
+                        # Track the last channel we measured
+                        previous_channel = self.module.get_active_channel()
 
-                        # Check user set dwell time isn't too long
-                        if self.dwell_time_delay > dwell_time:
-                            self.log.warn("WARNING: User set dwell_time_delay of "
-                                          + "{delay} s is larger than channel "
-                                          + "dwell time of {chan_time} s. If "
-                                          + "you are autoscanning this will "
-                                          + "cause no data to be collected. "
-                                          + "Reducing dwell time delay to {s} s.",
-                                          delay=self.dwell_time_delay,
-                                          chan_time=dwell_time,
-                                          s=dwell_time - 1)
-                            total_time = pause_time + dwell_time - 1
-                        else:
-                            total_time = pause_time + self.dwell_time_delay
+                    # Collect both temperature and resistance values from each Channel
+                    channel_str = active_channel.name.replace(' ', '_')
+                    temp_reading = self.module.get_temp(unit='kelvin',
+                                                        chan=active_channel.channel_num)
+                    res_reading = self.module.get_temp(unit='ohms',
+                                                       chan=active_channel.channel_num)
+                    if session.degraded:
+                        self.log.info("Connection re-established.")
+                        session.degraded = False
+                except ConnectionError:
+                    self.log.error("Failed to get data from LS372. Check network connection.")
+                    session.degraded = True
+                    time.sleep(1)
+                    continue
 
-                        for i in range(total_time):
-                            self.log.debug("Sleeping for {t} more seconds...",
-                                           t=total_time - i)
-                            time.sleep(1)
-
-                    # Track the last channel we measured
-                    previous_channel = self.module.get_active_channel()
-
+                # For data feed
                 current_time = time.time()
                 data = {
                     'timestamp': current_time,
@@ -271,14 +293,6 @@ class LS372_Agent:
                     'data': {}
                 }
 
-                # Collect both temperature and resistance values from each Channel
-                channel_str = active_channel.name.replace(' ', '_')
-                temp_reading = self.module.get_temp(unit='kelvin',
-                                                    chan=active_channel.channel_num)
-                res_reading = self.module.get_temp(unit='ohms',
-                                                   chan=active_channel.channel_num)
-
-                # For data feed
                 data['data'][channel_str + '_T'] = temp_reading
                 data['data'][channel_str + '_R'] = res_reading
                 session.app.publish_to_feed('temperatures', data)
@@ -292,8 +306,18 @@ class LS372_Agent:
 
                 # Also queries control channel if enabled
                 if self.control_chan_enabled:
-                    temp = self.module.get_temp(unit='kelvin', chan=0)
-                    res = self.module.get_temp(unit='ohms', chan=0)
+                    try:
+                        temp = self.module.get_temp(unit='kelvin', chan=0)
+                        res = self.module.get_temp(unit='ohms', chan=0)
+                        if session.degraded:
+                            self.log.info("Connection re-established.")
+                            session.degraded = False
+                    except ConnectionError:
+                        self.log.error("Failed to get data from LS372. Check network connection.")
+                        session.degraded = True
+                        time.sleep(1)
+                        continue
+
                     cur_time = time.time()
                     data = {
                         'timestamp': time.time(),
@@ -315,7 +339,16 @@ class LS372_Agent:
                 if params.get("sample_heater", False):
                     # Sample Heater
                     heater = self.module.sample_heater
-                    hout = heater.get_sample_heater_output()
+                    try:
+                        hout = heater.get_sample_heater_output()
+                        if session.degraded:
+                            self.log.info("Connection re-established.")
+                            session.degraded = False
+                    except ConnectionError:
+                        self.log.error("Failed to get data from LS372. Check network connection.")
+                        session.degraded = True
+                        time.sleep(1)
+                        continue
 
                     current_time = time.time()
                     htr_data = {
