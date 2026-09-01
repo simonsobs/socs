@@ -94,7 +94,8 @@ def _build_message(get_result, names, time):
             continue
 
         message['data'][field_name] = oid_value
-        message['data'][field_name + "_name"] = names[int(field_name[-1])]
+        if 'outlet' in field_name:
+            message['data'][field_name + "_name"] = names[int(field_name[-1])]
         message['data'][field_name + "_description"] = oid_description
 
     return message
@@ -143,8 +144,9 @@ def update_cache(get_result, names, outlet_locked, timestamp):
 
         # Update OID Cache for session.data
         oid_cache[field_name] = {"status": oid_value}
-        oid_cache[field_name]["name"] = names[int(field_name[-1])]
-        oid_cache[field_name]["locked"] = outlet_locked[int(field_name[-1])]
+        if 'outlet' in field_name:
+            oid_cache[field_name]["name"] = names[int(field_name[-1])]
+            oid_cache[field_name]["locked"] = outlet_locked[int(field_name[-1])]
         oid_cache[field_name]["description"] = oid_description
         oid_cache['ibootbar_connection'] = {'last_attempt': time.time(),
                                             'connected': True}
@@ -233,11 +235,17 @@ class ibootbarAgent:
             {'outletStatus_0':
                 {'status': 1,
                  'name': 'Outlet-1',
+                 'locked': True,
                  'description': 'on'},
              'outletStatus_1':
                 {'status': 0,
                  'name': 'Outlet-2',
+                 'locked': False,
                  'description': 'off'},
+             ...
+             'currentLC1_0':
+                {'status': 0,
+                 'description': '0'},
              ...
              'ibootbar_connection':
                 {'last_attempt': 1656085022.680916,
@@ -271,6 +279,11 @@ class ibootbarAgent:
             for i in range(8):
                 get_list.append((self.ibootbar_type + '-MIB', 'outletStatus', i))
                 name_list.append((self.ibootbar_type + '-MIB', 'outletName', i))
+            get_list.append((self.ibootbar_type + '-MIB', 'currentLC1', 0))
+            get_list.append((self.ibootbar_type + '-MIB', 'currentLC2', 0))
+            if self.ibootbar_type == 'IBOOTPDU':
+                get_list.append((self.ibootbar_type + '-MIB', 'voltageLC1', 0))
+                get_list.append((self.ibootbar_type + '-MIB', 'voltageLC2', 0))
 
             # Issue SNMP GET commands
             get_result = yield self.snmp.get(get_list, self.version)
