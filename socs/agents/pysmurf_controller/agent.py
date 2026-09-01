@@ -486,7 +486,7 @@ class PysmurfController:
 
     @ocs_agent.param('bands', default=None)
     @ocs_agent.param('kwargs', default=None)
-    @ocs_agent.param('run_in_main_procsess', default=False)
+    @ocs_agent.param('run_in_main_process', default=False)
     def uxm_setup(self, session, params):
         """uxm_setup(bands=None, kwargs=None, run_in_main_process=False)
 
@@ -505,6 +505,12 @@ class PysmurfController:
         <https://simons1.princeton.edu/docs/sodetlib/operations/setup.html#first-time-setup>`_
         for more information on the sodetlib setup procedure and allowed
         keyword arguments.
+
+        Note that (possibly) in contrast to sodetlib's uxm_setup function, the
+        following defaults are passed through, by this function:
+
+        - ``modify_attens=False``
+
 
         Args
         -----
@@ -542,9 +548,15 @@ class PysmurfController:
                    'band_medians': List of median white noise for each band
                 }
             }
+
         """
-        if params['kwargs'] is None:
-            params['kwargs'] = {}
+        # Defaults -- overrides some undesireable behaviors of
+        # sodetlib/pysmurf.  If these are changed, update docstring.
+        kwargs = {
+            'modify_attens': False,
+        }
+        if params['kwargs'] is not None:
+            kwargs.update(params['kwargs'])
 
         with self.lock.acquire_timeout(0, job='uxm_setup') as acquired:
             if not acquired:
@@ -552,7 +564,7 @@ class PysmurfController:
 
             cfg = RunCfg(
                 func_name='run_uxm_setup',
-                kwargs={'bands': params['bands'], 'kwargs': params['kwargs']},
+                kwargs={'bands': params['bands'], 'kwargs': kwargs},
                 run_in_main_process=params['run_in_main_process'],
             )
             result = run_smurf_func(cfg)
