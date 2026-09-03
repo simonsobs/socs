@@ -78,6 +78,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/rtsp_camera
     agents/scpi_psu
     agents/smurf_crate_monitor
+    agents/smurf_hammer
     agents/smurf_timing_card
     agents/srs_cg635
     agents/stimulator_encoder
