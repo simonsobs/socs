@@ -107,7 +107,7 @@ One should follow the "quick-start" installation instructions here...
 
 https://github.com/sr-cdf/souk_readout_tools
 
-**Be sure to select branch dev/1.3.0 from the pull down menu on github before cloning this repository.**
+**These instructions have been tested with the default "main" branch, currently.**
 
 ### ukkid_controller agent
 
