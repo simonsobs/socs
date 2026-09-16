@@ -191,6 +191,8 @@ class UPSAgent:
 
         if self.disabled_oids:
             self.log.info('Disabling OIDs: {oids}', oids=self.disabled_oids)
+        else:
+            self.disabled_oids = []
 
         self.lastGet = 0
 
