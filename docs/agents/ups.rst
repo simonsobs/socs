@@ -28,16 +28,27 @@ using all of the available arguments::
 
       {'agent-class': 'UPSAgent',
        'instance-id': 'ups',
-       'arguments': [['--address', '10.10.10.50'],
-                     ['--port', 161],
-                     ['--mode', 'acq'],
-                     ['--snmp-version', 1],
-                     ['--restart-time', 60]]},
+       'arguments': ['--address', '10.10.10.50',
+                     '--port', 161,
+                     '--mode', 'acq',
+                     '--snmp-version', 1,
+                     '--restart-time', 60,
+                     '--disabled-oids', [
+                        'upsBatteryTemperature',
+                        'upsInputCurrent',
+                        'upsInputTruePower'],
+       ]},
 
 .. note::
     The ``--address`` argument should be the address of the UPS on the network.
     The ``--restart-time`` argument should be set to number of minutes before
     exiting the agent. Setting to 0 (default) will not exit the agent.
+
+.. note::
+    The example ``--disabled-oids`` are valid for the `Eaton 9PX 8K G2`_. You
+    should try not disabling any OIDs for your UPS at first.
+
+.. _Eaton 9PX 8K G2: https://github.com/simonsobs/socs/issues/1013
 
 Docker Compose
 ``````````````
