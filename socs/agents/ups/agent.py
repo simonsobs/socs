@@ -161,6 +161,9 @@ class UPSAgent:
         SNMP port to issue GETs to, default to 161.
     version : int
         SNMP version for communication (1, 2, or 3), defaults to 3.
+    disabled_oids : list[str]
+        A list of OIDs to disable. If a UPS does not support certain OIDs, they
+        should be disabled to allow other queries to go through properly.
 
     Attributes
     ----------
@@ -173,7 +176,7 @@ class UPSAgent:
         txaio logger object, created by the OCSAgent
     """
 
-    def __init__(self, agent, address, port=161, version=1, restart_time=0):
+    def __init__(self, agent, address, port=161, version=1, restart_time=0, disabled_oids=None):
         self.agent = agent
         self.is_streaming = False
         self.log = self.agent.log
@@ -184,6 +187,12 @@ class UPSAgent:
         self.snmp = SNMPTwister(address, port)
         self.connected = True
         self.restart = restart_time
+        self.disabled_oids = disabled_oids
+
+        if self.disabled_oids:
+            self.log.info('Disabling OIDs: {oids}', oids=self.disabled_oids)
+        else:
+            self.disabled_oids = []
 
         self.lastGet = 0
 
@@ -340,6 +349,9 @@ class UPSAgent:
                     'upsOutputSource']
 
             for oid in oids:
+                if oid in self.disabled_oids:
+                    self.log.debug("Skipping disabled OID: {oid}", oid=oid)
+                    continue
                 main_get_list.append(('UPS-MIB', oid, 0))
                 get_list.append(('UPS-MIB', oid, 0))
 
@@ -366,6 +378,9 @@ class UPSAgent:
             for i in range(inputs):
                 get_list = []
                 for oid in input_oids:
+                    if oid in self.disabled_oids:
+                        self.log.debug("Skipping disabled OID: {oid}", oid=oid)
+                        continue
                     main_get_list.append(('UPS-MIB', oid, i + 1))
                     get_list.append(('UPS-MIB', oid, i + 1))
                 input_get_result = yield self.snmp.get(get_list, self.version)
@@ -389,6 +404,9 @@ class UPSAgent:
             for i in range(outputs):
                 get_list = []
                 for oid in output_oids:
+                    if oid in self.disabled_oids:
+                        self.log.debug("Skipping disabled OID: {oid}", oid=oid)
+                        continue
                     main_get_list.append(('UPS-MIB', oid, i + 1))
                     get_list.append(('UPS-MIB', oid, i + 1))
                 output_get_result = yield self.snmp.get(get_list, self.version)
@@ -474,6 +492,8 @@ def add_agent_args(parser=None):
     pgroup.add_argument("--restart-time", default=0,
                         help="Number of minutes before restarting agent.")
     pgroup.add_argument("--mode", choices=['acq', 'test'])
+    pgroup.add_argument("--disabled-oids", default=None, nargs='*',
+                        help="List of OIDs to disable from queries.")
 
     return parser
 
@@ -497,7 +517,8 @@ def main(args=None):
                  address=args.address,
                  port=int(args.port),
                  version=int(args.snmp_version),
-                 restart_time=int(args.restart_time))
+                 restart_time=int(args.restart_time),
+                 disabled_oids=args.disabled_oids)
 
     agent.register_process("acq",
                            p.acq,
