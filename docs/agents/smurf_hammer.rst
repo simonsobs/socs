@@ -23,6 +23,25 @@ Dependencies
 The SMuRF Hammer Agent requires the following packages:
 
     - `sodetlib <https://github.com/simonsobs/sodetlib>`_
+    - `pyepics <https://github.com/pyepics/pyepics>`_
+
+pyepics requires EPICS to be installed on the host. The easiest
+way to do this is to follow the installation steps present in the
+`Dockerfile from smurf_docker <https://github.com/simonsobs/smurf_dockers/blob/v0.0.9/smurf_base/Dockerfile>`_
+To build that version of EPICS I found I needed to use the following
+compiler flags:
+
+.. code-block:: bash
+
+    -std=c++98 -fno-access-control
+
+Note that it is also necessary to set the EPICS environment variables
+from the Dockerfile in the host's .bashrc and also the following:
+
+.. code-block:: bash
+
+    EPICS_CA_ADDR_LIST=127.255.255.255
+    EPICS_CA_MAX_ARRAY_BYTES=80000000
 
 Additionally, ``socs`` should be installed with the ``pysmurf`` group:
 
