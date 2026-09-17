@@ -4,12 +4,13 @@ FROM simonsobs/so_smurf_base:rogue6-rc5
 # sodetlib Install
 #################################################################
 WORKDIR /
-RUN git clone --branch tpm/rogue6 --depth 1 https://github.com/simonsobs/sodetlib.git
+RUN git clone https://github.com/simonsobs/sodetlib.git
 # allow versioneer to determine sodetlib version safely
 USER cryo
 RUN git config --global --add safe.directory /sodetlib
 USER root
 WORKDIR /sodetlib
+RUN git checkout d856b917da0ef31eec389338e3837f4ebd97d8ce  # tpm/rogue6
 RUN pip3 install -U pip
 RUN pip3 install -e .
 RUN pip3 install -r requirements.txt
