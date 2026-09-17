@@ -8,7 +8,7 @@ SMuRF Hammer Agent
 
 The SMuRF Hammer Agent wraps sodetlib's ``jackhammer hammer`` CLI command as an
 OCS agent. It operates on the crate controlled by the SMuRF server to which it
-is deployed and accepts that usual ``jackhammer`` options. Slots for which the
+is deployed and accepts the usual ``jackhammer`` options. Slots for which the
 hammer fails will be reported in the session data. There is also a monitoring
 process to expose the configuration state of each slot.
 
@@ -23,9 +23,8 @@ Dependencies
 The SMuRF Hammer Agent requires the following packages:
 
     - `sodetlib <https://github.com/simonsobs/sodetlib>`_
-    - `pyepics <https://github.com/pyepics/pyepics>`_
 
-pyepics requires EPICS to be installed on the host. The easiest
+jackhammer requires EPICS to be installed on the host. The easiest
 way to do this is to follow the installation steps present in the
 `Dockerfile from smurf_docker <https://github.com/simonsobs/smurf_dockers/blob/v0.0.9/smurf_base/Dockerfile>`_
 To build that version of EPICS I found I needed to use the following
@@ -78,8 +77,7 @@ The agent exposes two operations:
     Resets and reconfigures the specified SMuRF slots by calling
     ``sodetlib.hammers.jackhammer.hammer()``. The sequence reboots the
     carriers, waits for EPICS connectivity, and runs pysmurf setup. Failures
-    at each stage are caught per-slot, and the remaining slots continue. The
-    task is protected by a ``TimeoutLock`` and requires privilege level 2.
+    at each stage are caught per-slot, and the remaining slots continue.
 
 **monitor** (process)
     Continuously polls each slot's EPICS registers using ``epics.caget()``

@@ -7,6 +7,7 @@ import epics
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
+from sodetlib.hammers.jackhammer import sys_config, hammer
 
 
 class SmurfHammerAgent:
@@ -26,12 +27,11 @@ class SmurfHammerAgent:
         self._monitor_running = False
 
         # get slots from config file
-        from sodetlib.hammers.jackhammer import sys_config
         self.slot_order = list(sys_config['slot_order'])
 
         self.agent.register_feed('system_configured',
                                  record=True,
-                                 buffer_time=0)
+                                 buffer_time=1)
 
     @ocs_agent.param('slots', default=None)
     @ocs_agent.param('no_reboot', default=False, type=bool)
@@ -74,36 +74,35 @@ class SmurfHammerAgent:
              'failed_slots': {3: 'EPICS connection timed out ...'},
              'error': None}
         """
-        from sodetlib.hammers.jackhammer import hammer
 
-        with self.lock.acquire_timeout(10, job='hammer') as acquired:
-            if not acquired:
-                return False, "Could not acquire lock"
+        session.data = {
+            'slots': params.get('slots'),
+            'reboot': not params['no_reboot'],
+            'succeeded_slots': [],
+            'failed_slots': {},
+            'error': None,
+            'timestamp': time.time(),
+        }
 
-            session.data = {
-                'slots': params.get('slots'),
-                'reboot': not params['no_reboot'],
-                'succeeded_slots': [],
-                'failed_slots': {},
-                'error': None,
-                'timestamp': time.time(),
-            }
+        try:
+            result = hammer(
+                slots=params['slots'],
+                no_reboot=params['no_reboot'],
+                no_dump=not params['dump_logs'],
+                skip_setup=params['skip_setup'],
+                dump_rogue=params['dump_rogue'],
+            )
+        except Exception as e:
+            self.log.error(
+                "Hammer failed: {error}\n{traceback}",
+                error=e,
+                traceback=traceback.format_exc()
+            )
+            session.data['error'] = f"{e}"
+            return False, f"Hammer failed: {e}"
 
-            try:
-                result = hammer(
-                    slots=params['slots'],
-                    no_reboot=params['no_reboot'],
-                    no_dump=not params['dump_logs'],
-                    skip_setup=params['skip_setup'],
-                    dump_rogue=params['dump_rogue'],
-                )
-            except Exception as e:
-                self.log.error("Hammer failed: {error}", error=e)
-                session.data['error'] = traceback.format_exc()
-                return False, f"Hammer failed: {e}"
-
-            session.data['succeeded_slots'] = result['succeeded']
-            session.data['failed_slots'] = result['failed']
+        session.data['succeeded_slots'] = result['succeeded']
+        session.data['failed_slots'] = result['failed']
 
         succeeded = result['succeeded']
         failed = result['failed']
@@ -111,7 +110,7 @@ class SmurfHammerAgent:
         if not succeeded:
             return False, f"All slots failed: {failed}"
         if failed:
-            return True, (
+            return False, (
                 f"Partial success: slots {succeeded} succeeded, "
                 f"slots {list(failed.keys())} failed"
             )
