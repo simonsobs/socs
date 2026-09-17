@@ -7,7 +7,7 @@ import epics
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
-from sodetlib.hammers.jackhammer import sys_config, hammer
+from sodetlib.hammers.jackhammer import hammer, sys_config
 
 
 class SmurfHammerAgent:
