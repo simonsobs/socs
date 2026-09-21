@@ -10,7 +10,7 @@ USER cryo
 RUN git config --global --add safe.directory /sodetlib
 USER root
 WORKDIR /sodetlib
-RUN git checkout d856b917da0ef31eec389338e3837f4ebd97d8ce  # tpm/rogue6
+RUN git checkout 4cad0395d4f2702037848a938052c1aa3  # tpm/rogue6
 RUN pip3 install -U pip
 RUN pip3 install -e .
 RUN pip3 install -r requirements.txt
