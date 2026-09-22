@@ -5,12 +5,12 @@ Installation
 
 Install and update with pip::
 
-    $ pip install -U socs
+    $ python -m pip install -U socs
 
 You may install optional dependencies by including one or more agent group
 names on installation, for example::
 
-    $ pip3 install -U socs[labjack,pfeiffer]
+    $ python -m pip install -U socs[labjack,pfeiffer]
 
 The different groups, and the agents they provide dependencies for are:
 
@@ -40,7 +40,7 @@ The different groups, and the agents they provide dependencies for are:
 If you would like to install all optional dependencies use the special varient
 "all"::
 
-    $ pip3 install -U socs[all]
+    $ python -m pip install -U socs[all]
 
 .. note::
     Some Agents have additional dependencies that cannot be installed with pip.
@@ -61,8 +61,8 @@ To install from source, clone the respository and install with pip::
 
     git clone https://github.com/simonsobs/socs.git
     cd socs/
-    pip3 install -r requirements.txt
-    pip3 install .
+    python -m pip install -r requirements.txt
+    python -m pip install .
 
 .. note::
     If you are expecting to develop socs code you should consider using

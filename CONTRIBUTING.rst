@@ -82,7 +82,7 @@ when submitting pull requests.
 You should set this up before making and committing your changes. To do so make
 sure the ``pre-commit`` package is installed (it is in ``requirements.txt``)::
 
-    $ pip install -r requirements.txt
+    $ python -m pip install -r requirements.txt
 
 Then run::
 

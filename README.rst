@@ -20,19 +20,19 @@ Installation
 
 Install and update with pip::
 
-    $ pip3 install -U socs
+    $ python -m pip install -U socs
 
 You may install optional dependencies by including one or more agent group
 names on installation, for example::
 
-    $ pip3 install -U socs[labjack,synacc]
+    $ python -m pip install -U socs[labjack,synacc]
 
 For a complete list of agent groups see the `Installation Documentation`_.
 
 If you would like to install all optional dependencies use the special varient
 "all"::
 
-    $ pip3 install -U socs[all]
+    $ python -m pip install -U socs[all]
 
 **Note:** Not all optional dependencies can be installed this way. See the
 `Installation Documentation`_ for more info on specific agent dependencies.
@@ -48,10 +48,10 @@ and install using pip:
 
 .. code-block:: bash
 
-    git clone https://github.com/simonsobs/socs.git
-    cd socs/
-    pip3 install -r requirements.txt
-    pip3 install .
+    $ git clone https://github.com/simonsobs/socs.git
+    $ cd socs/
+    $ python -m pip install -r requirements.txt
+    $ python -m pip install .
 
 Docker Images
 -------------
@@ -74,9 +74,9 @@ The SOCS documentation can be built using Sphinx. There is a separate
 ``requirements.txt`` file in the ``docs/`` directory to install Sphinx and any
 additional documentation dependencies::
 
-  cd docs/
-  pip3 install -r requirements.txt
-  make html
+    $ cd docs/
+    $ python -m pip install -r requirements.txt
+    $ make html
 
 You can then open ``docs/_build/html/index.html`` in your preferred web
 browser. You can also find a copy hosted on `Read the Docs`_.
@@ -88,8 +88,8 @@ Tests
 The tests for SOCS are run using pytest, and should be run from the
 ``tests/`` directory::
 
-  $ cd tests/
-  $ python3 -m pytest --cov
+    $ cd tests/
+    $ python -m pytest --cov
 
 For more details see `tests/README.rst <tests_>`_.
 
