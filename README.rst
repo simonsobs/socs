@@ -97,7 +97,7 @@ For more details see `tests/README.rst <tests_>`_.
 
 Contributing
 ------------
-For guidelines on how to contribute to OCS see `CONTRIBUTING.rst`_.
+For guidelines on how to contribute to SOCS see `CONTRIBUTING.rst`_.
 
 .. _CONTRIBUTING.rst: https://github.com/simonsobs/socs/blob/main/CONTRIBUTING.rst
 
