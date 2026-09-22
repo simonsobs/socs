@@ -6,6 +6,9 @@
 SMuRF Hammer Agent
 ==================
 
+.. image:: https://img.shields.io/badge/AI-assisted-orange
+   :alt: Agent written with AI assitance
+
 The SMuRF Hammer Agent wraps sodetlib's ``jackhammer hammer`` CLI command as an
 OCS agent. It operates on the crate controlled by the SMuRF server to which it
 is deployed and accepts the usual ``jackhammer`` options. Slots for which the
