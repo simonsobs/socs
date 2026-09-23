@@ -5,6 +5,10 @@
 ==================
 Synaccess Agent
 ==================
+
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Synaccess Agent interfaces with the power strip over ethernet to control
 different outlets as well as get their status.
 

@@ -5,6 +5,10 @@
 ========================
 Smurf Timing Card Agent
 ========================
+
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Smurf Timing Card Agent monitors several diagnostic EPICS registers from SLAC's
 timing software.
 

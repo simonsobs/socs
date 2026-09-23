@@ -6,6 +6,9 @@
 Vantage Pro2 Agent
 ==================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Davis Instruments Vantage Pro2 is a weather system + monitor used to
 acquire and readout weather data. The Vantage Pro2 monitor is connected to
 the laboratory computer via usb cable and data is sent though that connection.

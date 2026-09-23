@@ -6,6 +6,9 @@
 HWP Encoder BBB Agent
 =====================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The optical encoder signals of the CHWP are captured by Beaglebone Black (BBB)
 boards with the IRIG-B timing reference.
 This agent receives and decodes UDP packets from BBB and publishes the data

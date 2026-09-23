@@ -6,6 +6,9 @@
 FLS Agent
 =========
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Frequency-selectable Laser Source (FLS) is a calibrator that uses the
 Toptica TeraScan 1550 laser system, installed in a setup with attenuating
 prisms and mirrors. The calibrator is used for passband measurements with

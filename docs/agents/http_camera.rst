@@ -6,6 +6,9 @@
 HTTP Camera Agent
 ====================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The HTTP Camera Agent is an OCS Agent which grabs screenshots from cameras
 using HTTP requests and saves files to a directory.
 

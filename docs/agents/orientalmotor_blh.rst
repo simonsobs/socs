@@ -6,6 +6,9 @@
 Oriental Motor BLH Agent
 ========================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 This agent is designed to interface with Oriental Motor's BLH series motor controllers.
 Only controllers with a model number that includes '-KD' are compatible with this agent.
 The controller is identified as a serial port,

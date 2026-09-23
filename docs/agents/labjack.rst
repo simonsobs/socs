@@ -6,6 +6,9 @@
 LabJack Agent
 =============
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 LabJacks are generic devices for interfacing with different sensors, providing
 analog and digital inputs and outputs. They are then commanded and queried over
 Ethernet.
