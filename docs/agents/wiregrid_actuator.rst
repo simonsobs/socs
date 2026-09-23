@@ -6,6 +6,9 @@
 Wiregrid Actuator Agent
 =======================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Wiregrid Actuator Agent controls the linear actuator
 to insert or eject the wire-grid via a GALIL motor controller.
 It communicates with the controller via an ethernet.

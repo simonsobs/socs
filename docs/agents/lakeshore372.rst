@@ -6,6 +6,9 @@
 Lakeshore 372
 =============
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Lakeshore 372 Agent interfaces with the Lakeshore 372 (LS372) hardware to
 perform 100 mK and 1K thermometer readout and control heater output. Basic
 functionality to interface and control an LS372 is provided by the

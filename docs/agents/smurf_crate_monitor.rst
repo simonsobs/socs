@@ -6,6 +6,9 @@
 Smurf Crate Monitor Agent
 =========================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The SMuRF readout system uses Advanced Telecommunications Computing Architecture
 (ATCA) crates for powering and communicating between boards and the site networking
 and timing infrastructure. This Agent monitors the sensors in these ATCA crates.

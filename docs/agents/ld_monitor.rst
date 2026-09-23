@@ -4,6 +4,9 @@
 Lightning Detector Agent
 ========================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The lightning detector agent communicates with the Lightning Detector System at
 the site and parses the data to obtain approximate lightning strike distances
 and standardized alarm levels.

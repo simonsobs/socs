@@ -6,6 +6,9 @@
 Wiregrid Encoder Agent
 =======================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Wiregrid Encoder Agent records the wire-grid encoder outputs
 related to the rotational angle of the wire-grid.
 The encoder reader data is read by a BeagleBoneBlack

@@ -6,6 +6,9 @@
 Stimulator Encoder Agent
 ========================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The optical encoder signals of the stimulator are captured by Kria KR260
 boards with the PTP timing reference.
 This agent runs inside the KR260 to publish captured data to the crossbar.

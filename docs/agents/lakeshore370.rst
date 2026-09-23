@@ -6,6 +6,9 @@
 Lakeshore 370
 =============
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Lakeshore 370 (LS370) units are an older version of the Lakshore 372, used
 for 100 mK and 1K thermometer readout.  Basic functionality to interface and
 control an LS370 is provided by the

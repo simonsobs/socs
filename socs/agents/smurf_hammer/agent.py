@@ -1,4 +1,4 @@
-# Agent developed with AI assistance.
+# Code developed with AI assistance.
 
 import argparse
 import os

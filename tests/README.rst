@@ -4,7 +4,7 @@ Tests
 We use `pytest <https://docs.pytest.org/>`_ as the test runner for SOCS. To run
 all of the tests, from with in the ``socs/tests/`` directory, run pytest::
 
-    $ python3 -m pytest --cov
+    $ python -m pytest --cov
 
 This will run every test, both unit and integration tests. Integration tests
 depend on mocked up versions of the hardware the agents in question interface
@@ -19,11 +19,11 @@ to limit which tests run. Here are some examples.
 
 Run only one test file::
 
-    $ python3 -m pytest --cov socs agents/test_ls372_agent.py
+    $ python -m pytest --cov socs agents/test_ls372_agent.py
 
 Run tests based on test name(s)::
 
-    $ python3 -m pytest --cov -k 'test_ls372_init_lakeshore_task'
+    $ python -m pytest --cov -k 'test_ls372_init_lakeshore_task'
 
 Note that this will match to the beginning of the test names, so the above will
 match 'test_ls372_init_lakeshore_task' as well as
@@ -38,11 +38,11 @@ be used to select or deselect tests.
 
 To run only the unit tests run::
 
-    $ python3 -m pytest --cov -m 'not integtest'
+    $ python -m pytest --cov -m 'not integtest'
 
 To run only the integration tests::
 
-    $ python3 -m pytest --cov -m 'integtest'
+    $ python -m pytest --cov -m 'integtest'
 
 .. note::
     The integration tests depend on '--cov' being used, so all examples here
@@ -51,7 +51,7 @@ To run only the integration tests::
 
 You can view the available markers with::
 
-    $ python3 -m pytest --markers
+    $ python -m pytest --markers
     @pytest.mark.integtest: marks tests as integration test (deselect with '-m "not integtest"')
     @pytest.mark.spt3g: marks tests that depend on spt3g (deselect with '-m "not spt3g"')
 
@@ -63,7 +63,7 @@ with `Coverage.py <https://coverage.readthedocs.io/>`_.
 
 To obtain code coverage::
 
-    $ python3 -m pytest --cov --cov-report=html
+    $ python -m pytest --cov --cov-report=html
 
 You can then view the coverage report in the ``htmlcov/`` directory. Coverage
 for SOCS is also automatically reported to
@@ -84,5 +84,5 @@ ignored by the automatic test discovery in pytest.
 When running against hardware, call only the test you'd like to run. For
 instance, to test just the Lakeshore 372::
 
-  $ cd hardware/
-  $ python3 -m pytest test_ls372.py
+    $ cd hardware/
+    $ python -m pytest test_ls372.py

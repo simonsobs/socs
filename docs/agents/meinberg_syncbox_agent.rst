@@ -6,6 +6,9 @@
 Meinberg Syncbox Agent
 ======================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Meinberg Syncbox Agent is an OCS Agent which monitors the Meinberg syncbox, the
 Monitoring is performed via SNMP.
 

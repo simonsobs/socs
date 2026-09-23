@@ -6,6 +6,9 @@
 Tektronix AWG Agent
 ===================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 This agent uses Standard Commands for Programmable Instruments (SCPI)
 It works for many function generators, including the Tektronix3021c.
 It connects to the function generator over ethernet, and allows

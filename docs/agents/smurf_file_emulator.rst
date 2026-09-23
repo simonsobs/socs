@@ -6,6 +6,9 @@
 Smurf File Emulator
 ====================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Smurf File Emulator agent creates fake pysmurf and g3 files using the same
 directory structure that we're currently archiving on simons1. This is for
 DAQ end-to-end and bookbinder tests.
