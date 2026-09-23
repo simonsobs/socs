@@ -52,6 +52,7 @@ def check_resp_state(resp, opcode=OpCode.SUCCEEDED.value):
     assert resp.session["op_code"] == opcode
 
 
+@pytest.mark.http
 @pytest.mark.integtest
 def test_synacc_startup(wait_for_crossbar, http_mock, run_agent, client):
     with http_mock:
@@ -61,6 +62,7 @@ def test_synacc_startup(wait_for_crossbar, http_mock, run_agent, client):
         check_resp_state(resp, OpCode.RUNNING.value)
 
 
+@pytest.mark.http
 @pytest.mark.integtest
 def test_synacc_reboot(wait_for_crossbar, http_mock, run_agent, client):
     with http_mock:
@@ -68,6 +70,7 @@ def test_synacc_reboot(wait_for_crossbar, http_mock, run_agent, client):
         check_resp_state(resp)
 
 
+@pytest.mark.http
 @pytest.mark.integtest
 def test_synacc_set_outlet_on(wait_for_crossbar, http_mock, run_agent, client):
     with http_mock:
@@ -75,6 +78,7 @@ def test_synacc_set_outlet_on(wait_for_crossbar, http_mock, run_agent, client):
         check_resp_state(resp)
 
 
+@pytest.mark.http
 @pytest.mark.integtest
 def test_synacc_set_outlet_off(wait_for_crossbar, http_mock, run_agent, client):
     with http_mock:
@@ -82,6 +86,7 @@ def test_synacc_set_outlet_off(wait_for_crossbar, http_mock, run_agent, client):
         check_resp_state(resp)
 
 
+@pytest.mark.http
 @pytest.mark.integtest
 def test_synacc_set_all(wait_for_crossbar, http_mock, run_agent, client):
     with http_mock:

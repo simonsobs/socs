@@ -67,12 +67,7 @@ def wait_for_main(client):
         time.sleep(0.2)
 
 
-@pytest.mark.integtest
-def test_testing(wait_for_crossbar):
-    """Just a quick test to make sure we can bring up crossbar."""
-    assert True
-
-
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_get_state(wait_for_crossbar, pid_agent, client):
     resp = client.get_state()
@@ -81,6 +76,7 @@ def test_hwp_rotation_get_state(wait_for_crossbar, pid_agent, client):
     assert len(state.keys()) > 0
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_set_direction(wait_for_crossbar, pid_agent, client):
     wait_for_main(client)
@@ -97,6 +93,7 @@ def test_hwp_rotation_set_direction(wait_for_crossbar, pid_agent, client):
     assert data['direction'] == 1
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_set_pid(wait_for_crossbar, pid_agent, client):
     wait_for_main(client)
@@ -107,6 +104,7 @@ def test_hwp_rotation_set_pid(wait_for_crossbar, pid_agent, client):
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_tune_stop(wait_for_crossbar, pid_agent, client):
     wait_for_main(client)
@@ -117,6 +115,7 @@ def test_hwp_rotation_tune_stop(wait_for_crossbar, pid_agent, client):
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_set_scale(wait_for_crossbar, pid_agent, client):
     wait_for_main(client)
@@ -127,6 +126,7 @@ def test_hwp_rotation_set_scale(wait_for_crossbar, pid_agent, client):
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_declare_freq(wait_for_crossbar, pid_agent, client):
     wait_for_main(client)
@@ -137,6 +137,7 @@ def test_hwp_rotation_declare_freq(wait_for_crossbar, pid_agent, client):
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_tune_freq(wait_for_crossbar, pid_agent, client):
     wait_for_main(client)

@@ -2,7 +2,7 @@
 # A container setup with an installation of socs.
 
 # Use the ocs image as a base
-FROM simonsobs/ocs:v0.12.0-1-g97e2f0e
+FROM simonsobs/ocs:v0.12.1
 
 # Set up the cryo/smurf user and group so this can run on smurf-servers
 # See link for how all other smurf-containers are set up:
@@ -13,6 +13,10 @@ RUN useradd -d /home/cryo -M cryo -u 1000 && \
     usermod -g smurf cryo && \
     mkdir /home/cryo && \
     chown cryo:smurf /home/cryo
+
+# Set up user/group for suprsync agent database permission compatability
+RUN groupadd group1002 -g 1002 && \
+    useradd -m user1010 -u 1010 -g 1002
 
 # Install packages
 # suprsync agent - rsync

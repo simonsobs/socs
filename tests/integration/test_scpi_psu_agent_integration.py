@@ -39,12 +39,14 @@ def check_resp_success(resp):
     assert resp.session["op_code"] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_scpi_psu_init_psu(wait_for_crossbar, gpib_emu, run_agent, client):
     resp = client.init()
     check_resp_success(resp)
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_scpi_psu_init_psu_acq_mode(wait_for_crossbar, gpib_emu, run_agent_acq, client):
     # Sleep to give time for the agent to initialize and enter the acq process
@@ -53,6 +55,7 @@ def test_scpi_psu_init_psu_acq_mode(wait_for_crossbar, gpib_emu, run_agent_acq, 
     check_resp_success(resp)
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_scpi_psu_set_output(wait_for_crossbar, gpib_emu, run_agent, client):
     client.init()
@@ -63,6 +66,7 @@ def test_scpi_psu_set_output(wait_for_crossbar, gpib_emu, run_agent, client):
     check_resp_success(resp)
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_scpi_psu_set_current(wait_for_crossbar, gpib_emu, run_agent, client):
     client.init()
@@ -70,6 +74,7 @@ def test_scpi_psu_set_current(wait_for_crossbar, gpib_emu, run_agent, client):
     check_resp_success(resp)
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_scpi_psu_set_voltage(wait_for_crossbar, gpib_emu, run_agent, client):
     client.init()
@@ -77,6 +82,7 @@ def test_scpi_psu_set_voltage(wait_for_crossbar, gpib_emu, run_agent, client):
     check_resp_success(resp)
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_scpi_psu_monitor_output(wait_for_crossbar, gpib_emu, run_agent, client):
     responses = {

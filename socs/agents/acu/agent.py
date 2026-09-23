@@ -7,7 +7,6 @@ from enum import Enum
 import numpy as np
 import ocs
 import soaculib as aculib
-import soaculib.status_keys as status_keys
 import twisted.web.client as tclient
 import yaml
 from autobahn.twisted.util import sleep as dsleep
@@ -20,7 +19,7 @@ from twisted.internet.defer import DeferredList, inlineCallbacks
 
 from socs.agents.acu import avoidance
 from socs.agents.acu import drivers as sh
-from socs.agents.acu import exercisor, hvac, hwp_iface
+from socs.agents.acu import exercisor, hvac, hwp_iface, status_keys
 
 #: The number of free ProgramTrack positions, when stack is empty.
 FULL_STACK = 10000
@@ -121,13 +120,20 @@ MONITOR_STRUCTURE = [
     ('ACU_emergency', 'ACU_emergency', None, None),
     ('ACU_corotator', 'corotator', None, None),
     ('ACU_shutter', 'shutter', None, None),
-    ('ACU_tilt', 'tilt_slow', 'changed', 0.5),
+
+    # Deprecated: tilt_slow and tilt_fast. Removed after soaculib 0.4.3
+    ('ACU_tilt_old', 'tilt_slow', 'changed', 0.5),
     (None, 'tilt_fast', None, None),
+
+    # New tiltmeter dataset.
+    ('ACU_tilt', 'tiltmeter', 'tick', None),
+
     ('ACU_sun_avoidance', 'sun_avoidance', None, 1.),
     ('ACU_corrections', 'corrections', None, 10.),
     ('ACU_hvac_data', 'hvac_data', None, 10.),
     ('ACU_hvac_ctrl', 'hvac_ctrl', None, None),
     ('ACU_hvac_faults', 'hvac_faults', None, None),
+    ('ACU_power_dist', 'power_distribution', None, 10),
 ]
 
 
@@ -202,6 +208,7 @@ class ACUAgent:
             'shutter': _dsets.get('shutter_dataset'),
             'pointing': _dsets.get('pointing_dataset'),
             'hvac': _dsets.get('hvac_dataset'),
+            'power_dist': _dsets.get('power_dist_dataset'),
         }
         for k, v in self.datasets.items():
             if v is not None:
@@ -275,6 +282,12 @@ class ACUAgent:
             self.hwp_rules.enabled = False
         startup_monitor_hwp = (startup and self.hwp_rules.configured)
 
+        # HVAC Manager
+        self.hvm = None
+
+        # Power Distribution field names (alias -> status key)
+        self.power_dist_aliases = self.acu_config.get('power_distribution_aliases')
+
         # Exercise plan.
         self.exercise_plan = self.acu_config.get('exercise_plan')
 
@@ -287,7 +300,7 @@ class ACUAgent:
         tclient._HTTP11ClientFactory.noisy = False
 
         self.acu_control = aculib.AcuControl(
-            acu_config, backend=RetwistedHttpBackend(persistent=False))
+            acu_config, backend=RetwistedHttpBackend(persistent=True))
         self.acu_read = aculib.AcuControl(
             acu_config, backend=TwistedHttpBackend(persistent=True), readonly=True)
 
@@ -452,6 +465,14 @@ class ACUAgent:
                                 self.set_shutter,
                                 blocking=False,
                                 aborter=self._simple_task_abort)
+        if self.datasets['hvac']:
+            agent.register_task('set_hvac',
+                                self.set_hvac,
+                                blocking=False)
+        if self.datasets['power_dist']:
+            agent.register_task('set_power',
+                                self.set_power,
+                                blocking=False)
         agent.register_task('update_hwp',
                             self.update_hwp,
                             blocking=False)
@@ -556,6 +577,11 @@ class ACUAgent:
               "Booster EL Housing on": false,
               ...
             },
+            "PowerDistribution": {
+              "Lights 42 Process Space": false,
+              "Lights 44 Electronic Space": false,
+              ...
+            },
             "StatusResponseRate": 19.237531827325963,
             "PlatformType": "satp",
             "IgnoredAxes": [],
@@ -564,6 +590,18 @@ class ACUAgent:
                 180,
                 40
               ]
+            },
+            "PowerDistributionAliases": {
+               "Smurf Crates": {
+                 "Smurf Crate 1": "Q2009 DAPS 4",
+                 "Smurf Crate 2": "Q2011 DAPS 6",
+                 ...
+               },
+               "Lights": {
+                 "Lights Main": "Main Lighting",
+                 "Lights Process": "Lights 42 Process Space",
+                 ...
+               },
             },
             "DefaultScanParams": {
               "az_speed": 2.0,
@@ -592,6 +630,7 @@ class ACUAgent:
                         'StatusResponseRate': 0.,
                         'IgnoredAxes': self.ignore_axes,
                         'NamedPositions': self.named_positions,
+                        'PowerDistributionAliases': self.power_dist_aliases,
                         'connected': False}
         not_data_keys = list(session.data.keys())
 
@@ -700,6 +739,7 @@ class ACUAgent:
                     ('shutter', 'StatusShutter'),
                     ('pointing', 'CmdPointingCorrection'),
                     ('hvac', 'Hvac'),
+                    ('power_dist', 'PowerDistribution'),
             ]:
                 if self.datasets[short]:
                     output[collection] = (
@@ -712,7 +752,7 @@ class ACUAgent:
         session.data.update((yield _get_status()))
         qual_pacer = Pacemaker(.1)
 
-        hvm = hvac.HvacManager()
+        self.hvm = hvac.HvacManager()
 
         last_resp_rate = None
         data_blocks = {}
@@ -778,13 +818,13 @@ class ACUAgent:
                 if k in not_data_keys:
                     continue
 
-                if k == 'Hvac' and len(v) > 0 and (hvm.grouped_fields is None):
+                if k == 'Hvac' and len(v) > 0 and (self.hvm.grouped_fields is None):
                     # Runs when first HVAC data are received. These
                     # fields aren't listed explicitly in soaculib so
                     # they're analyzed here.
-                    hvm.parse_fields(v)
-                    assert len(hvm.grouped_fields['unclassified']) == 0
-                    self.status_field_map.update(hvm.get_block_info())
+                    self.hvm.parse_fields(v)
+                    assert len(self.hvm.grouped_fields['unclassified']) == 0
+                    self.status_field_map.update(self.hvm.get_block_info())
 
                 for (key, value) in v.items():
                     try:
@@ -911,7 +951,7 @@ class ACUAgent:
                 new_blocks[block_name] = {
                     'timestamp': self.data['status']['summary']['ctime'],
                     'block_name': block_name,
-                    'data': self.data['status'][data_key],
+                    'data': {} | self.data['status'][data_key],
                 }
 
             # Only keep blocks that have changed or have new data.
@@ -1290,7 +1330,7 @@ class ACUAgent:
         # (SATP), but in "cold" cases where siren needs to sound, this
         # can be as long as 12 seconds.  For the LAT, can take an
         # extra couple seconds if there were faults to clear.
-        MAX_STARTUP_TIME = 15.
+        MAX_STARTUP_TIME = 20.
 
         # How long does it take to sound the warning horn?  It takes
         # 10 seconds.  Don't wait longer than this.
@@ -1300,6 +1340,12 @@ class ACUAgent:
         # brakes released, except in case that warning horn is
         # sounding?  3 seconds should be enough.
         WARNING_HORN_DETECT = 3.
+
+        # How long after mode change should we wait before signaling
+        # to caller that we have passed the "init" stage?  Without
+        # this check, we can get charged double warning horn penalty
+        # for 2-axis moves on LAT.
+        MIN_INIT_PHASE = 1.
 
         # Velocity to assume when computing maximum time a move should
         # take (to bail out in unforeseen circumstances).  There are
@@ -1486,6 +1532,11 @@ class ACUAgent:
                     elif time_since_start > WARNING_HORN_DETECT and not warning_horn:
                         warning_horn = True
                         self.log.info('Warning horn is probably sounding.')
+                    elif state_feedback['state'] == 'init' and time_since_start > MIN_INIT_PHASE:
+                        # This is to prevent az and el warning horns
+                        # from each incurring a 10s delay...
+                        state_feedback['state'] = 'wait'
+
                 elif still and motion_expected:
                     self.log.error(f'Motion did not start within {MAX_STARTUP_TIME:.1f} s.')
                     state = state.FAIL
@@ -2384,7 +2435,7 @@ class ACUAgent:
                                     'data': scan_params_bundle})
 
         ret_val = (yield self._run_track(
-            session=session, point_gen=g, step_time=step_time,
+            session=session, point_gen=g, step_time=step_time, stop_accel=az_accel,
             track_axes=track_axes, point_batch_count=point_batch_count,
             free_form=free_form, unabort_failure=(params['scan_type'] in [2, 3])))
 
@@ -2396,7 +2447,7 @@ class ACUAgent:
         return ret_val
 
     @inlineCallbacks
-    def _run_track(self, session, point_gen, step_time, track_axes=['az'],
+    def _run_track(self, session, point_gen, step_time, stop_accel=0.5, track_axes=['az'],
                    point_batch_count=None, free_form=False, unabort_failure=False):
         """Run a ProgramTrack track scan, with points provided by a
         generator.
@@ -2408,6 +2459,10 @@ class ACUAgent:
             This is used to guarantee that points are uploaded
             sufficiently in advance for the servo unit to process
             them.
+          stop_accel: float acceleration value used to generate the
+            stop PointTrack for the scan. If _run_track is called from
+            generate_scan, stop_accel is equal to the az_accel for the
+            scan. By default the stop will be generated with stop_accel=0.5.
           track_axes: list of strings indicating which axes ('az',
             'el') should be put in ProgramTrack mode.  Axes not
             included here will not have their mode changed.
@@ -2433,22 +2488,13 @@ class ACUAgent:
         # more than that to allow for rounding when we are setting the
         # refill threshold.
         MIN_STACK_POP = 6  # points
+        MAX_ALLOWABLE_FREE_POSITIONS = FULL_STACK - MIN_STACK_POP
 
         # Minimum amount of time (seconds), in advance, to populate
         # the trajectory.  In cases where step_time is short, this
         # creates a longer track window to survive agent outages.
         # (The cost is that stopping a scan may take a little longer.)
         MIN_STACK_ADVANCE_TIME = 3.
-
-        # Minimum nuber of points to keep in the stack.
-        _pbc = max(MIN_STACK_POP, MIN_STACK_ADVANCE_TIME / step_time)
-        if point_batch_count is None or _pbc > point_batch_count:
-            point_batch_count = _pbc
-
-        STACK_REFILL_THRESHOLD = \
-            FULL_STACK - point_batch_count - LOOP_STEP / step_time
-        STACK_TARGET = \
-            FULL_STACK - point_batch_count * 2 - LOOP_STEP / step_time
 
         # Special error bits to watch here
         PTRACK_FAULT_KEYS = [
@@ -2501,7 +2547,7 @@ class ACUAgent:
             #   a few seconds and clear the stack.
             mode = 'go'
 
-            lines = []
+            point_prov = sh.PointProvider(point_gen)
             last_mode = None
             last_upload_az = None
             start_time = time.time()
@@ -2509,6 +2555,7 @@ class ACUAgent:
             faults = {}
             got_points_in = False
             first_upload_time = None
+            last_uploaded_timestamp = 0
             wait_stop_timeout = None
 
             prog_track_err = False
@@ -2529,7 +2576,7 @@ class ACUAgent:
                     or (got_progtrack and free_positions < FULL_STACK)
 
                 if last_mode != mode:
-                    self.log.info(f'scan mode={mode}, line_buffer={len(lines)}, track_free={free_positions}')
+                    self.log.info(f'scan mode={mode}, line_buffer={len(point_prov)}, track_free={free_positions}')
                     last_mode = mode
 
                 for k in PTRACK_FAULT_KEYS:
@@ -2560,42 +2607,38 @@ class ACUAgent:
                     if session.status == 'stopping' and mode not in ['stop', 'abort']:
                         mode = 'stop'
                         stop_message = 'User-requested stop.'
-                        lines = []
+                        point_prov.stop(free_form, stop_accel)
 
                 if mode == 'abort':
-                    lines = []
+                    point_prov.abort()
 
                 # Is it time to upload more lines?
-                if free_positions >= STACK_REFILL_THRESHOLD:
-                    new_line_target = max(int(free_positions - STACK_TARGET), 1)
+                # This happens when the current time of uploaded points is less
+                # than the MIN_STACK_ADVANCE_TIME.
+                # (Meaning we have less than the minimum time worth of points uploaded).
+                # Or if the total number of free positions is higher than the MAX_ALLOWABLE_FREE_POSITIONS.
+                # (Meaning we haven't uploaded at least the minimum number of points)
+                if ((last_uploaded_timestamp - time.time()) <= MIN_STACK_ADVANCE_TIME) \
+                   or (free_positions > MAX_ALLOWABLE_FREE_POSITIONS):
 
-                    # Make sure that you get one more line than you
-                    # need (len(lines) > new_line_target), so that
-                    # after "grabbing the minimum batch", below, there
-                    # is still >= 1 line left.  The lines-is-empty
-                    # check is used to decide we're done.
-                    while mode == 'go' and (len(lines) <= new_line_target or lines[-1].group_flag != 0):
-                        try:
-                            lines.extend(next(point_gen))
-                        except StopIteration:
-                            mode = 'stop'
-                            stop_message = 'Stop due to end of the planned track.'
+                    upload_lines = []
+                    # Grab points from point_prov until our last point is at least
+                    # 2 * MIN_STACK_ADVANCE_TIME seconds from now.
+                    # If that isn't enough points to have MIN_STACK_POP_TIME amount of points uploaded,
+                    # Keep grabbing points until we have enough.
+                    while not point_prov.is_empty() and (len(upload_lines) == 0
+                                                         or upload_lines[-1].timestamp - time.time() < (2 * MIN_STACK_ADVANCE_TIME)
+                                                         or (free_positions - len(upload_lines) > MAX_ALLOWABLE_FREE_POSITIONS)):
 
-                        if len(lines) > FULL_STACK / 2:
-                            # This is used to raise an error and
-                            # abort; but it is more likely to occur in
-                            # the case where bad group_flag handling,
-                            # above, is messing things up.  So we just
-                            # break out and let some points get
-                            # processed.
-                            break
-
-                    # Grab the minimum batch
-                    upload_lines, lines = lines[:new_line_target], lines[new_line_target:]
+                        upload_lines.append(point_prov.pop())
 
                     # If the last line has a "group" flag, keep transferring lines.
-                    while len(lines) and len(upload_lines) and upload_lines[-1].group_flag != 0:
-                        upload_lines.append(lines.pop(0))
+                    while not point_prov.is_empty() and len(upload_lines) and upload_lines[-1].group_flag != 0:
+                        upload_lines.append(point_prov.pop())
+
+                    if point_prov.is_empty() and mode == 'go':
+                        mode = 'stop'
+                        stop_message = 'Stop due to end of the planned track.'
 
                     if len(upload_lines):
                         # Discard the group flag and upload all.
@@ -2618,7 +2661,10 @@ class ACUAgent:
                             first_upload_time = time.time()
                         last_upload_az = upload_lines[-1].az
 
-                if len(lines) == 0 and free_positions >= FULL_STACK - 1:
+                        # Track the timestamp of the current upload.
+                        last_uploaded_timestamp = upload_lines[-1].timestamp
+
+                if point_prov.is_empty() and free_positions >= FULL_STACK - 1:
                     if mode == 'stop':
                         if wait_stop_timeout is None:
                             self.log.info('Stack is empty; waiting for settling...')
@@ -3561,6 +3607,143 @@ class ACUAgent:
             return False, message
 
         return False, 'Aborted in state {state}'
+
+    @ocs_agent.param('targets')
+    @ocs_agent.param('values')
+    @inlineCallbacks
+    def set_hvac(self, session, params):
+        """set_hvac(targets, values)
+
+        **Task** Set HVAC control parameters.
+
+        Args:
+          targets: a list of targets.
+          values: a list of values (or a single value, which will be broadcast).
+
+        Here are examples of target names:
+        - "Fan Yoke Traverse A Electronic Space"
+        - "Booster Yoke Traverse M Servo Space"
+        - "Heater" (to turn heater on/off)
+        - "Temperature Yoke Traverse" (the heater setpoint)
+
+        If a value matches "on" or "off", then it will be treated as a
+        request to turn the device on or off.  Otherwise, the value
+        will be interpreted as a "setpoint" specification (i.e. a fan
+        speed (%), or a thermostat temperature (degrees C).
+
+        """
+        error_count = 0
+        sup_targets = params['targets']
+        sup_values = params['values']
+        if not isinstance(sup_values, list):
+            sup_values = [sup_values] * len(sup_targets)
+        if len(sup_values) != len(sup_targets):
+            return False, 'Number of values not compatible with number of targets.'
+
+        # Expand any broadcast targets to specific targets.
+        tvs = []
+        for st, sv in zip(sup_targets, sup_values):
+            for broadcast_targets, group_key in [
+                    (['fans', 'fan'], 'fan_on'),
+                    (['boosters', 'booster'], 'booster_on'),
+                    (['heaters', 'heater'], 'heater_on'),
+            ]:
+                if st.lower() in broadcast_targets:
+                    self.log.info(f'Expanding target "{st}".')
+                    for t in self.hvm.grouped_fields[group_key]:
+                        tvs.append((t.cmd_base, sv))
+                    break
+            else:
+                tvs.append((st, sv))
+
+        # Construct the commands
+        cmds = []
+        for t, v in tvs:
+            c = self.hvm.get_command(t, v)
+            if c.get('error'):
+                self.log.warn(c['error'])
+                error_count += 1
+            else:
+                cmds.append(c)
+
+        # Execute the commands.
+        for c in cmds:
+            msg = f'Issuing: {c["command"]}' + (
+                '' if c.get('parameter') is None else
+                f' with parameter {c["parameter"]}')
+            self.log.info(msg)
+            result = (yield self.acu_control.Command(**c))
+            self.log.info(f'result: {result}')
+            # error check ...
+            yield dsleep(0.2)
+
+        if error_count > 0:
+            return False, "Some requests not processed."
+        return True, "All requests processed successfully."
+
+    @ocs_agent.param('targets')
+    @ocs_agent.param('values')
+    @inlineCallbacks
+    def set_power(self, session, params):
+        """set_power(targets, values)
+
+        **Task** Set Power Distribution (breakers).
+
+        Args:
+          targets: a list of targets.
+          values: a list of values (or a single value, which will be broadcast).
+
+        The targets can be drawn from the ACU internal names, e.g.:
+
+            - "Q2011 DAPS 6"
+            - "Main Lighting"
+
+        Or from aliases defined in the agent config, e.g.:
+
+            - "Smurf Crate 2"
+            - "Lights Main"
+
+        Values must either "on" or "off".
+
+        """
+        error_count = 0
+        sup_targets = params['targets']
+        sup_values = params['values']
+        if not isinstance(sup_values, list):
+            sup_values = [sup_values] * len(sup_targets)
+        if len(sup_values) != len(sup_targets):
+            return False, 'Number of values not compatible with number of targets.'
+
+        # Convert any aliaes to ACU names.
+        tvs = []
+        for st, sv in zip(sup_targets, sup_values):
+            assert sv.lower() in ['on', 'off']
+            for _, submap in self.power_dist_aliases.items():
+                if st in submap:
+                    tvs.append((submap[st], sv))
+                    break
+            else:
+                tvs.append((st, sv))
+
+        # Construct the commands
+        cmds = [{'identifier': 'Datasets.PowerDistribution',
+                'command': f'Switch {v} {t}'}
+                for t, v in tvs]
+
+        # Execute the commands.
+        for c in cmds:
+            msg = f'Issuing: {c["command"]}' + (
+                '' if c.get('parameter') is None else
+                f' with parameter {c["parameter"]}')
+            self.log.info(msg)
+            result = (yield self.acu_control.Command(**c))
+            self.log.info(f'result: {result}')
+            # error check ...
+            yield dsleep(0.2)
+
+        if error_count > 0:
+            return False, "Some requests not processed / not successful."
+        return True, "All requests processed successfully."
 
     @ocs_agent.param('starting_index', type=int, default=0)
     def exercise(self, session, params):

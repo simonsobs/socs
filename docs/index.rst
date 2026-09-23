@@ -42,6 +42,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/cryomech_cpa
     agents/devantech_dS378
     agents/fts_agent
+    agents/fls
     agents/generator
     agents/galil_axis
     agents/hi6200

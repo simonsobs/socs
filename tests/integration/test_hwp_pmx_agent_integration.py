@@ -23,12 +23,7 @@ responses = {
 kikusui_emu = create_device_emulator(responses, relay_type='tcp', port=5025)
 
 
-@pytest.mark.integtest
-def test_testing(wait_for_crossbar):
-    """Just a quick test to make sure we can bring up crossbar."""
-    assert True
-
-
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_main(wait_for_crossbar, kikusui_emu, run_agent, client):
     client.main.stop()
@@ -38,6 +33,7 @@ def test_hwp_rotation_main(wait_for_crossbar, kikusui_emu, run_agent, client):
     assert resp.session['success']
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_set_off(wait_for_crossbar, kikusui_emu, run_agent, client):
     kikusui_emu.update_responses({
@@ -50,6 +46,7 @@ def test_hwp_rotation_set_off(wait_for_crossbar, kikusui_emu, run_agent, client)
     assert resp.session['success']
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_set_on(wait_for_crossbar, kikusui_emu, run_agent, client):
     kikusui_emu.update_responses({
@@ -62,6 +59,7 @@ def test_hwp_rotation_set_on(wait_for_crossbar, kikusui_emu, run_agent, client):
     assert resp.session['success']
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_set_i(wait_for_crossbar, kikusui_emu, run_agent, client):
     kikusui_emu.update_responses(
@@ -74,6 +72,7 @@ def test_hwp_rotation_set_i(wait_for_crossbar, kikusui_emu, run_agent, client):
     assert resp.session['success']
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_set_i_lim(wait_for_crossbar, kikusui_emu, run_agent, client):
     kikusui_emu.update_responses(
@@ -85,6 +84,7 @@ def test_hwp_rotation_set_i_lim(wait_for_crossbar, kikusui_emu, run_agent, clien
     assert resp.session['success']
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_set_v(wait_for_crossbar, kikusui_emu, run_agent, client):
     kikusui_emu.update_responses(
@@ -96,6 +96,7 @@ def test_hwp_rotation_set_v(wait_for_crossbar, kikusui_emu, run_agent, client):
     assert resp.session['success']
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_set_v_lim(wait_for_crossbar, kikusui_emu, run_agent, client):
     kikusui_emu.update_responses({
@@ -109,6 +110,7 @@ def test_hwp_rotation_set_v_lim(wait_for_crossbar, kikusui_emu, run_agent, clien
     assert resp.session['success']
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_use_ext(wait_for_crossbar, kikusui_emu, run_agent, client):
     kikusui_emu.update_responses({
@@ -122,6 +124,7 @@ def test_hwp_rotation_use_ext(wait_for_crossbar, kikusui_emu, run_agent, client)
     assert resp.session['success']
 
 
+@pytest.mark.hwp
 @pytest.mark.integtest
 def test_hwp_rotation_ign_ext(wait_for_crossbar, kikusui_emu, run_agent, client):
     kikusui_emu.update_responses({

@@ -46,6 +46,7 @@ client = create_client_fixture('pfeifferturboA')
 emulator = create_device_emulator({}, relay_type='tcp')
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_pfeiffer_tc400_init_lakeshore(wait_for_crossbar, emulator, run_agent,
                                        client):
@@ -56,6 +57,7 @@ def test_pfeiffer_tc400_init_lakeshore(wait_for_crossbar, emulator, run_agent,
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_pfeiffer_tc400_turn_turbo_on(wait_for_crossbar, emulator, run_agent,
                                       client):
@@ -73,6 +75,7 @@ def test_pfeiffer_tc400_turn_turbo_on(wait_for_crossbar, emulator, run_agent,
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_pfeiffer_tc400_turn_turbo_on_not_ready(wait_for_crossbar, emulator,
                                                 run_agent, client):
@@ -88,6 +91,7 @@ def test_pfeiffer_tc400_turn_turbo_on_not_ready(wait_for_crossbar, emulator,
     assert resp.session['op_code'] == OpCode.FAILED.value
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_pfeiffer_tc400_turn_turbo_on_failed(wait_for_crossbar, emulator,
                                              run_agent, client):
@@ -103,6 +107,7 @@ def test_pfeiffer_tc400_turn_turbo_on_failed(wait_for_crossbar, emulator,
     assert resp.session['op_code'] == OpCode.FAILED.value
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_pfeiffer_tc400_turn_turbo_off(wait_for_crossbar, emulator, run_agent,
                                        client):
@@ -118,6 +123,7 @@ def test_pfeiffer_tc400_turn_turbo_off(wait_for_crossbar, emulator, run_agent,
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_pfeiffer_tc400_turn_turbo_off_failed(wait_for_crossbar, emulator,
                                               run_agent, client):
@@ -133,6 +139,7 @@ def test_pfeiffer_tc400_turn_turbo_off_failed(wait_for_crossbar, emulator,
     assert resp.session['op_code'] == OpCode.FAILED.value
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_pfeiffer_tc400_turn_turbo_off_failed_unready(wait_for_crossbar,
                                                       emulator, run_agent,
@@ -149,6 +156,7 @@ def test_pfeiffer_tc400_turn_turbo_off_failed_unready(wait_for_crossbar,
     assert resp.session['op_code'] == OpCode.FAILED.value
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_pfeiffer_tc400_acknowledge_turbo_errors(wait_for_crossbar, emulator,
                                                  run_agent, client):
@@ -163,6 +171,7 @@ def test_pfeiffer_tc400_acknowledge_turbo_errors(wait_for_crossbar, emulator,
     assert resp.session['op_code'] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_pfeiffer_tc400_acq(wait_for_crossbar, emulator, run_agent, client):
     client.init()

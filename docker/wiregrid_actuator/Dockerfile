@@ -21,7 +21,8 @@ RUN apt-get update \
  && mv -v /tmp/gcapsd/usr/sbin/gcapsd /usr/sbin/ \
  && rm -r /tmp/gcapsd/ \
  && python3 -m pip install --upgrade pip \
- && python3 -m pip install https://www.galil.com/sw/pub/python/gclib-1.0.0-py3-none-any.whl \
+ && python3 -m pip install https://www.galil.com/sw/pub/python/gclib-1.0.1-py3-none-any.whl \
+ && cp /usr/share/gclib/examples/python/* .\
  && python3 -c "import gclib; print(f'gclib location: {gclib.__file__}');"
 
 COPY ./ ./

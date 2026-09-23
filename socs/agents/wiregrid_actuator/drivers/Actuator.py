@@ -99,7 +99,7 @@ class Actuator:
             msg = 'Actuator:_connect() : ERROR!: Failed to '\
                   'initialize the connection to the actuator controller.'
             raise RuntimeError(msg)
-        self.g.GOpen('{}'.format(self.ip_address))
+        self.g.GOpen('{} --direct'.format(self.ip_address))
         # Connection check
         print('Actuator:_connect(): {}'.format(self.g.GInfo()))
         status = self._check_motortype()

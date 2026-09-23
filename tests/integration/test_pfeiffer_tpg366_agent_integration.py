@@ -33,6 +33,7 @@ def check_resp_success(resp):
     assert resp.session["op_code"] == OpCode.SUCCEEDED.value
 
 
+@pytest.mark.tcp
 @pytest.mark.integtest
 def test_pfeiffer_tpg366_acq(wait_for_crossbar, emu, run_agent, client):
     resp = client.acq.start(test_mode=True)
