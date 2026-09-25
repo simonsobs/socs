@@ -1,3 +1,10 @@
+# isort: off
+# Select asyncioreactor before agent starts the reactor
+import asyncio
+from twisted.internet import asyncioreactor
+asyncioreactor.install(asyncio.get_event_loop())
+# isort: on
+
 import argparse
 import time
 from os import environ
@@ -8,7 +15,7 @@ from ocs import ocs_agent, site_config
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks
 
-from socs.snmp import SNMPTwister
+from socs.snmp import SNMPInterface
 
 # For logging
 txaio.use_twisted()
@@ -33,7 +40,7 @@ class MeinbergSNMP:
         Address of the M1000.
     port : int
         SNMP port to issue GETs to.
-    snmp : socs.snmp.SNMPTwister
+    snmp : socs.snmp.SNMPInterface
         snmp handler from SOCS
     mib_timings : list
         list of dicts describing the SNMP OIDs to check, and at which
@@ -52,7 +59,7 @@ class MeinbergSNMP:
         self.address = address
         self.port = port
         self.version = version
-        self.snmp = SNMPTwister(address, port)
+        self.snmp = SNMPInterface(address, port)
 
         # OIDs and how often to query them
         self.mib_timings = [{"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
@@ -99,7 +106,7 @@ class MeinbergSNMP:
         Returns
         -------
         get_list : list
-            List of OID tuples to be passed to an SNMPTwister object in a GET call.
+            List of OID tuples to be passed to an SNMPInterface object in a GET call.
 
         """
         get_list = []

@@ -1,3 +1,10 @@
+# isort: off
+# Select asyncioreactor before agent starts the reactor
+import asyncio
+from twisted.internet import asyncioreactor
+asyncioreactor.install(asyncio.get_event_loop())
+# isort: on
+
 import argparse
 import os
 import time
@@ -8,7 +15,7 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 from twisted.internet.defer import inlineCallbacks
 
-from socs.snmp import SNMPTwister
+from socs.snmp import SNMPInterface
 
 # For logging
 txaio.use_twisted()
@@ -203,7 +210,7 @@ class ibootbarAgent:
         self.ibootbar_type = ibootbar_type
         self.version = version
         self.address = address
-        self.snmp = SNMPTwister(address, port)
+        self.snmp = SNMPInterface(address, port)
         self.connected = True
 
         self.lastGet = 0
