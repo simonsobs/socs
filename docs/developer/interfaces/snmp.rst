@@ -9,8 +9,8 @@ Protocol (SNMP). SNMP is a standard protocol for collecting and organizing
 information about devices on the network.
 
 SNMP support is provided through the python module `pysnmp`_. pysnmp supports
-twisted as an I/O framework, which integrates nicely with OCS/SOCS. SOCS makes this
-twisted interface for SNMP available via the SNMPTwister class.
+asyncio as an I/O framework. SOCS makes this interface for SNMP available via
+the SNMPInterface class.
 
 .. _pysnmp: http://snmplabs.com/pysnmp/contents.html
 
@@ -57,29 +57,25 @@ An example which converted the MBG-SNMP-LTNG-MIB .mib file::
 
 Examples
 --------
-A standalone example of using ``SNMPTwister`` to interact with a device::
+A standalone example of using ``SNMPInterface`` to interact with a device::
 
-    from twisted.internet import reactor
-    from twisted.internet.defer import inlineCallbacks
-    from socs.snmp import SNMPTwister
+    import asyncio
+    from socs.snmp import SNMPInterface
 
     # Setup communication with M1000
-    snmp = SNMPTwister('10.10.10.186', 161)
+    snmp = SNMPInterface('10.10.10.176', 161)
 
     # Define OIDs to query
     get_list = [('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
                 ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 1),
                 ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 2)]
 
-    @inlineCallbacks
-    def query_snmp():
-        x = yield snmp.get(get_list)
+    async def query_snmp():
+        x = await snmp.get(get_list, 1)
         print(x)
-        reactor.stop()
 
-    # Call query_snmp within the reactor
-    reactor.callWhenRunning(query_snmp)
-    reactor.run()
+    # Call query_snmp within the event loop
+    asyncio.run(query_snmp())
 
 This will return something like the following::
 
@@ -92,9 +88,9 @@ examples.
 API
 ---
 
-If you are developing an SNMP monitoring agent, the SNMP + twisted
+If you are developing an SNMP monitoring agent, the SNMP
 interface is available for use and detailed here:
 
-.. autoclass:: socs.snmp.SNMPTwister
+.. autoclass:: socs.snmp.SNMPInterface
     :members:
     :noindex:
