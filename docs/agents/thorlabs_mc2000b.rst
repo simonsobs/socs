@@ -6,6 +6,9 @@
 Thorlabs MC2000B Agent
 ========================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Thorlabs MC2000B Agent is an OCS agent which helps monitor input and output
 frequencies of the Thorlabs chopper, and sends commands to set the frequency of the chopper,
 as well as other features such as the bladetype and reference modes of the device.

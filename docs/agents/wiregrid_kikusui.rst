@@ -6,6 +6,9 @@
 Wiregrid Kikusui Agent
 =======================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Wiregrid Kikusui Agent controls the wire-grid rotation.
 The KIKUSUI is a power supply and
 it is controlled via serial-to-ethernet converter.

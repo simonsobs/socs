@@ -6,6 +6,9 @@
 Pysmurf Controller
 ====================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Pysmurf Controller OCS agent provides an interface to run pysmurf and
 sodetlib control scripts on the smurf-server through an OCS client.
 

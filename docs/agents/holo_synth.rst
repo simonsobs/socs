@@ -6,6 +6,9 @@
 Holography Synthesizer Agent
 =============================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Holography Synthesizer Agent is provided with OCS to help demonstrate and
 debug issues with the holography synthesizers. The synthesizers provide a
 signal at a desired frequency for holography measurements. This agent will

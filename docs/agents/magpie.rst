@@ -6,6 +6,9 @@
 Magpie Agent
 ===============
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The magpie is an incredibly intelligent bird, with a decent ability to mimic
 other bird calls, though not as good as `the superb lyrebird
 <https://www.youtube.com/watch?v=mSB71jNq-yQ>`_. In the context of OCS, the job

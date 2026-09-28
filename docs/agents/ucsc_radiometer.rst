@@ -6,6 +6,9 @@
 UCSC Radiometer Agent
 =====================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The UCSC Radiometer Agent monitors the PWV through the UCSC Radiometer web server.
 
 .. argparse::

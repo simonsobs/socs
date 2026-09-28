@@ -5,6 +5,10 @@
 ============================
 Stimulator Thermometer Agent
 ============================
+
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 This is an OCS agent to acquire temperature data of the stimulator.
 
 .. argparse::

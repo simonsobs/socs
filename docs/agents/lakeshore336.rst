@@ -6,6 +6,9 @@
 Lakeshore 336
 =============
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Lakeshore 336 Agent interfaces with the Lakeshore 336 (LS336) hardware to
 perform temperature monitoring and servoing on the LS336's four channels.
 This setup is currently primarily being used for controlling a cold load.

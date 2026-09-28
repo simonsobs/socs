@@ -6,6 +6,9 @@
 Cryomech CPA Agent
 ==================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Cryomech CPA compressor is a commonly used compressor model for the
 pulse tubes within SO. The CPA Agent interfaces with the compressor over
 ethernet to monitor the health of the unit, including stats such as Helium

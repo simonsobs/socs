@@ -6,6 +6,9 @@
 HWP Gripper Agent
 =================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 Agent which controls and monitor's the HWP's set of three LEY32C-30 linear actuators.
 
 .. argparse::

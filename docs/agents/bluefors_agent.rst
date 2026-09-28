@@ -6,6 +6,9 @@
 Bluefors Agent
 ==============
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Bluefors Agent is an OCS Agent which tracks the contents of the Bluefors
 logs and passes them to the live monitor and to the OCS housekeeping data
 aggregator.

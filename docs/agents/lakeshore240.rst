@@ -6,6 +6,9 @@
 Lakeshore 240
 =============
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Lakeshore 240 is a 4-lead meausrement device used for readout of ROXes and
 Diodes at 1K and above.
 

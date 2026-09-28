@@ -6,6 +6,9 @@
 UPS Agent
 ====================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The UPS Agent is an OCS Agent which monitors various UPS models via SNMP.
 
 .. argparse::

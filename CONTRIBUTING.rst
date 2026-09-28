@@ -5,32 +5,8 @@ Contributing to SOCS
 Branches
 --------
 
-Following release v0.4.1, socs now has a single ``main`` branch, which replaces
-the old ``master`` and ``develop`` branch model, described below. ``main``
-functions like ``develop`` used to, and is the new default branch. Feature
-branches should be based off of the latest ``main``, and pull requests should
-be made into ``main``.
-
-Users that want a "stable" installation of socs should install from PyPI and/or
-use tagged Docker images corresponding to the targeted release, i.e. v0.4.1.
-Installing from source (i.e. from the ``main`` branch) comes with the usual
-caveats of potential instability.
-
-Old Branching Model
-```````````````````
-    **Note:** This branching model is no longer used, but the description is
-    left here while we transition to the new one.
-
-There are two long-lived branches in SOCS, ``master`` and ``develop``.
-``master`` should be considered stable, and will only move forward on official
-releases. ``develop`` may be unstable, and is where all development should take
-place. This branching model follows the one in the OCS_ repository.
-
-What this means for you, the contributor, is that you should base your feature
-branches off of the latest ``develop`` branch, and pull request them into
-``develop``. Detailed steps below.
-
-.. _OCS: https://github.com/simonsobs/ocs
+socs has a single ``main`` branch Feature branches should be based off of the
+latest ``main``, and pull requests should be made into ``main``.
 
 Pull Requests
 -------------
@@ -46,31 +22,60 @@ submit a PR from there. See the `GitHub documentation
 <https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork>`_
 for details on how to do so.
 
-Releases
---------
+PR Template
+```````````
+When you open a PR, a template will automatically populate the text field. Please
+fill out all sections of the template.
 
-    **Note:** Releases will be issued by core maintainers of SOCS.
+Force Pushes
+````````````
+Please refrain from force pushing a rebase onto a branch after marking your PR
+ready for review, unless requested to do so by a maintainer. Doing so makes it
+difficult for the reviewers to follow changes you have made in response to the
+review.
 
-If you are trying to issue a release of SOCS you should follow these steps:
+AI Usage
+````````
+Use of AI tools is allowed under the Simons Observatory `AI Governance
+Policy`_, provided the usage is disclosed. Before submitting a PR with AI
+generated code, please make sure to read the AI policy and follow the
+guidelines within.
 
-1. Test the release properly builds and publishes with a pre-release. You can
-   do so by pushing a tag matching ``v0.*.*a*``, ``v0.*.*b*``, or
-   ``v0.*.*rc*``.
-2. If no new commits are made following a pre-release, remove the pre-release
-   tag. Multiple tags may prevent the official release from publishing properly.
-3. Use the GitHub releases interface to draft a new release, creating a new tag
-   targeting the ``main`` branch.
-4. Write the release notes. Make use of the "Generate release notes" feature.
-   It is helpful to organize these into sections as done in past releases. Be
-   sure to highlight any breaking changes and include instructions for any
-   actions users must take when updating.
+As a way of marking which Agents were developed with and without AI assistance,
+the Agent reference pages should contain one of two badges:
+
+.. image:: https://img.shields.io/badge/AI-assisted-orange
+   :alt: Agent written with AI assistance
+
+::
+
+    .. image:: https://img.shields.io/badge/AI-assisted-orange
+       :alt: Agent written with AI assistance
+
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
+::
+
+    .. image:: https://img.shields.io/badge/AI-free-green
+       :alt: Agent written without AI assistance
+
+You must also include the following comment at the top of every source file
+that was generated using AI::
+
+    # Code developed with AI assistance.
+
+Most agents in this repo pre-date AI tools, and so contain AI free code, to the
+best of the maintainer's knowledge.
+
+.. _AI Governance Policy: https://simonsobservatory.org/wp-content/uploads/2026/08/Digital_Assets_Policy_20260811.pdf
 
 Development Guide
 -----------------
 
 Contributors should follow the recommendations made in the `SO Developer Guide`_.
 
-.. _SO Developer Guide: https://simons1.princeton.edu/docs/so_dev_guide/
+.. _SO Developer Guide: https://simonsobs-dev-guide.readthedocs.io/en/latest/
 
 pre-commit
 ``````````
@@ -82,7 +87,7 @@ when submitting pull requests.
 You should set this up before making and committing your changes. To do so make
 sure the ``pre-commit`` package is installed (it is in ``requirements.txt``)::
 
-    $ pip install -r requirements.txt
+    $ python -m pip install -r requirements.txt
 
 Then run::
 
@@ -91,8 +96,8 @@ Then run::
 This will install the configured git hooks and any dependencies. Now, whenever
 you commit the hooks will run. If there are issues you will see them in the
 output. This may automatically make changes to your staged files.  These
-changes will be unstaged and need to be reviewed (typically with a ``git
-diff``), restaged, and recommitted. For example, if you have trailing
+changes will be unstaged and need to be reviewed (typically with a ``git diff``),
+restaged, and recommitted. For example, if you have trailing
 whitespace on a line, pre-commit will prevent the commit and remove the
 whitespace. You will then stage the new changes with another ``git add <file>``
 and then re-run the commit. Here is the expected git output for this example:
@@ -133,3 +138,27 @@ and then re-run the commit. Here is the expected git output for this example:
     $ git commit
 
 .. _pre-commit: https://pre-commit.com/
+
+For Repo Maintainers
+--------------------
+
+The following sections are only relevant for repo maintainers.
+
+Releases
+````````
+
+    **Note:** Releases will be issued by core maintainers of SOCS.
+
+If you are trying to issue a release of SOCS you should follow these steps:
+
+1. Test the release properly builds and publishes with a pre-release. You can
+   do so by pushing a tag matching ``v0.*.*a*``, ``v0.*.*b*``, or
+   ``v0.*.*rc*``.
+2. If no new commits are made following a pre-release, remove the pre-release
+   tag. Multiple tags may prevent the official release from publishing properly.
+3. Use the GitHub releases interface to draft a new release, creating a new tag
+   targeting the ``main`` branch.
+4. Write the release notes. Make use of the "Generate release notes" feature.
+   It is helpful to organize these into sections as done in past releases. Be
+   sure to highlight any breaking changes and include instructions for any
+   actions users must take when updating.

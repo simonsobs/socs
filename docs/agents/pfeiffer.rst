@@ -7,6 +7,9 @@
 Pfeiffer TPG 366 Agent
 ======================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Pfeiffer TPG 366 Controller is a six channel pressure gauge monitor. The
 Pfeiffer agent communicates with the Controller module, and reads out
 pressure readingss from the six different channels.

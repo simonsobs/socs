@@ -6,6 +6,9 @@
 Lakeshore 425
 ======================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Lakeshore Model 425 gaussmeter is a device which measure the magnetic field by hall sensor.
 This agent is used to measure the magnetic field from the superconducting magnetic bearing of the CHWP rotation mechanism and to monitoring the status of floating and rotating CHWP.
 

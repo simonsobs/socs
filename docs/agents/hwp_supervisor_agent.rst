@@ -6,6 +6,9 @@
 HWP Supervisor Agent
 =====================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The HWP supervisor agent monitors and can issue commands to hwp subsystems,
 and monitors data from other agents on the network that may be relevant to HWP
 operation.  Session data from the supervisor agent's ``monitor`` task can be

@@ -6,6 +6,9 @@
 Galil Axis Agent
 ================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Galil Axis Agent provides motion control and telemetry readout for
 the Galil DMC motor controller. When used in the Simons Observatory SAT Coupling
 Optics system, the agent controls four axes—two linear and two angular—that move

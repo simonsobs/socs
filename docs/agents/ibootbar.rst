@@ -6,6 +6,9 @@
 iBootbar Agent
 ====================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The iBootbar Agent is an OCS Agent which monitors and sends commands to the dataprobe
 iBoot PDU or iBoot Bar. iBoot Bar is an older device. Monitoring and commanding is
 performed via SNMP.

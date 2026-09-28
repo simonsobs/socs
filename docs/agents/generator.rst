@@ -6,6 +6,9 @@
 Generator Agent
 ====================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Generator Agent is an OCS Agent which monitors on-site generators via Modbus.
 
 .. argparse::

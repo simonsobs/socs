@@ -6,6 +6,9 @@
 HWP PID Agent
 =============
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 .. argparse::
     :filename: ../socs/agents/hwp_pid/agent.py
     :func: make_parser

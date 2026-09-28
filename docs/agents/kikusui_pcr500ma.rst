@@ -6,6 +6,9 @@
 KIKUSUI PCR500MA Agent
 ========================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 This agent is designed to interface with KIKUSUI's PCR500MA AC power supply.
 
 

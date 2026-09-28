@@ -6,6 +6,9 @@
 Pysmurf Monitor
 ====================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The pysmurf_monitor agent listens to the UDP messages that the
 *pysmurf publisher* sends and acts on them. It will add newly registered filse
 to the pysmurf_files database, and send session info to pysmurf-controller

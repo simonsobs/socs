@@ -6,6 +6,9 @@
 SRS CG635 Agent
 ====================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The SRS CG635 Agent is an OCS Agent which retrieves data from the SRS CG635 clock
 via a Prologix GPIB interface.
 

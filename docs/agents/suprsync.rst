@@ -6,6 +6,9 @@
 SupRsync Agent
 ==============
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The SupRsync agent keeps a local directory synced with a remote server.
 It continuously copies over new files to its destination, verifying the copy
 by checking the md5sum and deleting the local files after a specified amount

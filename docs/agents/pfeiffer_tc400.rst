@@ -6,6 +6,9 @@
 Pfeiffer TC 400 Agent
 =====================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Pfeiffer TC 400 Agent is an OCS Agent which controls the
 Pfeiffer TC 400 electronic drive unit, which control the turbos used
 for the bluefors DR. The communcation is done over serial, and should be

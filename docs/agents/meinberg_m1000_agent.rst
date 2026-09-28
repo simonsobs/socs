@@ -4,6 +4,9 @@
 Meinberg M1000 Agent
 ====================
 
+.. image:: https://img.shields.io/badge/AI-free-green
+   :alt: Agent written without AI assistance
+
 The Meinberg M1000 Agent is an OCS Agent which monitors the Meinberg M1000, the
 main source of timing for the SO site. Monitoring is performed via SNMP.
 
