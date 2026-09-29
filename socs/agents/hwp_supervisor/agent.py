@@ -1032,6 +1032,31 @@ class ControlAction:
 
 
 @contextmanager
+def ensure_spin_stop(hwp_state: HWPState, log: txaio.ILogger) -> Generator[None, None, None]:
+    """
+    Check HWP is stopped. This will check hwp_pid parameters
+
+    Args
+    ------
+    hwp_state : HWPState
+        HWP state object.
+    log: logger
+        Log object
+    """
+    now = time.time()
+    hwp_state.update_spin_state()
+
+    if hwp_state.is_spinning is None:
+        tdiff = now - hwp_state.pid_last_updated
+        raise RuntimeError(f"HWP PID state has not been updated in {tdiff} sec")
+
+    if hwp_state.is_spinning:
+        raise RuntimeError("HWP is spinning. Rotation safery check is failed.")
+
+    log.info("Rotation safety checks have passed")
+
+
+@contextmanager
 def ensure_grip_safety(hwp_state: HWPState, log: txaio.ILogger) -> Generator[None, None, None]:
     """
     Run required checks for gripper safety. This will check ACU parameters such
@@ -1043,8 +1068,8 @@ def ensure_grip_safety(hwp_state: HWPState, log: txaio.ILogger) -> Generator[Non
     hwp_state : HWPState
         HWP state object. In addition to reading ACU state vars, this will
         set the `request_block_ACU_motion` flag if `use_acu_blocking` is set.
-    timeout: float
-        Timeout for waiting for the ACU blockout before an error will be raised.
+    log: logger
+        Log object
     """
     now = time.time()
 
@@ -1442,8 +1467,9 @@ class ControlStateMachine:
                     else:
                         kw = {'outlet': outlet, 'on': outlet_state}
                     self.run_and_validate(clients.driver_iboot.set_outlet, kwargs=kw)
-                for outlet in state.outlets:
-                    set_outlet_state(outlet, False)
+                with ensure_spin_stop(hwp_state, self.log):
+                    for outlet in state.outlets:
+                        set_outlet_state(outlet, False)
                 self.action.set_state(ControlState.Done(success=True))
                 return
 
@@ -1454,12 +1480,13 @@ class ControlStateMachine:
                     else:
                         kw = {'outlet': outlet, 'on': outlet_state}
                     self.run_and_validate(clients.gripper_iboot.set_outlet, kwargs=kw)
-                for outlet in state.outlets:
-                    set_outlet_state(outlet, False)
-                    time.sleep(2)
-                for outlet in state.outlets:
-                    set_outlet_state(outlet, True)
-                    time.sleep(2)
+                with ensure_spin_stop(hwp_state, self.log):
+                    for outlet in state.outlets:
+                        set_outlet_state(outlet, False)
+                        time.sleep(2)
+                    for outlet in state.outlets:
+                        set_outlet_state(outlet, True)
+                        time.sleep(2)
                 self.action.set_state(ControlState.Done(success=True))
                 return
 
