@@ -8,7 +8,7 @@ from pysnmp.hlapi.v3arch.asyncio import (CommunityData, ContextData, ObjectIdent
 from socs import mibs
 
 # For logging
-txaio.use_asyncio()
+txaio.use_twisted()
 
 
 MIB_SOURCE = f"{os.path.dirname(mibs.__file__)}"
