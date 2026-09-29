@@ -1051,7 +1051,7 @@ def ensure_spin_stop(hwp_state: HWPState, log: txaio.ILogger) -> Generator[None,
         raise RuntimeError(f"HWP PID state has not been updated in {tdiff} sec")
 
     if hwp_state.is_spinning:
-        raise RuntimeError("HWP is spinning. Rotation safery check is failed.")
+        raise RuntimeError("HWP is spinning. Rotation safety check is failed.")
 
     log.info("Rotation safety checks have passed")
 
@@ -1907,7 +1907,7 @@ class HWPSupervisor:
             requested = state.__class__.__name__
             cur = self.control_state_machine.action
             cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
+            return False, f"{requested} is rejected as {cur_state_type} is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -1954,7 +1954,7 @@ class HWPSupervisor:
             requested = state.__class__.__name__
             cur = self.control_state_machine.action
             cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
+            return False, f"{requested} is rejected as {cur_state_type} is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2029,7 +2029,7 @@ class HWPSupervisor:
             requested = state.__class__.__name__
             cur = self.control_state_machine.action
             cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
+            return False, f"{requested} is rejected as {cur_state_type} is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2087,7 +2087,7 @@ class HWPSupervisor:
             requested = state.__class__.__name__
             cur = self.control_state_machine.action
             cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
+            return False, f"{requested} is rejected as {cur_state_type} is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2116,7 +2116,7 @@ class HWPSupervisor:
             requested = state.__class__.__name__
             cur = self.control_state_machine.action
             cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
+            return False, f"{requested} is rejected as {cur_state_type} is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2145,7 +2145,7 @@ class HWPSupervisor:
             requested = state.__class__.__name__
             cur = self.control_state_machine.action
             cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
+            return False, f"{requested} is rejected as {cur_state_type} is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2204,7 +2204,7 @@ class HWPSupervisor:
             requested = state.__class__.__name__
             cur = self.control_state_machine.action
             cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
+            return False, f"{requested} is rejected as {cur_state_type} is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2237,7 +2237,7 @@ class HWPSupervisor:
             requested = state.__class__.__name__
             cur = self.control_state_machine.action
             cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
+            return False, f"{requested} is rejected as {cur_state_type} is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2270,7 +2270,7 @@ class HWPSupervisor:
             requested = state.__class__.__name__
             cur = self.control_state_machine.action
             cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
+            return False, f"{requested} is rejected as {cur_state_type} is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
