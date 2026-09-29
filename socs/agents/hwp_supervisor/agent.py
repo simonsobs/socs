@@ -1497,14 +1497,19 @@ class ControlStateMachine:
         finally:
             self.lock.release()
 
-    def request_new_action(self, state):
+    def request_new_action(self, state, abort=False):
         """
         Requests that a new action is started with a given state.
-        If an action is already in progress, it will be aborted.
+        If an action is already in progress, it will be aborted only if
+        `abort` is True. Otherwise the request is rejected and None
+        is returned.
         """
         with self.lock:
             if not self.action.completed:
-                self.action.set_state(ControlState.Abort())
+                if not abort:
+                    return None
+                else:
+                    self.action.set_state(ControlState.Abort())
             if len(self.action_history) > self.max_action_history_count:
                 self.action_history.pop(0)
             self.action = ControlAction(state)
@@ -1898,6 +1903,11 @@ class HWPSupervisor:
             direction=d
         )
         action = self.control_state_machine.request_new_action(state)
+        if action is None:
+            requested = state.__class__.__name__
+            cur = self.control_state_machine.action
+            cur_state_type = cur.cur_state_info.state_type
+            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -1940,6 +1950,11 @@ class HWPSupervisor:
             direction=d
         )
         action = self.control_state_machine.request_new_action(state)
+        if action is None:
+            requested = state.__class__.__name__
+            cur = self.control_state_machine.action
+            cur_state_type = cur.cur_state_info.state_type
+            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2010,6 +2025,11 @@ class HWPSupervisor:
             max_brake_duration=max_brake_duration,
         )
         action = self.control_state_machine.request_new_action(state)
+        if action is None:
+            requested = state.__class__.__name__
+            cur = self.control_state_machine.action
+            cur_state_type = cur.cur_state_info.state_type
+            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2063,6 +2083,11 @@ class HWPSupervisor:
             freq_tol_duration=freq_tol_duration,
         )
         action = self.control_state_machine.request_new_action(state)
+        if action is None:
+            requested = state.__class__.__name__
+            cur = self.control_state_machine.action
+            cur_state_type = cur.cur_state_info.state_type
+            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2087,6 +2112,11 @@ class HWPSupervisor:
         """
         state = ControlState.GripHWP()
         action = self.control_state_machine.request_new_action(state)
+        if action is None:
+            requested = state.__class__.__name__
+            cur = self.control_state_machine.action
+            cur_state_type = cur.cur_state_info.state_type
+            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2111,6 +2141,11 @@ class HWPSupervisor:
         """
         state = ControlState.UngripHWP()
         action = self.control_state_machine.request_new_action(state)
+        if action is None:
+            requested = state.__class__.__name__
+            cur = self.control_state_machine.action
+            cur_state_type = cur.cur_state_info.state_type
+            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2134,7 +2169,7 @@ class HWPSupervisor:
             }
         """
         state = ControlState.Idle()
-        action = self.control_state_machine.request_new_action(state)
+        action = self.control_state_machine.request_new_action(state, abort=True)
         session.data['action'] = action.encode()
         return True, "Set state to idle"
 
@@ -2165,6 +2200,11 @@ class HWPSupervisor:
         }
         state = ControlState.EnableDriverBoard(**kw)
         action = self.control_state_machine.request_new_action(state)
+        if action is None:
+            requested = state.__class__.__name__
+            cur = self.control_state_machine.action
+            cur_state_type = cur.cur_state_info.state_type
+            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2193,6 +2233,11 @@ class HWPSupervisor:
         }
         state = ControlState.DisableDriverBoard(**kw)
         action = self.control_state_machine.request_new_action(state)
+        if action is None:
+            requested = state.__class__.__name__
+            cur = self.control_state_machine.action
+            cur_state_type = cur.cur_state_info.state_type
+            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2221,6 +2266,11 @@ class HWPSupervisor:
         }
         state = ControlState.PowerCycleGripper(**kw)
         action = self.control_state_machine.request_new_action(state)
+        if action is None:
+            requested = state.__class__.__name__
+            cur = self.control_state_machine.action
+            cur_state_type = cur.cur_state_info.state_type
+            return False, f"{requested} is rejected as ({cur_state_type}) is in progress."
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
