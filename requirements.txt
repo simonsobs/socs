@@ -6,9 +6,9 @@ twisted
 
 # hardware communication
 pyserial
-pysnmp==4.4.12
+pysnmp
 pysmi
-pyasn1==0.4.8
+pyasn1
 
 # common dependencies - used by multiple agents
 numpy
