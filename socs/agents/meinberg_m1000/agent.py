@@ -6,7 +6,7 @@ import txaio
 from autobahn.twisted.util import sleep as dsleep
 from ocs import ocs_agent, site_config
 from twisted.internet import reactor
-from twisted.internet.defer import inlineCallbacks, ensureDeferred
+from twisted.internet.defer import inlineCallbacks
 
 from socs.snmp import SNMPInterface
 
@@ -217,8 +217,8 @@ class MeinbergSNMP:
                 self.oid_cache[field_name]["description"] = oid_description
                 self.oid_cache['m1000_connection'] = {'last_attempt': time.time(),
                                                       'connected': True}
-        # This is a TypeError due to nothing coming back from run_snmp_get, so
-        # get_result is None here and can't be iterated.
+        # This is a TypeError due to nothing coming back from the yield in
+        # run_snmp_get, so get_result is None here and can't be iterated.
         except TypeError:
             self.oid_cache['m1000_connection'] = {'last_attempt': time.time(),
                                                   'connected': False}
@@ -287,9 +287,7 @@ class MeinbergSNMP:
                 continue
 
             # Issue SNMP GET command
-            coroutine_obj = self.snmp.get(get_list, self.version)
-            d = ensureDeferred(coroutine_obj)
-            result = yield d
+            result = yield self.snmp.get(get_list, self.version)
             read_time = time.time()
 
             # Do not publish if M1000 connection has dropped
@@ -404,9 +402,7 @@ class MeinbergM1000Agent:
 
         # Make an initial attempt at connection.
         # Allows us to fail early if misconfigured.
-        coroutine_obj = self.meinberg.run_snmp_get(session)
-        d = ensureDeferred(coroutine_obj)
-        yield d
+        yield self.meinberg.run_snmp_get(session)
         if not self.meinberg.oid_cache['m1000_connection'].get('connected', False):
             self.log.error('No initial SNMP response.')
             self.log.error('Either there is a network connection issue, '
@@ -419,9 +415,7 @@ class MeinbergM1000Agent:
         self.is_streaming = True
 
         while self.is_streaming:
-            coroutine_obj = self.meinberg.run_snmp_get(session)
-            d = ensureDeferred(coroutine_obj)
-            yield d
+            yield self.meinberg.run_snmp_get(session)
             self.log.debug("{data}", data=session.data)
             yield dsleep(1)
 
