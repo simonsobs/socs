@@ -4,6 +4,7 @@ import txaio
 from pysnmp.hlapi.v3arch.asyncio import (CommunityData, ContextData, ObjectIdentity,
                                          ObjectType, SnmpEngine, UdpTransportTarget,
                                          UsmUserData, get_cmd, set_cmd)
+from twisted.internet.defer import Deferred
 
 from socs import mibs
 
@@ -11,16 +12,15 @@ from socs import mibs
 txaio.use_twisted()
 
 
-# https://pysnmp.readthedocs.io/en/latest/faq/pass-custom-mib-to-manager.html
 MIB_SOURCE = f"{os.path.dirname(mibs.__file__)}"
 
 
-class SNMPTwister:
-    """Helper class for handling SNMP communication with twisted.
+class SNMPInterface:
+    """Helper class for handling SNMP communication.
 
     More information can be found in the pySNMP documentation: `PySNMP Examples`_
 
-    .. _PySNMP Examples: https://snmplabs.thola.io/pysnmp/examples/contents.html
+    .. _PySNMP Examples: https://docs.lextudio.com/pysnmp/v7.1/examples/
 
     Parameters
     ----------
@@ -35,8 +35,8 @@ class SNMPTwister:
         PySNMP engine
     address : str
         Address of the SNMP Agent to send GET/SET requests to
-    udp_transport : pysnmp.hlapi.twisted.transport.UdpTransportTarget
-        UDP transport for UDP over IPv4
+    port : int
+        Associated port for SNMP communication. Default is 161
     log : txaio.tx.Logger
         txaio logger object
 
@@ -45,14 +45,16 @@ class SNMPTwister:
     def __init__(self, address, port=161):
         self.snmp_engine = SnmpEngine()
         self.address = address
-        self.udp_transport = UdpTransportTarget((address, port))
+        self.port = port
         self.log = txaio.make_logger()
 
     def _success(self, args):
         """Success callback.
 
-        Taken from Twisted example for SNMPv1 from pySNMP documentation:
-        https://snmplabs.thola.io/pysnmp/examples/hlapi/twisted/contents.html
+        Originally taken from Twisted example for SNMPv1 from pySNMP
+        documentation. pySNMP no longer supports twisted, but a similar
+        structure can be seen in the example at:
+        https://docs.lextudio.com/pysnmp/v7.1/quick-start
 
         Returns
         -------
@@ -61,7 +63,8 @@ class SNMPTwister:
             returned in SNMP response.
 
         """
-        (error_status, error_index, var_binds) = args
+        #(error_status, error_index, var_binds) = args
+        (error_indication, error_status, error_index, var_binds) = args
 
         if error_status:
             self.log.error('%s: %s at %s' % (self.address,
@@ -77,18 +80,53 @@ class SNMPTwister:
     def _failure(self, error_indication):
         """Failure Errback.
 
-        Taken from Twisted example for SNMPv1 from pySNMP documentation:
-        https://snmplabs.thola.io/pysnmp/examples/hlapi/twisted/contents.html
+        Originally taken from Twisted example for SNMPv1 from pySNMP
+        documentation. pySNMP no longer supports twisted, but a similar
+        structure can be seen in the example at:
+        https://docs.lextudio.com/pysnmp/v7.1/quick-start
 
         """
         self.log.error('%s failure: %s' % (self.address, error_indication))
 
+    async def _get(self, oid_list, version):
+        """Private coroutine that gets converted to a Deferred to maintain
+        functionality with existing Twisted code.
+
+        See docstring in ``self.get()`` for details.
+
+        """
+        oid_list = [ObjectType(ObjectIdentity(*x).addMibSource(MIB_SOURCE))
+                    if isinstance(x, tuple)
+                    else x
+                    for x
+                    in oid_list]
+
+        if version == 1:
+            version_object = CommunityData('public', mpModel=0)  # SNMPv1
+        elif version == 2:
+            version_object = CommunityData('public')  # SNMPv2c
+        elif version == 3:
+            version_object = UsmUserData('ocs')  # SNMPv3 (no auth, no privacy)
+        else:
+            raise ValueError(f'SNMP version {version} not supported.')
+
+        iterator = get_cmd(self.snmp_engine,
+                           version_object,
+                           await UdpTransportTarget.create((self.address, self.port)),
+                           ContextData(),
+                           *oid_list)
+
+        error_indication, error_status, error_index, var_binds = await iterator
+
+        return (error_indication, error_status, error_index, var_binds)
+        
+
     def get(self, oid_list, version):
-        """Issue a getCmd to get SNMP OID states.
+        """Issue a get_cmd to get SNMP OID states.
 
         Example
         -------
-        >>> snmp = SNMPTwister('localhost', 161)
+        >>> snmp = SNMPInterface('localhost', 161)
         >>> snmp.get([ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB',
                                                 'mbgLtNgRefclockState',
                                                 1)),
@@ -96,7 +134,7 @@ class SNMPTwister:
                                                 'mbgLtNgRefclockLeapSecondDate',
                                                 1))])
 
-        >>> snmp = SNMPTwister('localhost', 161)
+        >>> snmp = SNMPInterface('localhost', 161)
         >>> result = snmp.get([('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
                                ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockLeapSecondDate', 1)])
         >>> # Simply printing the returned object shows a nice string
@@ -132,37 +170,18 @@ class SNMPTwister:
             instances representing MIB variables returned in SNMP response.
 
         """
-        oid_list = [ObjectType(ObjectIdentity(*x).addMibSource(MIB_SOURCE))
-                    if isinstance(x, tuple)
-                    else x
-                    for x
-                    in oid_list]
-
-        if version == 1:
-            version_object = CommunityData('public', mpModel=0)  # SNMPv1
-        elif version == 2:
-            version_object = CommunityData('public')  # SNMPv2c
-        elif version == 3:
-            version_object = UsmUserData('ocs')  # SNMPv3 (no auth, no privacy)
-        else:
-            raise ValueError(f'SNMP version {version} not supported.')
-
-        datagram = getCmd(self.snmp_engine,
-                          version_object,
-                          self.udp_transport,
-                          ContextData(),
-                          *oid_list)
-
-        datagram.addCallback(self._success).addErrback(self._failure)
-
-        return datagram
+        print('get')
+        d = Deferred.fromCoroutine(self._get(oid_list, version))
+        print('deferred', d)
+        d.addCallback(self._success).addErrback(self._failure)
+        return d
 
     def set(self, oid_list, version, setvalue, community_name='private'):
-        """Issue a setCmd to set SNMP OID states.
+        """Issue a set_cmd to set SNMP OID states.
         See `Modifying MIB variables`_ for more info on setting OID states.
 
         .. _Modifying MIB variables:
-           https://snmplabs.thola.io/pysnmp/examples/hlapi/asyncore/sync/manager/cmdgen/modifying-variables.html
+           https://docs.lextudio.com/pysnmp/v7.1/examples/v1arch/asyncio/manager/cmdgen/modifying-variables
 
         Parameters
         ----------
@@ -199,11 +218,11 @@ class SNMPTwister:
         else:
             raise ValueError(f'SNMP version {version} not supported.')
 
-        datagram = setCmd(self.snmp_engine,
-                          version_object,
-                          self.udp_transport,
-                          ContextData(),
-                          *oid_list)
+        datagram = set_cmd(self.snmp_engine,
+                           version_object,
+                           self.udp_transport,
+                           ContextData(),
+                           *oid_list)
 
         datagram.addCallback(self._success).addErrback(self._failure)
 
