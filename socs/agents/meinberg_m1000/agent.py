@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import time
 from os import environ
 
@@ -12,6 +13,7 @@ from socs.snmp import SNMPInterface
 
 # For logging
 txaio.use_twisted()
+
 
 
 class MeinbergSNMP:
@@ -264,8 +266,18 @@ class MeinbergSNMP:
 
         return message
 
-    @inlineCallbacks
-    def run_snmp_get(self, session):
+    async def test(self):
+        get_list = [('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
+                    ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 1),
+                    ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 2)]
+
+        print(self.interval_groups)        
+        y = self.snmp.get(get_list, self.version)
+        x = await y
+        print(x)
+        return x
+
+    async def run_snmp_get(self, session):
         """Peform the main data acquisition steps, issuing SNMP GET commands
         for each OID, depending on when we last queried them.
 
@@ -279,6 +291,7 @@ class MeinbergSNMP:
 
         """
         for interval in self.interval_groups:
+            print('interval:', interval)
             # Create list of OIDs to GET based on last time we checked them
             get_list = self._build_get_list(interval)
 
@@ -286,9 +299,15 @@ class MeinbergSNMP:
             if not get_list:
                 continue
 
+            print('awaiting')
             # Issue SNMP GET command
-            result = yield self.snmp.get(get_list, self.version)
+            print(get_list)
+            print(self.snmp)
+            print('about to await another get')
+            result = await self.snmp.get(get_list, self.version)
             read_time = time.time()
+            print('done awaiting')
+            print(result)
 
             # Do not publish if M1000 connection has dropped
             try:
@@ -307,6 +326,8 @@ class MeinbergSNMP:
 
             # Update connection status in session.data
             session.data = self.oid_cache
+
+        return 'test'
 
 
 class MeinbergM1000Agent:
@@ -351,7 +372,6 @@ class MeinbergM1000Agent:
                                  agg_params=agg_params,
                                  buffer_time=1)
 
-    @inlineCallbacks
     def acq(self, session, params=None):
         """acq()
 
@@ -402,7 +422,7 @@ class MeinbergM1000Agent:
 
         # Make an initial attempt at connection.
         # Allows us to fail early if misconfigured.
-        yield self.meinberg.run_snmp_get(session)
+        asyncio.run(self.meinberg.run_snmp_get(session))  # do more of this, get the result from asyncio.run() ran within the worker thread
         if not self.meinberg.oid_cache['m1000_connection'].get('connected', False):
             self.log.error('No initial SNMP response.')
             self.log.error('Either there is a network connection issue, '
@@ -415,9 +435,13 @@ class MeinbergM1000Agent:
         self.is_streaming = True
 
         while self.is_streaming:
-            yield self.meinberg.run_snmp_get(session)
+            print('running snmp get')
+            # This now hangs when I hit here, maybe because the UdpTransport is linked to the previously run eventloop? not clear to me
+            asyncio.run(self.meinberg.run_snmp_get(session))
             self.log.debug("{data}", data=session.data)
-            yield dsleep(1)
+            print('sleeping')
+            time.sleep(1)
+            print('done sleeping')
 
         return True, "Finished Recording"
 
@@ -472,7 +496,7 @@ def main(args=None):
     agent.register_process("acq",
                            listener.acq,
                            listener._stop_acq,
-                           startup=bool(args.auto_start), blocking=False)
+                           startup=bool(args.auto_start), blocking=True)
 
     runner.run(agent, auto_reconnect=True)
 
