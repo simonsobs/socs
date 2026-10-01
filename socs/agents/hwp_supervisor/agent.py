@@ -2195,7 +2195,7 @@ class HWPSupervisor:
             'cycle_wait_time': self.driver_power_cycle_wait_time,
         }
         state = ControlState.EnableDriverBoard(**kw)
-        action, err_msg = self.control_state_machine.request_new_action(state, abort=True)
+        action, err_msg = self.control_state_machine.request_new_action(state)
         if action is None:
             return False, err_msg
         action.sleep_until_complete(session=session)
