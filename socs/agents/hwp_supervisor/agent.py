@@ -1031,10 +1031,9 @@ class ControlAction:
             time.sleep(dt)
 
 
-@contextmanager
 def ensure_spin_stop(hwp_state: HWPState, log: txaio.ILogger) -> Generator[None, None, None]:
     """
-    Check HWP is stopped. This will check hwp_pid parameters
+    Check HWP is stopped. This will check hwp_pid parameters.
 
     Args
     ------
@@ -1467,9 +1466,10 @@ class ControlStateMachine:
                     else:
                         kw = {'outlet': outlet, 'on': outlet_state}
                     self.run_and_validate(clients.driver_iboot.set_outlet, kwargs=kw)
-                with ensure_spin_stop(hwp_state, self.log):
-                    for outlet in state.outlets:
-                        set_outlet_state(outlet, False)
+
+                ensure_spin_stop(hwp_state, self.log)
+                for outlet in state.outlets:
+                    set_outlet_state(outlet, False)
                 self.action.set_state(ControlState.Done(success=True))
                 return
 
@@ -1480,13 +1480,14 @@ class ControlStateMachine:
                     else:
                         kw = {'outlet': outlet, 'on': outlet_state}
                     self.run_and_validate(clients.gripper_iboot.set_outlet, kwargs=kw)
-                with ensure_spin_stop(hwp_state, self.log):
-                    for outlet in state.outlets:
-                        set_outlet_state(outlet, False)
-                        time.sleep(2)
-                    for outlet in state.outlets:
-                        set_outlet_state(outlet, True)
-                        time.sleep(2)
+
+                ensure_spin_stop(hwp_state, self.log)
+                for outlet in state.outlets:
+                    set_outlet_state(outlet, False)
+                    time.sleep(2)
+                for outlet in state.outlets:
+                    set_outlet_state(outlet, True)
+                    time.sleep(2)
                 self.action.set_state(ControlState.Done(success=True))
                 return
 
@@ -1503,18 +1504,29 @@ class ControlStateMachine:
         If an action is already in progress, it will be aborted only if
         `abort` is True. Otherwise the request is rejected and None
         is returned.
+
+        Returns
+        ---------
+        action : ControlAction or None
+            HWP control action object
+        err_msg : str
+            error message
+
         """
         with self.lock:
             if not self.action.completed:
                 if not abort:
-                    return None
+                    requested = state.__class__.__name__
+                    cur_state_type = self.action.cur_state_info.state_type
+                    err_msg = f"{requested} is rejected as {cur_state_type} is in progress."
+                    return None, err_msg
                 else:
                     self.action.set_state(ControlState.Abort())
             if len(self.action_history) > self.max_action_history_count:
                 self.action_history.pop(0)
             self.action = ControlAction(state)
             self.action_history.append(self.action)
-            return self.action
+            return self.action, 'no error'
 
 
 class HWPSupervisor:
@@ -1902,12 +1914,9 @@ class HWPSupervisor:
             freq_tol_duration=freq_tol_duration,
             direction=d
         )
-        action = self.control_state_machine.request_new_action(state)
+        action, err_msg = self.control_state_machine.request_new_action(state)
         if action is None:
-            requested = state.__class__.__name__
-            cur = self.control_state_machine.action
-            cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as {cur_state_type} is in progress."
+            return False, err_msg
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -1949,12 +1958,9 @@ class HWPSupervisor:
             voltage=params['voltage'],
             direction=d
         )
-        action = self.control_state_machine.request_new_action(state)
+        action, err_msg = self.control_state_machine.request_new_action(state)
         if action is None:
-            requested = state.__class__.__name__
-            cur = self.control_state_machine.action
-            cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as {cur_state_type} is in progress."
+            return False, err_msg
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2024,12 +2030,9 @@ class HWPSupervisor:
             brake_voltage=brake_voltage,
             max_brake_duration=max_brake_duration,
         )
-        action = self.control_state_machine.request_new_action(state)
+        action, err_msg = self.control_state_machine.request_new_action(state)
         if action is None:
-            requested = state.__class__.__name__
-            cur = self.control_state_machine.action
-            cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as {cur_state_type} is in progress."
+            return False, err_msg
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2082,12 +2085,9 @@ class HWPSupervisor:
             freq_tol=freq_tol,
             freq_tol_duration=freq_tol_duration,
         )
-        action = self.control_state_machine.request_new_action(state)
+        action, err_msg = self.control_state_machine.request_new_action(state)
         if action is None:
-            requested = state.__class__.__name__
-            cur = self.control_state_machine.action
-            cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as {cur_state_type} is in progress."
+            return False, err_msg
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2111,12 +2111,9 @@ class HWPSupervisor:
             }
         """
         state = ControlState.GripHWP()
-        action = self.control_state_machine.request_new_action(state)
+        action, err_msg = self.control_state_machine.request_new_action(state)
         if action is None:
-            requested = state.__class__.__name__
-            cur = self.control_state_machine.action
-            cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as {cur_state_type} is in progress."
+            return False, err_msg
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2140,12 +2137,9 @@ class HWPSupervisor:
             }
         """
         state = ControlState.UngripHWP()
-        action = self.control_state_machine.request_new_action(state)
+        action, err_msg = self.control_state_machine.request_new_action(state)
         if action is None:
-            requested = state.__class__.__name__
-            cur = self.control_state_machine.action
-            cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as {cur_state_type} is in progress."
+            return False, err_msg
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2169,7 +2163,9 @@ class HWPSupervisor:
             }
         """
         state = ControlState.Idle()
-        action = self.control_state_machine.request_new_action(state, abort=True)
+        action, err_msg = self.control_state_machine.request_new_action(state, abort=True)
+        if action is None:
+            return False, err_msg
         session.data['action'] = action.encode()
         return True, "Set state to idle"
 
@@ -2199,12 +2195,9 @@ class HWPSupervisor:
             'cycle_wait_time': self.driver_power_cycle_wait_time,
         }
         state = ControlState.EnableDriverBoard(**kw)
-        action = self.control_state_machine.request_new_action(state)
+        action, err_msg = self.control_state_machine.request_new_action(state, abort=True)
         if action is None:
-            requested = state.__class__.__name__
-            cur = self.control_state_machine.action
-            cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as {cur_state_type} is in progress."
+            return False, err_msg
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2232,12 +2225,9 @@ class HWPSupervisor:
             'outlets': self.driver_iboot_outlets,
         }
         state = ControlState.DisableDriverBoard(**kw)
-        action = self.control_state_machine.request_new_action(state)
+        action, err_msg = self.control_state_machine.request_new_action(state)
         if action is None:
-            requested = state.__class__.__name__
-            cur = self.control_state_machine.action
-            cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as {cur_state_type} is in progress."
+            return False, err_msg
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
@@ -2265,12 +2255,9 @@ class HWPSupervisor:
             'outlets': self.gripper_iboot_outlets,
         }
         state = ControlState.PowerCycleGripper(**kw)
-        action = self.control_state_machine.request_new_action(state)
+        action, err_msg = self.control_state_machine.request_new_action(state)
         if action is None:
-            requested = state.__class__.__name__
-            cur = self.control_state_machine.action
-            cur_state_type = cur.cur_state_info.state_type
-            return False, f"{requested} is rejected as {cur_state_type} is in progress."
+            return False, err_msg
         action.sleep_until_complete(session=session)
         return action.success, f"Completed with state: {action.cur_state_info.state}"
 
