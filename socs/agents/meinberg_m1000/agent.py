@@ -1,3 +1,8 @@
+# Select asyncioreactor before agent starts the reactor
+import asyncio
+from twisted.internet import asyncioreactor
+asyncioreactor.install(asyncio.get_event_loop())
+
 import argparse
 import time
 from os import environ
