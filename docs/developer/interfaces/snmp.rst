@@ -12,6 +12,11 @@ SNMP support is provided through the python module `pysnmp`_. pysnmp supports
 asyncio as an I/O framework. SOCS makes this interface for SNMP available via
 the SNMPInterface class.
 
+.. note::
+
+    For backwards compatability with existing based agents, the SNMPInterface
+    returns Twisted Deferreds like the old SNMPTwister class used to.
+
 .. _pysnmp: http://snmplabs.com/pysnmp/contents.html
 
 MIB to Python Conversion
@@ -84,6 +89,20 @@ This will return something like the following::
 
 See existing SNMP using agents, such as the Meinberg M1000 Agent for more
 examples.
+
+Use in Agents
+-------------
+``ocs`` currently only supports the default Twisted reactor. For the asyncio
+features of pysnmp to work we need to use the asyncio reactor. You can force
+this selection by adding this block to the top of your agent::
+
+    # Select asyncioreactor before agent starts the reactor
+    import asyncio
+    from twisted.internet import asyncioreactor
+    asyncioreactor.install(asyncio.get_event_loop())
+
+Doing so will allow you to use asyncio features like ``async def`` and
+``await`` alongside the usual Twisted features like Deferreds.
 
 API
 ---
