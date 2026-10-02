@@ -186,7 +186,7 @@ class SNMPInterface:
             instances representing MIB variables returned in the SNMP response.
 
         """
-        return self._coroutine_to_deferred(self._get_async, oid_list, version)
+        return self._coroutine_func_to_deferred(self._get_async, oid_list, version)
 
     async def _set_async(self, oid_list, version, setvalue, community_name='private'):
         """Async method for set_cmd.
@@ -273,4 +273,4 @@ class SNMPInterface:
             instances representing MIB variables returned in the SNMP response.
 
         """
-        return self._coroutine_to_deferred(self._set_async, oid_list, version, setvalue, community_name)
+        return self._coroutine_func_to_deferred(self._set_async, oid_list, version, setvalue, community_name)
