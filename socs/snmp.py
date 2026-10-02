@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 import txaio
@@ -5,6 +6,7 @@ from pysnmp.hlapi.v3arch.asyncio import (CommunityData, ContextData, ObjectIdent
                                          ObjectType, SnmpEngine, UdpTransportTarget,
                                          UsmUserData, get_cmd, set_cmd)
 
+from twisted.internet import defer
 from socs import mibs
 
 # For logging
@@ -47,7 +49,32 @@ class SNMPInterface:
         self.port = port
         self.log = txaio.make_logger()
 
-    async def get(self, oid_list, version):
+    @staticmethod
+    def _coroutine_func_to_deferred(coroutine_func, *args, **kwargs):
+        """Helper method for interopability between asyncio and Twisted.
+        Converts a coroutine function into a Twisted Deferred.
+
+        This allows existing agents that were originally built for the old
+        ``SNMPTwister`` to continue using Deferreds.
+
+        Parameters
+        ----------
+        coroutine_func : list
+            List of high-level MIB Object OIDs. The list elements should either be
+            ObjectType, or tuples which define the OIDs, as shown in the
+            example above. See `Specifying MIB object`_ for more info.
+
+        Returns
+        -------
+        list
+            A sequence of ObjectType class instances representing MIB variables
+            returned in SNMP response.
+        """
+        task = asyncio.create_task(coroutine_func(*args, **kwargs))
+        d = defer.Deferred.fromFuture(task)
+        return d
+
+    async def _get_async(self, oid_list, version):
         """Issue a get_cmd to get SNMP OID states.
 
         Example
@@ -131,7 +158,10 @@ class SNMPInterface:
 
         return var_binds
 
-    async def set(self, oid_list, version, setvalue, community_name='private'):
+    def get(self, oid_list, version):
+        return self._coroutine_to_deferred(self._get_async, oid_list, version)
+
+    async def _set_async(self, oid_list, version, setvalue, community_name='private'):
         """Issue a set_cmd to set SNMP OID states.
 
         See `Modifying MIB variables`_ for more info on setting OID states.
@@ -193,3 +223,6 @@ class SNMPInterface:
                 self.log.debug(' = '.join([x.prettyPrint() for x in var]))
 
         return var_binds
+
+    async def set(self, oid_list, version, setvalue, community_name='private'):
+        return self._coroutine_to_deferred(self._set_async, oid_list, version, setvalue, community_name)
