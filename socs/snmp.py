@@ -70,8 +70,8 @@ class SNMPInterface:
             A sequence of ObjectType class instances representing MIB variables
             returned in SNMP response.
         """
-        task = asyncio.create_task(coroutine_func(*args, **kwargs))
-        d = defer.Deferred.fromFuture(task)
+        future = asyncio.ensure_future(coroutine_func(*args, **kwargs))
+        d = defer.Deferred.fromFuture(future)
         return d
 
     async def _get_async(self, oid_list, version):
