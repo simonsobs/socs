@@ -64,23 +64,32 @@ Examples
 --------
 A standalone example of using ``SNMPInterface`` to interact with a device::
 
+    # Select asyncioreactor before agent starts the reactor
     import asyncio
+    from twisted.internet import asyncioreactor
+    asyncioreactor.install(asyncio.get_event_loop())
+    
+    from twisted.internet import reactor
+    from twisted.internet.defer import inlineCallbacks
     from socs.snmp import SNMPInterface
-
+    
     # Setup communication with M1000
     snmp = SNMPInterface('10.10.10.176', 161)
-
+    
     # Define OIDs to query
     get_list = [('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
                 ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 1),
                 ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 2)]
-
-    async def query_snmp():
-        x = await snmp.get(get_list, 1)
+    
+    @inlineCallbacks
+    def query_snmp():
+        x = yield snmp.get(get_list, 1)
         print(x)
-
-    # Call query_snmp within the event loop
-    asyncio.run(query_snmp())
+        reactor.stop()
+    
+    # Call query_snmp within the reactor
+    reactor.callWhenRunning(query_snmp)
+    reactor.run()
 
 This will return something like the following::
 
@@ -89,6 +98,30 @@ This will return something like the following::
 
 See existing SNMP using agents, such as the Meinberg M1000 Agent for more
 examples.
+
+.. caution::
+    Using the ``asyncio`` methods directly isn't really supported, since OCS
+    doesn't formally support ``asyncio``, but here is an example anyway.
+    
+Using the ``asyncio`` methods directly::
+
+    import asyncio
+    from socs.snmp import SNMPInterface
+
+    # Setup communication with M1000
+    snmp = SNMPInterface('10.10.10.186', 161)
+
+    # Define OIDs to query
+    get_list = [('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
+                ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 1),
+                ('MBG-SNMP-LTNG-MIB', 'mbgLtNgSysPsStatus', 2)]
+
+    async def query_snmp():
+        x = await snmp._get_async(get_list, 1)
+        print(x)
+
+    # Call query_snmp within the event loop
+    asyncio.run(query_snmp())
 
 Use in Agents
 -------------
