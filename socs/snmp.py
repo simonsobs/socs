@@ -75,27 +75,7 @@ class SNMPInterface:
         return d
 
     async def _get_async(self, oid_list, version):
-        """Issue a get_cmd to get SNMP OID states.
-
-        Example
-        -------
-        >>> snmp = SNMPInterface('localhost', 161)
-        >>> snmp.get([ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB',
-                                                'mbgLtNgRefclockState',
-                                                1)),
-                      ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB',
-                                                'mbgLtNgRefclockLeapSecondDate',
-                                                1))])
-
-        >>> snmp = SNMPInterface('localhost', 161)
-        >>> result = snmp.get([('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
-                               ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockLeapSecondDate', 1)])
-        >>> # Simply printing the returned object shows a nice string
-        >>> print(result[0])
-        MBG-SNMP-LTNG-MIB::mbgLtNgRefclockState.1 = notSynchronized
-        >>> # The corresponding integer value is hidden within the returned object
-        >>> print(result[0][1]._value)
-        2
+        """Async method for get_cmd.
 
         Parameters
         ----------
@@ -159,15 +139,57 @@ class SNMPInterface:
         return var_binds
 
     def get(self, oid_list, version):
+        """Issue a get_cmd to get SNMP OID states.
+
+        Example
+        -------
+        >>> snmp = SNMPInterface('localhost', 161)
+        >>> snmp.get([ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB',
+                                                'mbgLtNgRefclockState',
+                                                1)),
+                      ObjectType(ObjectIdentity('MBG-SNMP-LTNG-MIB',
+                                                'mbgLtNgRefclockLeapSecondDate',
+                                                1))])
+
+        >>> snmp = SNMPInterface('localhost', 161)
+        >>> result = snmp.get([('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
+                               ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockLeapSecondDate', 1)])
+        >>> # Simply printing the returned object shows a nice string
+        >>> print(result[0])
+        MBG-SNMP-LTNG-MIB::mbgLtNgRefclockState.1 = notSynchronized
+        >>> # The corresponding integer value is hidden within the returned object
+        >>> print(result[0][1]._value)
+        2
+
+        Parameters
+        ----------
+        oid_list : list
+            List of high-level MIB Object OIDs. The list elements should either be
+            ObjectType, or tuples which define the OIDs, as shown in the
+            example above. See `Specifying MIB object`_ for more info.
+
+            .. _Specifying MIB Object:
+               https://snmplabs.thola.io/pysnmp/docs/pysnmp-hlapi-tutorial.html#specifying-mib-object
+        version : int
+            SNMP version for communicaton (1, 2, or 3). All versions supported
+            here without auth or privacy. If using v3 the configured username
+            on the SNMP device should be 'ocs'. For details on version
+            implementation in pysnmp see `SNMP Versions`_.
+
+            .. _SNMP Versions:
+               https://snmplabs.thola.io/pysnmp/examples/hlapi/asyncore/sync/manager/cmdgen/snmp-versions.html
+
+        Returns
+        -------
+        twisted.internet.defer.Deferred
+            If successful, this will contain a list of ObjectType class
+            instances representing MIB variables returned in the SNMP response.
+
+        """
         return self._coroutine_to_deferred(self._get_async, oid_list, version)
 
     async def _set_async(self, oid_list, version, setvalue, community_name='private'):
-        """Issue a set_cmd to set SNMP OID states.
-
-        See `Modifying MIB variables`_ for more info on setting OID states.
-
-        .. _Modifying MIB variables:
-           https://docs.lextudio.com/pysnmp/v7.1/examples/v1arch/asyncio/manager/cmdgen/modifying-variables
+        """Async method for set_cmd.
 
         Parameters
         ----------
@@ -225,4 +247,30 @@ class SNMPInterface:
         return var_binds
 
     async def set(self, oid_list, version, setvalue, community_name='private'):
+        """Issue a set_cmd to set SNMP OID states.
+
+        See `Modifying MIB variables`_ for more info on setting OID states.
+
+        .. _Modifying MIB variables:
+           https://docs.lextudio.com/pysnmp/v7.1/examples/v1arch/asyncio/manager/cmdgen/modifying-variables
+
+        Parameters
+        ----------
+        oid_list : list
+            List of high-level MIB Object OIDs. The list elements should either be
+            ObjectType, or tuples which define the OIDs.
+        version : int
+            SNMP version for communicaton (1, 2, or 3). All versions supported
+            here without auth or privacy. If using v3 the configured username
+            on the SNMP device should be 'ocs'.
+        setvalue : int
+            Integer to set OID. For example, 0 is off and 1 is on for outletControl on the iBootPDU.
+
+        Returns
+        -------
+        twisted.internet.defer.Deferred
+            If successful, this will contain a list of ObjectType class
+            instances representing MIB variables returned in the SNMP response.
+
+        """
         return self._coroutine_to_deferred(self._set_async, oid_list, version, setvalue, community_name)
