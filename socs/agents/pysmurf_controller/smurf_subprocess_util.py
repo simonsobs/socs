@@ -83,7 +83,7 @@ def encode_dataclass(obj):
     return json.dumps(data).encode()
 
 
-def get_smurf_control():
+def get_smurf_control(dump_configs=False):
     """
     Get the SMuRF control object and sodetlib configuration object for the
     current slot
@@ -91,7 +91,7 @@ def get_smurf_control():
     slot = os.environ['SLOT']
     cfg = DetConfig()
     cfg.load_config_files(slot=slot)
-    S = cfg.get_smurf_control()
+    S = cfg.get_smurf_control(dump_configs=dump_configs)
     S.load_tune(cfg.dev.exp['tunefile'])
     return S, cfg
 
@@ -129,7 +129,7 @@ def take_bgmap(kwargs=None):
 
 def take_iv(iv_kwargs=None):
     """Runs and analyzes an IV curve"""
-    S, cfg = get_smurf_control()
+    S, cfg = get_smurf_control(dump_configs=True)
     if iv_kwargs is None:
         iv_kwargs = {}
     iva = iv.take_iv(S, cfg, **iv_kwargs)
