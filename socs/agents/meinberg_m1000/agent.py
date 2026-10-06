@@ -1,13 +1,17 @@
-# isort: off
 # Select asyncioreactor before agent starts the reactor
 import asyncio
+import os
+
 from twisted.internet import asyncioreactor
-asyncioreactor.install(asyncio.get_event_loop())
-# isort: on
+
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
+    asyncioreactor.install(asyncio.get_event_loop())
+# /asyncioreactor setup
 
 import argparse
+import os
 import time
-from os import environ
 
 import txaio
 from autobahn.twisted.util import sleep as dsleep
@@ -463,7 +467,7 @@ def make_parser(parser=None):
 
 def main(args=None):
     # Start logging
-    txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     parser = make_parser()
     args = site_config.parse_args(agent_class="MeinbergM1000Agent",

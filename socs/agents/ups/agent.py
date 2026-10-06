@@ -1,12 +1,15 @@
-# isort: off
 # Select asyncioreactor before agent starts the reactor
 import asyncio
+import os
+
 from twisted.internet import asyncioreactor
-asyncioreactor.install(asyncio.get_event_loop())
-# isort: on
+
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
+    asyncioreactor.install(asyncio.get_event_loop())
+# /asyncioreactor setup
 
 import argparse
-import os
 import signal
 import time
 
