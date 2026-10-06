@@ -3,14 +3,17 @@ import asyncio
 import os
 
 from twisted.internet import asyncioreactor
+from twisted.internet.error import ReactorAlreadyInstalledError
 
 ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
-    asyncioreactor.install(asyncio.get_event_loop())
+    try:
+        asyncioreactor.install(asyncio.get_event_loop())
+    except ReactorAlreadyInstalledError:
+        print('Error: Failed to install the asyncioreactor.')
 # /asyncioreactor setup
 
 import argparse
-import os
 import time
 
 import txaio
