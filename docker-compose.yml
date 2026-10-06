@@ -9,9 +9,10 @@ services:
   # --------------------------------------------------------------------------
   # SOCS Agents
   # --------------------------------------------------------------------------
-  ocs-pysmurf-agent:
-    image: "ocs-pysmurf-agent"
-    build: ./docker/pysmurf_controller/
+  # Temporarily disabled until https://github.com/simonsobs/socs/issues/1113 is resolved
+  #ocs-pysmurf-agent:
+  #  image: "ocs-pysmurf-agent"
+  #  build: ./docker/pysmurf_controller/
 
   # Temporarily disabled until https://github.com/simonsobs/socs/issues/1100 is resolved
   #ocs-wgactuator-agent:
