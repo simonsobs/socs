@@ -24,7 +24,9 @@ jobs:
     timeout-minutes: 10
     strategy:
       matrix:
-        python: ["3.10", "3.11", "3.12"]
+        # Don't test in 3.12 until #1041 is fixed
+        # https://github.com/simonsobs/socs/issues/1041
+        python: ["3.10", "3.11"]
 
     steps:
     - name: Set up Python ${{ matrix.python }}
