@@ -21,6 +21,7 @@ agents = {
     'HWPPIDAgent': {'module': 'socs.agents.hwp_pid.agent', 'entry_point': 'main'},
     'HWPPMXAgent': {'module': 'socs.agents.hwp_pmx.agent', 'entry_point': 'main'},
     'HWPSupervisor': {'module': 'socs.agents.hwp_supervisor.agent', 'entry_point': 'main'},
+    'IFMIOLinkMasterAgent': {'module': 'socs.agents.ifm_iolink_master.agent', 'entry_point': 'main'},
     'ibootbarAgent': {'module': 'socs.agents.ibootbar.agent', 'entry_point': 'main'},
     'LabJackAgent': {'module': 'socs.agents.labjack.agent', 'entry_point': 'main'},
     'Lakeshore240Agent': {'module': 'socs.agents.lakeshore240.agent', 'entry_point': 'main'},
