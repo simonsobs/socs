@@ -1,6 +1,20 @@
+# Select asyncioreactor before agent starts the reactor
+import asyncio
+import os
+
+from twisted.internet import asyncioreactor
+from twisted.internet.error import ReactorAlreadyInstalledError
+
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
+    try:
+        asyncioreactor.install(asyncio.get_event_loop())
+    except ReactorAlreadyInstalledError:
+        print('Error: Failed to install the asyncioreactor.')
+# /asyncioreactor setup
+
 import argparse
 import time
-from os import environ
 
 import txaio
 from autobahn.twisted.util import sleep as dsleep
@@ -8,7 +22,7 @@ from ocs import ocs_agent, site_config
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks
 
-from socs.snmp import SNMPTwister
+from socs.snmp import SNMPInterface
 
 # For logging
 txaio.use_twisted()
@@ -33,7 +47,7 @@ class MeinbergSNMP:
         Address of the M1000.
     port : int
         SNMP port to issue GETs to.
-    snmp : socs.snmp.SNMPTwister
+    snmp : socs.snmp.SNMPInterface
         snmp handler from SOCS
     mib_timings : list
         list of dicts describing the SNMP OIDs to check, and at which
@@ -52,7 +66,7 @@ class MeinbergSNMP:
         self.address = address
         self.port = port
         self.version = version
-        self.snmp = SNMPTwister(address, port)
+        self.snmp = SNMPInterface(address, port)
 
         # OIDs and how often to query them
         self.mib_timings = [{"oid": ('MBG-SNMP-LTNG-MIB', 'mbgLtNgRefclockState', 1),
@@ -99,7 +113,7 @@ class MeinbergSNMP:
         Returns
         -------
         get_list : list
-            List of OID tuples to be passed to an SNMPTwister object in a GET call.
+            List of OID tuples to be passed to an SNMPInterface object in a GET call.
 
         """
         get_list = []
@@ -456,7 +470,7 @@ def make_parser(parser=None):
 
 def main(args=None):
     # Start logging
-    txaio.start_logging(level=environ.get("LOGLEVEL", "info"))
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
 
     parser = make_parser()
     args = site_config.parse_args(agent_class="MeinbergM1000Agent",

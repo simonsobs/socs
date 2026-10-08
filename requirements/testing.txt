@@ -6,4 +6,4 @@ pytest-dependency
 pytest-order
 pytest-twisted
 so3g
-thola-snmpsim
+snmpsim

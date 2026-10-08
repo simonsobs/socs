@@ -1,5 +1,19 @@
-import argparse
+# Select asyncioreactor before agent starts the reactor
+import asyncio
 import os
+
+from twisted.internet import asyncioreactor
+from twisted.internet.error import ReactorAlreadyInstalledError
+
+ON_RTD = os.environ.get('READTHEDOCS') == 'True'
+if not ON_RTD:
+    try:
+        asyncioreactor.install(asyncio.get_event_loop())
+    except ReactorAlreadyInstalledError:
+        print('Error: Failed to install the asyncioreactor.')
+# /asyncioreactor setup
+
+import argparse
 import time
 
 import txaio
@@ -8,7 +22,7 @@ from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 from twisted.internet.defer import inlineCallbacks
 
-from socs.snmp import SNMPTwister
+from socs.snmp import SNMPInterface
 
 # For logging
 txaio.use_twisted()
@@ -218,7 +232,7 @@ class MeinbergSyncboxAgent:
         self.log.info(f'Using SNMP version {version}.')
         self.version = version
         self.address = address
-        self.snmp = SNMPTwister(address, port)
+        self.snmp = SNMPInterface(address, port)
         self.connected = True
 
         self.lastGet = 0
