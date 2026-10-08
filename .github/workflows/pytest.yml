@@ -24,9 +24,7 @@ jobs:
     timeout-minutes: 10
     strategy:
       matrix:
-        # Don't test in 3.12 until #1041 is fixed
-        # https://github.com/simonsobs/socs/issues/1041
-        python: ["3.10", "3.11"]
+        python: ["3.10", "3.11", "3.12"]
 
     steps:
     - name: Set up Python ${{ matrix.python }}
@@ -74,10 +72,10 @@ jobs:
         sudo apt-get install -y socat
 
     # Run on a single version, since these tests are run in Docker
-    - name: Set up Python 3.11
+    - name: Set up Python 3.12
       uses: actions/setup-python@v7
       with:
-        python-version: 3.11
+        python-version: 3.12
 
     - name: Clone socs
       uses: actions/checkout@v7
@@ -105,10 +103,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Set up Python 3.11
+    - name: Set up Python 3.12
       uses: actions/setup-python@v7
       with:
-        python-version: 3.11
+        python-version: 3.12
 
     - name: Install coverage
       run: |
