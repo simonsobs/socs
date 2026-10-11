@@ -1,0 +1,35 @@
+# Example register configuration for SmurfPcieMonitorAgent.
+# Each entry specifies a rogue tree path and a short field name
+# used as the key in the published data feed.
+registers:
+  # AxiVersion info
+  - path: "pcie.Core.AxiPcieCore.AxiVersion.FpgaVersion"
+    field_name: "fpga_version"
+  - path: "pcie.Core.AxiPcieCore.AxiVersion.UpTimeCnt"
+    field_name: "uptime_cnt"
+  - path: "pcie.Core.AxiPcieCore.AxiVersion.DeviceId"
+    field_name: "device_id"
+  - path: "pcie.Core.AxiPcieCore.AxiVersion.BuildStamp"
+    field_name: "build_stamp"
+  # SysMon (FPGA temperatures / voltages)
+  - path: "pcie.Core.SysMon.Temperature"
+    field_name: "fpga_temp_degc"
+  - path: "pcie.Core.SysMon.VccInt"
+    field_name: "vccint_v"
+  - path: "pcie.Core.SysMon.VccAux"
+    field_name: "vccaux_v"
+  - path: "pcie.Core.SysMon.VccBram"
+    field_name: "vccbram_v"
+  # RSSI connection status for each of the 6 links
+  - path: "pcie.Core.UdpGrp.RssiClient[0].OpenConn"
+    field_name: "rssi0_open"
+  - path: "pcie.Core.UdpGrp.RssiClient[1].OpenConn"
+    field_name: "rssi1_open"
+  - path: "pcie.Core.UdpGrp.RssiClient[2].OpenConn"
+    field_name: "rssi2_open"
+  - path: "pcie.Core.UdpGrp.RssiClient[3].OpenConn"
+    field_name: "rssi3_open"
+  - path: "pcie.Core.UdpGrp.RssiClient[4].OpenConn"
+    field_name: "rssi4_open"
+  - path: "pcie.Core.UdpGrp.RssiClient[5].OpenConn"
+    field_name: "rssi5_open"
