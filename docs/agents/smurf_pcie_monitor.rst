@@ -44,25 +44,47 @@ argument sets the time in seconds between register polling cycles (default 30).
 Docker Compose
 ``````````````
 
-The SMuRF PCIe Monitor Agent should be configured to run in a Docker container.
-Because it needs to reach the ZMQ server inside the ``smurf-pcie-docker``
-container, the simplest approach is to use ``network_mode: host``. An example
-docker compose service configuration is shown here::
+This agent requires ``pyrogue`` (part of the SLAC rogue framework), which is not
+available via pip. A Dockerfile is provided in the agent directory that builds
+on the ``smurf-pcie`` image and installs socs::
+
+  docker build -t ocs-smurf-pcie-monitor:latest \
+    -f socs/agents/smurf_pcie_monitor/Dockerfile .
+
+The agent connects to a rogue 6 ZMQ server running in a separate
+``smurf-pcie-docker`` container. Both containers should use
+``network_mode: host`` so they can communicate over ``localhost``.
+
+An example docker compose service for the **rogue server** container::
+
+  smurf-pcie-server:
+    image: ghcr.io/slaclab/smurf-pcie:R3.3.3
+    network_mode: host
+    container_name: smurf-pcie-server
+    restart: unless-stopped
+    devices:
+      - /dev/datadev_0
+    volumes:
+      - ./shared:/shared
+    command: python3 /shared/start_server.py --port 9200
+
+An example docker compose service for the **OCS agent** container::
 
   ocs-smurf-pcie-monitor:
-    image: simonsobs/socs:latest
-    <<: *log-options
+    image: ocs-smurf-pcie-monitor:latest
     network_mode: host
-    hostname: ocs-docker
+    hostname: smurf-srv24-docker
     container_name: ocs-smurf-pcie-monitor
     volumes:
       - ${OCS_CONFIG_DIR}:/config
     environment:
       - INSTANCE_ID=smurf-pcie-monitor
+      - SITE_HUB=ws://${CB_HOST}:8001/ws
+      - SITE_HTTP=http://${CB_HOST}:8001/call
+      - OCS_CONFIG_DIR=/config/smurf-srv24
       - LOGLEVEL=info
 
-Ensure the ``smurf-pcie-docker`` container is running and its ZMQ server is
-accessible at the address specified in the site config.
+Ensure the rogue server container is running before starting the OCS agent.
 
 Register Config
 ---------------
@@ -74,29 +96,29 @@ monitor. Each entry specifies a rogue tree ``path`` and a short
 
     registers:
       # FPGA identification and uptime
-      - path: "pcie.Core.AxiPcieCore.AxiVersion.FpgaVersion"
+      - path: "Core.AxiPcieCore.AxiVersion.FpgaVersion"
         field_name: "fpga_version"
-      - path: "pcie.Core.AxiPcieCore.AxiVersion.UpTimeCnt"
+      - path: "Core.AxiPcieCore.AxiVersion.UpTimeCnt"
         field_name: "uptime_cnt"
-      - path: "pcie.Core.AxiPcieCore.AxiVersion.BuildStamp"
+      - path: "Core.AxiPcieCore.AxiVersion.BuildStamp"
         field_name: "build_stamp"
 
       # FPGA system monitor (temperatures and voltages)
-      - path: "pcie.Core.SysMon.Temperature"
+      - path: "Core.SysMon.Temperature"
         field_name: "fpga_temp_degc"
-      - path: "pcie.Core.SysMon.VccInt"
+      - path: "Core.SysMon.VccInt"
         field_name: "vccint_v"
-      - path: "pcie.Core.SysMon.VccAux"
+      - path: "Core.SysMon.VccAux"
         field_name: "vccaux_v"
-      - path: "pcie.Core.SysMon.VccBram"
+      - path: "Core.SysMon.VccBram"
         field_name: "vccbram_v"
 
       # RSSI link status (per-link)
-      - path: "pcie.Core.UdpGrp.RssiClient[0].OpenConn"
+      - path: "Core.UdpGrp.RssiClient[0].OpenConn"
         field_name: "rssi0_open"
-      - path: "pcie.Core.UdpGrp.RssiClient[1].OpenConn"
+      - path: "Core.UdpGrp.RssiClient[1].OpenConn"
         field_name: "rssi1_open"
-      - path: "pcie.Core.UdpGrp.RssiClient[2].OpenConn"
+      - path: "Core.UdpGrp.RssiClient[2].OpenConn"
         field_name: "rssi2_open"
 
 Only registers listed in this file will be polled. Register paths must match

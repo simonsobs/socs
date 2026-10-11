@@ -38,12 +38,11 @@ class SmurfPcieMonitorAgent:
                     pass
                 self._client = None
             host, port = self.zmq_addr.rsplit(':', 1)
-            self._client = pyrogue.interfaces.ZmqClientRoot(
+            self._client = pyrogue.interfaces.VirtualClient(
                 addr=host,
                 port=int(port),
             )
-            self._client.setTimeout(5.0)
-            self._client.getNode('pcie')
+            self._client.root.Core
             self.log.info("Connected to rogue server at {addr}",
                           addr=self.zmq_addr)
             return True
@@ -56,7 +55,7 @@ class SmurfPcieMonitorAgent:
         """Disconnect from the rogue ZMQ server."""
         if self._client is not None:
             try:
-                self._client.stop()
+                self._client.close()
             except Exception:
                 pass
             self._client = None
@@ -68,10 +67,13 @@ class SmurfPcieMonitorAgent:
         data = {}
         for reg in self.registers:
             try:
-                node = self._client.getNode(reg['path'])
-                if node is None:
-                    self.log.warn("Node not found: {p}", p=reg['path'])
-                    continue
+                node = self._client.root
+                for part in reg['path'].split('.'):
+                    if '[' in part:
+                        name, idx = part.rstrip(']').split('[')
+                        node = getattr(node, name)[int(idx)]
+                    else:
+                        node = getattr(node, part)
                 val = node.get()
                 data[reg['field_name']] = val
             except Exception as e:
