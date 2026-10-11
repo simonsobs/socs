@@ -31,9 +31,9 @@ example configuration block using all of the available arguments::
     {'agent-class': 'SmurfPcieMonitorAgent',
      'instance-id': 'smurf-pcie-monitor',
      'arguments': [
-       '--zmq-addr', 'localhost:9100',
-       '--reg-config', '/config/pcie_regs.yaml',
-       '--poll-interval', '30',
+       ['--zmq-addr', 'localhost:9200'],
+       ['--reg-config', '/config/smurf-srv24/pcie_regs.yaml'],
+       ['--poll-interval', '30'],
      ]},
 
 The ``--zmq-addr`` argument should point to the ZMQ server address exposed by
@@ -144,8 +144,8 @@ Useful registers to monitor include:
 - **FPGA version and uptime** -- confirms firmware identity and tracks resets.
 - **System monitor** -- FPGA die temperature and supply voltages
   (``VccInt``, ``VccAux``, ``VccBram``).
-- **RSSI link status** -- valid frame counts and drop counts for each of the
-  six 10 GbE links to the carrier boards.
+- **RSSI link status** -- connection state for each of the six 10 GbE links
+  to the carrier boards.
 - **DMA stream monitors** -- inbound and outbound AXI stream frame counters.
 
 The agent follows the socs robustness guidelines for agent-device connections.

@@ -95,10 +95,13 @@ class SmurfPcieMonitorAgent:
             An example of the session data::
 
                 >>> response.session['data']
-                {'timestamp': 1678983237.8,
-                 'fpga_version': 50331648,
-                 'uptime_cnt': 123456,
-                 'device_id': 1234}
+                {'fpga_version': 67305472,
+                 'uptime_cnt': 1632801,
+                 'device_id': 0,
+                 'fpga_temp_degc': 56.206,
+                 'vccint_v': 0.931,
+                 'rssi2_open': 1,
+                 'timestamp': 1791691115.9}
 
         """
         pacemaker = Pacemaker(1. / self.poll_interval)
