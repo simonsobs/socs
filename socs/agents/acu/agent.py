@@ -2458,9 +2458,8 @@ class ACUAgent:
     @ocs_agent.param('step_time', type=float, default=0.1)
     @inlineCallbacks
     def generate_el_nod(self, session, params):
-        """generate_el_nod(el_depth=None, el_speed=None, el_freq=None, \
-                           num_nods=None, start_time=None, \
-                           scan_upload_length=None)
+        """generate_el_nod(el_depth, el_freq=None, num_nods=None, \
+                           start_time=None, step_time=None)
 
         **Process** - Scan generator. Generates sinusoidal elevation nods
         at the current azimuth and elevation of the platform. Nods are generated
