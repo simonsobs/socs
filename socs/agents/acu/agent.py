@@ -2472,7 +2472,7 @@ class ACUAgent:
         Parameters:
             el_depth (float): The number of degrees from the current
                 el to nod to. Can be negative.
-                Positive el_depth nods updwards, downwards for negative el_depth.
+                Positive el_depth nods upwards, downwards for negative el_depth.
             el_freq (float or None): frequency of the elevation nods.
                 If None, scan_params['el_freq'] is used.
             num_nods (int or None): if not None, limits the nods to
@@ -2488,8 +2488,8 @@ class ACUAgent:
 
         Notes:
           Note that all parameters are optional except for
-          el_depth. If only those el_depth is passed, the Process will nod with that
-          depth and theel_freq specified in the scan_params (if it is specified)
+          el_depth. If only the el_depth is passed, the Process will nod with that
+          depth and the el_freq specified in the scan_params (if it is specified)
           indefinitely (until Process .stop method is called).
           The azimuth axis held in Stop while the elevation nods are executed.
 
