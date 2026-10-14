@@ -2518,6 +2518,9 @@ class ACUAgent:
         if abs(el_depth) < 0.1:
             raise ValueError("El depth amplitude must be greater than 0.1 for el nod!")
 
+        if abs(el_freq) < 0.001:
+            raise ValueError("El freq must be greater than 0.001 Hz for el nod!")
+
         # If requested el is just outside acceptable range, tweak it in.
         _f, _ = self._get_limit_func('elevation')
         el_endpoint1, _untweaked_el = _f(el_endpoint1), el_endpoint1

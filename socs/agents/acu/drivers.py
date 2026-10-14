@@ -1010,9 +1010,12 @@ def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
     arbitrarily long sin el nods.
 
     Parameters:
-        el_endpoint1 (float): elevation endpoint for the scan start
-        el_endpoint2 (float): second elevation endpoint of the scan. For
-            constant az scans, this must be equal to el_endpoint1.
+        az (float): azimuth position to do the sin el nod. Azimuth position
+            stays constant throughout the sin el nod.
+        el_endpoint1 (float): elevation endpoint for the el nod start.
+        el_endpoint2 (float): second elevation endpoint of the scan.
+            Can be greater than el_endpoint1 for a positive el nod or
+            less than el_endpoint2 for a negative el nod.
         el_freq(float): frequency of the elevation nods in Hz.
         num_nods (int or None): if not None, limits the points
           returned to the specified number of el nods (one nod is one full sine wave).
