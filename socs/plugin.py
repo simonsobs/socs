@@ -53,6 +53,7 @@ agents = {
     'UCSCRadiometerAgent': {'module': 'socs.agents.ucsc_radiometer.agent', 'entry_point': 'main'},
     'UPSAgent': {'module': 'socs.agents.ups.agent', 'entry_point': 'main'},
     'VantagePro2Agent': {'module': 'socs.agents.vantagepro2.agent', 'entry_point': 'main'},
+    'VentionControllerAgent': {'module': 'socs.agents.vention_controller.agent', 'entry_point': 'main'},
     'WiregridActuatorAgent': {'module': 'socs.agents.wiregrid_actuator.agent', 'entry_point': 'main'},
     'WiregridEncoderAgent': {'module': 'socs.agents.wiregrid_encoder.agent', 'entry_point': 'main'},
     'WiregridKikusuiAgent': {'module': 'socs.agents.wiregrid_kikusui.agent', 'entry_point': 'main'},
