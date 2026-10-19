@@ -1016,7 +1016,7 @@ def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
         el_endpoint2 (float): second elevation endpoint of the scan.
             Can be greater than el_endpoint1 for a positive el nod or
             less than el_endpoint2 for a negative el nod.
-        el_freq(float): frequency of the elevation nods in Hz.
+        el_freq(float): frequency of the elevation nods in Hz. Defaults to 0.15.
         num_nods (int or None): if not None, limits the points
           returned to the specified number of el nods (one nod is one full sine wave).
         start_time (float or None): a ctime at which to start the scan.
@@ -1024,9 +1024,10 @@ def generate_sin_el_nod(az, el_endpoint1, el_endpoint2,
             wait_to_start.
         wait_to_start (float): number of seconds to wait between
             start_time and when the scan actually starts. Default is 10 seconds.
-        step_time (float): time between points on the constant-velocity
-            parts of the motion. Default value is 1.0 seconds. Minimum value is
-            0.05 seconds.
+        step_time (float): suggested time between points on the constant-velocity
+            parts of the motion. Actual value will be computed to fit evenly into
+            a single nod period. Default value is 0.05 seconds, and that's also
+            the minimum accepted value.
 
     Yields:
         points (list): a list of TrackPoint objects.  Raises

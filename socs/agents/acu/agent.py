@@ -2459,7 +2459,7 @@ class ACUAgent:
     @inlineCallbacks
     def generate_el_nod(self, session, params):
         """generate_el_nod(el_depth, el_freq=None, num_nods=None, \
-                           start_time=None, step_time=None)
+                           start_time=None, step_time=0.1)
 
         **Process** - Scan generator. Generates sinusoidal elevation nods
         at the current azimuth and elevation of the platform. Nods are generated
