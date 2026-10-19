@@ -9,6 +9,25 @@ from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
 from machinelogic import Machine, MotionProfile, ActuatorGroup
 
+def get_profile(agent, velocity, acceleration):
+    """Select the motion profile to use for a movement.
+
+    If both velocity and acceleration are given, build a new
+    MotionProfile from them. If neither is given, fall back to the
+    profile stored by set_motion_profile.
+
+    Returns:
+        tuple: (profile, error_message). Exactly one will be None.
+
+    """
+    if (velocity is None) != (acceleration is None):
+        return None, "Specify both velocity and acceleration, or neither to use the profile from set_motion_profile."
+    if velocity is not None:
+        return MotionProfile(velocity=velocity, acceleration=acceleration), None
+    if agent.profile is None:
+        return None, "No profile set; run set_motion_profile first, or pass velocity and acceleration."
+    return agent.profile, None
+
 class VentionControllerAgent:
     """ Agent for controlling Vention actuator motors used in LAT FTS
     coupling optics instrument for passband measurements on-site.
@@ -33,7 +52,6 @@ class VentionControllerAgent:
         self.profile = None
         self.group = None
         self.axes = {}
-        self.moving = False
 
         # Register data feeds
         agg_params = {
@@ -134,7 +152,7 @@ class VentionControllerAgent:
                     for name, axis in self.axes.items():
                         data[f'{name}pos'] = axis.state.position
                         data[f'{name}vel'] = axis.state.speed
-                        data[f'{name}home'], data[f'{name}end'] = axis.state.end_sensors
+                        data[f'{name}home'], data[f'{name}end'] = int(axis.state.end_sensors[0]), int(axis.state.end_sensors[1])
                     if session.degraded:
                         self.log.info("Connection re-established.")
                         session.degraded = False
@@ -169,80 +187,6 @@ class VentionControllerAgent:
             return True, 'requested to stop taking data.'
         else:
             return False, 'acq is not currently running'
-
-    def _get_profile(self, velocity, acceleration):
-        """Select the motion profile to use for a movement.
-
-        If both velocity and acceleration are given, build a new
-        MotionProfile from them. If neither is given, fall back to the
-        profile stored by set_motion_profile.
-
-        Returns:
-            tuple: (profile, error_message). Exactly one will be None.
-
-        """
-        if (velocity is None) != (acceleration is None):
-            return None, "Specify both velocity and acceleration, or neither to use the profile from set_motion_profile."
-        if velocity is not None:
-            return MotionProfile(velocity=velocity, acceleration=acceleration), None
-        if self.profile is None:
-            return None, "No profile set; run set_motion_profile first, or pass velocity and acceleration."
-        return self.profile, None
-
-    def _move(self, job, target, profile, relative):
-        """Start a move, release the lock, then wait for the move to finish.
-
-        The lock is only held while starting the move, so acq keeps
-        sampling the stage positions during the motion. self.moving blocks
-        any other move from starting until this one completes.
-
-        Args:
-            job (str): Name to record on the lock.
-            target (tuple): (x, y, z) distances (relative) or positions
-                (absolute), in mm.
-            profile (MotionProfile): Motion profile for the move.
-            relative (bool): If True, move by target; otherwise move to target.
-
-        Returns:
-            tuple: (ok, error_message). error_message is None on success.
-
-        """
-        with self.lock.acquire_timeout(timeout=5, job=job) as acquired:
-            if not acquired:
-                self.log.warn(f"Could not start Task because "
-                              f"{self.lock.job} is already running")
-                return False, "Could not acquire lock"
-
-            axes = self.axes.values()
-            if self.moving or any(a.state.move_in_progress for a in axes):
-                return False, "A move is already in progress."
-
-            try:
-                if relative:
-                    travel = sum(abs(d) for d in target)
-                    self.group.move_relative_async(target, profile)
-                else:
-                    current = [a.state.position for a in axes]
-                    travel = sum(abs(t - c) for t, c in zip(target, current))
-                    self.group.move_absolute_async(target, profile)
-            except Exception as e:
-                self.log.error(f"Failed to start move: {e}")
-                return False, f"Failed to start move: {e}"
-            self.moving = True
-
-        if profile.velocity == 0:
-            timeout = 10
-        else:
-            timeout = 2 * travel / abs(profile.velocity) + 10
-        try:
-            self.group.wait_for_move_completion(timeout)
-        except Exception as e:
-            self.log.error(f"Move did not complete: {e}")
-            return False, f"Move did not complete within {timeout:.1f} s: {e}"
-        finally:
-            self.moving = False
-
-        return True, None
 
     @ocs_agent.param('velocity', type=float)
     @ocs_agent.param('acceleration', type=float)
@@ -293,15 +237,19 @@ class VentionControllerAgent:
             return False, "Agent not initialized; run init first."
         distances = params['distances']
 
-        profile, err = self._get_profile(params['velocity'], params['acceleration'])
+        profile, err = get_profile(self, params['velocity'], params['acceleration'])
         if err:
             return False, err
 
-        ok, err = self._move('set_relative_position', tuple(distances), profile, relative=True)
-        if not ok:
-            return False, err
+        with self.lock.acquire_timeout(timeout=5, job='home') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                                f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
 
-        return True, f"Moved stages by relative distances: {distances}."
+            self.group.move_relative_async(distances, profile)
+
+        return True, f"Commanded stages to move by relative distances: {distances}."
 
     @ocs_agent.param('distances', type=list)
     @ocs_agent.param('velocity', default=None, type=float)
@@ -325,15 +273,46 @@ class VentionControllerAgent:
             return False, "Agent not initialized; run init first."
         distances = params['distances']
 
-        profile, err = self._get_profile(params['velocity'], params['acceleration'])
+        profile, err = get_profile(self, params['velocity'], params['acceleration'])
         if err:
             return False, err
 
-        ok, err = self._move('set_absolute_position', tuple(distances), profile, relative=False)
-        if not ok:
-            return False, err
+        with self.lock.acquire_timeout(timeout=5, job='home') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                                f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
 
-        return True, f"Moved stages to absolute position: {distances}."
+            self.group.move_absolute_async(distances, profile)
+
+        return True, f"Commanded stages to move to absolute position: {distances}."
+
+    @ocs_agent.param('timeout', type=float, default=60)
+    def wait_for_move(self, session, params):
+        """wait_for_move(timeout=60)
+
+        **Task** - Wait for the current move to finish. Note that acq cannot happen while this task is running.
+
+        Parameters:
+            timeout (float, optional): The timeout for waiting for the move to finish, in seconds. Default is 60.
+
+        """
+        if not self.initialized:
+            return False, "Agent not initialized; run init first."
+
+        with self.lock.acquire_timeout(timeout=5, job='wait_for_move') as acquired:
+            if not acquired:
+                self.log.warn(f"Could not start Task because "
+                              f"{self.lock.job} is already running")
+                return False, "Could not acquire lock"
+
+            try:
+                self.group.wait_for_move_completion(params['timeout'])
+            except Exception as e:
+                self.log.error(f"Move did not complete: {e}")
+                return False, f"Move did not complete within {params['timeout']:.1f} s: {e}"
+
+        return True, "Move completed successfully."
 
     @ocs_agent.param('timeout', default=60., type=float)
     def home(self, session, params):
@@ -357,10 +336,6 @@ class VentionControllerAgent:
                               f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            if self.moving or any(a.state.move_in_progress for a in self.axes.values()):
-                return False, "A move is already in progress."
-            self.moving = True
-
         try:
             for name, axis in self.axes.items():
                 self.log.info(f"Homing {name} axis")
@@ -368,8 +343,6 @@ class VentionControllerAgent:
         except Exception as e:
             self.log.error(f"Homing {name} axis failed: {e}")
             return False, f"Homing {name} axis failed: {e}"
-        finally:
-            self.moving = False
 
         return True, "Homed all axes."
 
@@ -427,6 +400,7 @@ def main(args=None):
     agent.register_task('set_motion_profile', ventioncontroller_agent.set_motion_profile)
     agent.register_task('set_relative_position', ventioncontroller_agent.set_relative_position)
     agent.register_task('set_absolute_position', ventioncontroller_agent.set_absolute_position)
+    agent.register_task('wait_for_move', ventioncontroller_agent.wait_for_move)
     agent.register_task('home', ventioncontroller_agent.home)
     agent.register_task('check_sensors', ventioncontroller_agent.check_sensors)
     agent.register_process('acq', ventioncontroller_agent.acq, ventioncontroller_agent._stop_acq)
@@ -435,4 +409,7 @@ def main(args=None):
 
 
 if __name__ == '__main__':
+    from multiprocessing import resource_tracker
+
+    resource_tracker.ensure_running()
     main()
