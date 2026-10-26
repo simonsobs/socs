@@ -47,6 +47,7 @@ class VentionControllerAgent:
 
         self.initialized = False
         self.take_data = False
+        self.is_moving = False
 
         self.stage = None
         self.profile = None
@@ -153,6 +154,7 @@ class VentionControllerAgent:
                         data[f'{name}pos'] = axis.state.position
                         data[f'{name}vel'] = axis.state.speed
                         data[f'{name}home'], data[f'{name}end'] = int(axis.state.end_sensors[0]), int(axis.state.end_sensors[1])
+                    self.is_moving = any(axis.state.move_in_progress for axis in self.axes.values())
                     if session.degraded:
                         self.log.info("Connection re-established.")
                         session.degraded = False
@@ -241,7 +243,7 @@ class VentionControllerAgent:
         if err:
             return False, err
 
-        with self.lock.acquire_timeout(timeout=5, job='home') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='set_relative_position') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                                 f"{self.lock.job} is already running")
@@ -249,7 +251,20 @@ class VentionControllerAgent:
 
             self.group.move_relative_async(distances, profile)
 
-        return True, f"Commanded stages to move by relative distances: {distances}."
+        time.sleep(1)
+        while True:
+            # data acquisition updates the moving field if it is running
+            if not self.take_data:
+                with self.lock.acquire_timeout(timeout=3, job='set_relative_position') as acquired:
+                    if not acquired:
+                        self.log.warn(f"Could not check because lock held by {self.lock.job}")
+                        return False, "Could not acquire lock"
+                    self.is_moving = any(axis.state.move_in_progress for axis in self.axes.values())
+
+            if not self.is_moving:
+                break
+
+        return True, f"Completed move by relative distances: {distances}."
 
     @ocs_agent.param('distances', type=list)
     @ocs_agent.param('velocity', default=None, type=float)
@@ -277,7 +292,7 @@ class VentionControllerAgent:
         if err:
             return False, err
 
-        with self.lock.acquire_timeout(timeout=5, job='home') as acquired:
+        with self.lock.acquire_timeout(timeout=5, job='set_absolute_position') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
                                 f"{self.lock.job} is already running")
@@ -285,34 +300,20 @@ class VentionControllerAgent:
 
             self.group.move_absolute_async(distances, profile)
 
-        return True, f"Commanded stages to move to absolute position: {distances}."
+        time.sleep(1)
+        while True:
+            # data acquisition updates the moving field if it is running
+            if not self.take_data:
+                with self.lock.acquire_timeout(timeout=3, job='set_absolute_position') as acquired:
+                    if not acquired:
+                        self.log.warn(f"Could not check because lock held by {self.lock.job}")
+                        return False, "Could not acquire lock"
+                    self.is_moving = any(axis.state.move_in_progress for axis in self.axes.values())
 
-    @ocs_agent.param('timeout', type=float, default=60)
-    def wait_for_move(self, session, params):
-        """wait_for_move(timeout=60)
+            if not self.is_moving:
+                break
 
-        **Task** - Wait for the current move to finish. Note that acq cannot happen while this task is running.
-
-        Parameters:
-            timeout (float, optional): The timeout for waiting for the move to finish, in seconds. Default is 60.
-
-        """
-        if not self.initialized:
-            return False, "Agent not initialized; run init first."
-
-        with self.lock.acquire_timeout(timeout=5, job='wait_for_move') as acquired:
-            if not acquired:
-                self.log.warn(f"Could not start Task because "
-                              f"{self.lock.job} is already running")
-                return False, "Could not acquire lock"
-
-            try:
-                self.group.wait_for_move_completion(params['timeout'])
-            except Exception as e:
-                self.log.error(f"Move did not complete: {e}")
-                return False, f"Move did not complete within {params['timeout']:.1f} s: {e}"
-
-        return True, "Move completed successfully."
+        return True, f"Completed move to absolute position: {distances}."
 
     @ocs_agent.param('timeout', default=60., type=float)
     def home(self, session, params):
@@ -400,7 +401,6 @@ def main(args=None):
     agent.register_task('set_motion_profile', ventioncontroller_agent.set_motion_profile)
     agent.register_task('set_relative_position', ventioncontroller_agent.set_relative_position)
     agent.register_task('set_absolute_position', ventioncontroller_agent.set_absolute_position)
-    agent.register_task('wait_for_move', ventioncontroller_agent.wait_for_move)
     agent.register_task('home', ventioncontroller_agent.home)
     agent.register_task('check_sensors', ventioncontroller_agent.check_sensors)
     agent.register_process('acq', ventioncontroller_agent.acq, ventioncontroller_agent._stop_acq)
