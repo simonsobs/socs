@@ -121,10 +121,10 @@ class VentionControllerAgent:
             The data collected is stored in session data in the structure:
 
                 >> response.session['data']
-                {'fields': {'xpos':0.0, 'xvel':0.0, 'xhome':0.0, 'xend':0.0, 
-                            'ypos':0.0, 'yvel':0.0, 'yhome':0.0, 'yend':0.0, 
-                            'zpos':0.0, 'zvel':0.0, 'zhome':0.0, 'zend':0.0}}, 
-                            'timestamp': 1764009732.0866072}
+                {'fields': {'xpos': 24.978515625, 'xvel': 0.0, 'xhome': 0, 'xend': 0,
+                            'ypos': 24.990234375, 'yvel': 0.0, 'yhome': 0, 'yend': 0,
+                            'zpos': 24.9765625, 'zvel': 0.0, 'zhome': 0, 'zend': 0},
+                 'timestamp': 1792526637.1090364}
 
         """
         with self.lock.acquire_timeout(0, job='acq') as acquired:
