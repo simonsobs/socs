@@ -137,7 +137,7 @@ class VentionControllerAgent:
 
             self.take_data = True
 
-            pm = Pacemaker(1 / 3, quantize=False)
+            pm = Pacemaker(5, quantize=False)
             while self.take_data:
                 pm.sleep()
                 # Reliqinuish sampling lock occassionally
