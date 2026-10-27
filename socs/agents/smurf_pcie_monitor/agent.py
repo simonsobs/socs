@@ -1,3 +1,5 @@
+# Code developed with AI assistance.
+
 import argparse
 import os
 import time
@@ -30,18 +32,12 @@ class SmurfPcieMonitorAgent:
         """Connect to the rogue ZMQ server. Returns True on success."""
         import pyrogue.interfaces
         try:
-            if self._client is not None:
-                try:
-                    self._client.stop()
-                except Exception:
-                    pass
-                self._client = None
+            self._disconnect()
             host, port = self.zmq_addr.rsplit(':', 1)
             self._client = pyrogue.interfaces.VirtualClient(
                 addr=host,
                 port=int(port),
             )
-            self._client.root.Core
             self.log.info("Connected to rogue server at {addr}",
                           addr=self.zmq_addr)
             return True
@@ -54,7 +50,7 @@ class SmurfPcieMonitorAgent:
         """Disconnect from the rogue ZMQ server."""
         if self._client is not None:
             try:
-                self._client.close()
+                self._client.stop()
             except Exception:
                 pass
             self._client = None
@@ -66,13 +62,11 @@ class SmurfPcieMonitorAgent:
         data = {}
         for reg in self.registers:
             try:
-                node = self._client.root
-                for part in reg['path'].split('.'):
-                    if '[' in part:
-                        name, idx = part.rstrip(']').split('[')
-                        node = getattr(node, name)[int(idx)]
-                    else:
-                        node = getattr(node, part)
+                # Configured paths are relative to the root; getNode requires
+                # an absolute path and handles indexed nodes itself.
+                node = self._client.root.getNode(f"root.{reg['path']}")
+                if node is None:
+                    raise ValueError(f"Register at {reg['path']} doesn't exist.")
                 val = node.get()
                 data[reg['field_name']] = val
             except Exception as e:
