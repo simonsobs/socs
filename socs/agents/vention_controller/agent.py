@@ -68,7 +68,7 @@ class VentionControllerAgent:
     def init(self, session, params=None):
         """init(auto_acquire=False)
 
-        **Task** - Initalize connection to Vention controller.
+        **Task** - Initialize connection to Vention controller.
 
         Parameters:
             auto_acquire(bool):  If True, start acquisition immediately after
@@ -101,7 +101,7 @@ class VentionControllerAgent:
 
         self.initialized = True
 
-        # start data acquistion if requested
+        # start data acquisition if requested
         if params['auto_acquire']:
             resp = self.agent.start('acq', params={})
             self.log.info(f'Response from acq.start(): {resp[1]}')
@@ -121,7 +121,7 @@ class VentionControllerAgent:
         Notes:
             The data collected is stored in session data in the structure:
 
-                >> response.session['data']
+                >>> response.session['data']
                 {'fields': {'xpos': 24.978515625, 'xvel': 0.0, 'xhome': 0, 'xend': 0,
                             'ypos': 24.990234375, 'yvel': 0.0, 'yhome': 0, 'yend': 0,
                             'zpos': 24.9765625, 'zvel': 0.0, 'zhome': 0, 'zend': 0},
@@ -140,7 +140,7 @@ class VentionControllerAgent:
             pm = Pacemaker(5, quantize=False)
             while self.take_data:
                 pm.sleep()
-                # Reliqinuish sampling lock occassionally
+                # Relinquish sampling lock occassionally
                 if time.time() - last_release > 1:
                     last_release = time.time()
                     if not self.lock.release_and_acquire(timeout=10):
