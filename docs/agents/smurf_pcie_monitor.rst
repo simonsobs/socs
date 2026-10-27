@@ -6,6 +6,9 @@
 SMuRF PCIe Monitor Agent
 =========================
 
+.. image:: https://img.shields.io/badge/AI-assisted-orange
+   :alt: Agent written with AI assistance
+
 The SMuRF PCIe Monitor Agent monitors a configurable subset of PCIe card
 registers via the rogue 6 ZMQ server running inside the ``smurf-pcie-docker``
 container.
@@ -55,18 +58,15 @@ The agent connects to a rogue 6 ZMQ server running in a separate
 ``smurf-pcie-docker`` container. Both containers should use
 ``network_mode: host`` so they can communicate over ``localhost``.
 
-An example docker compose service for the **rogue server** container::
+The server must be configured separately to expose the PCIe rogue tree on
+an explicit ZMQ port matching ``--zmq-addr``. SOCS does not provide a server
+launcher; a custom startup script must be supplied by the deployment. See the `upstream container documentation
+<https://github.com/slaclab/smurf-pcie-docker>`_ for the tools provided by
+that image.
 
-  smurf-pcie-server:
-    image: ghcr.io/slaclab/smurf-pcie:R3.3.3
-    network_mode: host
-    container_name: smurf-pcie-server
-    restart: unless-stopped
-    devices:
-      - /dev/datadev_0
-    volumes:
-      - ./shared:/shared
-    command: python3 /shared/start_server.py --port 9200
+The monitor uses an existing server so it does not need to own the PCIe
+hardware tree. Running the tree inside this agent would require a different
+hardware setup and lifecycle; it is not implemented here.
 
 An example docker compose service for the **OCS agent** container::
 
@@ -90,8 +90,8 @@ Register Config
 ---------------
 
 The agent reads a YAML file that specifies which rogue register paths to
-monitor. Each entry specifies a rogue tree ``path`` and a short
-``field_name`` used as the key in the published data feed. An example
+monitor. Each entry specifies a rogue tree ``path`` relative to the root and a
+short ``field_name`` used as the key in the published data feed. An example
 ``pcie_regs.yaml``::
 
     registers:
@@ -132,8 +132,7 @@ Description
 The SMuRF system uses a KCU1500 PCIe card to route data between the ATCA
 carrier boards and the data acquisition server over 10 GbE links. The PCIe
 card firmware exposes diagnostic registers through a rogue variable tree. The
-``smurf-pcie-docker`` container starts a rogue 6 server that makes these
-registers accessible over a ZMQ interface.
+server must expose this tree through a rogue 6 ZMQ interface.
 
 This agent connects to that ZMQ server as a rogue 6 ``VirtualClient`` and
 periodically reads the subset of registers specified in the YAML configuration
