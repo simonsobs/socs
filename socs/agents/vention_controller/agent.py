@@ -1,13 +1,13 @@
 import argparse
-from operator import pos
 import os
 import time
+from operator import pos
 
 import yaml
+from machinelogic import ActuatorGroup, Machine, MotionProfile
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
-from machinelogic import Machine, MotionProfile, ActuatorGroup
 
 def get_profile(agent, velocity, acceleration):
     """Select the motion profile to use for a movement.
@@ -27,6 +27,7 @@ def get_profile(agent, velocity, acceleration):
     if agent.profile is None:
         return None, "No profile set; run set_motion_profile first, or pass velocity and acceleration."
     return agent.profile, None
+
 
 class VentionControllerAgent:
     """ Agent for controlling Vention linear actuators for use with the FTS-coupling optics instrument for on-site passband measurements of the LAT.
@@ -178,7 +179,7 @@ class VentionControllerAgent:
         self.agent.feeds['stage_status'].flush_buffer()
 
         return True, 'Acquisition exited cleanly.'
-    
+
     def _stop_acq(self, session, params):
         """
         Stops acq process.
@@ -208,13 +209,12 @@ class VentionControllerAgent:
         with self.lock.acquire_timeout(timeout=5, job='set_motion_profile') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
-                                f"{self.lock.job} is already running")
+                              f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
             # set motion profile
             self.profile = MotionProfile(velocity=velocity, acceleration=acceleration)
         return True, f"Commanded stages to set motion profile with velocity={velocity}, acceleration={acceleration}."
-
 
     @ocs_agent.param('distances', type=list)
     @ocs_agent.param('velocity', default=None, type=float)
@@ -245,7 +245,7 @@ class VentionControllerAgent:
         with self.lock.acquire_timeout(timeout=5, job='set_relative_position') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
-                                f"{self.lock.job} is already running")
+                              f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
             self.group.move_relative_async(distances, profile)
@@ -294,7 +294,7 @@ class VentionControllerAgent:
         with self.lock.acquire_timeout(timeout=5, job='set_absolute_position') as acquired:
             if not acquired:
                 self.log.warn(f"Could not start Task because "
-                                f"{self.lock.job} is already running")
+                              f"{self.lock.job} is already running")
                 return False, "Could not acquire lock"
 
             self.group.move_absolute_async(distances, profile)
@@ -352,7 +352,7 @@ class VentionControllerAgent:
         **Task** - Return the current [home, end] sensor states for each axis.
 
         Notes:
-            This task returns the sensor states as boolean values, whereas acq stores them as integers (0/1). 
+            This task returns the sensor states as boolean values, whereas acq stores them as integers (0/1).
 
         """
         if not self.initialized:
@@ -360,6 +360,7 @@ class VentionControllerAgent:
 
         states = {name: axis.state.end_sensors for name, axis in self.axes.items()}
         return True, f"[home, end] sensor states: {states}"
+
 
 def make_parser(parser=None):
     """Build the argument parser for the Agent. Allows sphinx to automatically build documentation based on this function.
@@ -406,7 +407,7 @@ def main(args=None):
     agent.register_task('home', ventioncontroller_agent.home)
     agent.register_task('check_sensors', ventioncontroller_agent.check_sensors)
     agent.register_process('acq', ventioncontroller_agent.acq, ventioncontroller_agent._stop_acq)
-    
+
     runner.run(agent, auto_reconnect=True)
 
 
