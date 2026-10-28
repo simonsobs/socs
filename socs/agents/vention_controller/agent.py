@@ -29,11 +29,10 @@ def get_profile(agent, velocity, acceleration):
     return agent.profile, None
 
 class VentionControllerAgent:
-    """ Agent for controlling Vention actuator motors used in LAT FTS
-    coupling optics instrument for passband measurements on-site.
+    """ Agent for controlling Vention linear actuators for use with the FTS-coupling optics instrument for on-site passband measurements of the LAT.
 
     Args:
-        ip (str): IP address for the Vention actuator controller
+        ip (str): IP address for the Vention motor controller
         port (int, optional): TCP port for controller communication.
             Default is 23
     """
@@ -112,7 +111,7 @@ class VentionControllerAgent:
     def acq(self, session, params):
         """acq()
 
-        **Process** - Starts acquisition of data from the Vention Controller.
+        **Process** - Starts acquisition of data from the Vention controller.
 
         Parameters:
             test_mode (bool, optional): Run the process loop only once.
@@ -195,7 +194,7 @@ class VentionControllerAgent:
     def set_motion_profile(self, session, params):
         """set_motion_profile(velocity, acceleration)
 
-        **Task** - Set the motion profile (i.e. velocity and acceleration) for the stages in self.profile.
+        **Task** - Set the motion profile (i.e. velocity and acceleration) for subsequent axis motion commands.
 
         Parameters:
             velocity (float): The velocity to use, in mm/s.
@@ -223,15 +222,15 @@ class VentionControllerAgent:
     def set_relative_position(self, session, params):
         """set_relative_position(distances, velocity=None, acceleration=None)
 
-        **Task** - Set the relative 3D position location for the stages.
+        **Task** - Move the axes by (x, y, z) relative to their current position.
 
         Parameters:
-            distances (list): A list of relative (x,y,z) distance values, in millimeters.
+            distances (list): A list of relative (x,y,z) distance values, in mm.
             velocity (float, optional): The velocity to use for the movement, in mm/s.
             acceleration (float, optional): The acceleration to use for the movement, in mm/s^2.
 
         Notes:
-            velocity and acceleration must be given together. If neither is
+            Velocity and acceleration must be given together. If neither is
             given, the profile from set_motion_profile is used.
 
         """
@@ -272,15 +271,15 @@ class VentionControllerAgent:
     def set_absolute_position(self, session, params):
         """set_absolute_position(distances, velocity=None, acceleration=None)
 
-        **Task** - Set the absolute 3D position location for the stages.
+        **Task** - Move the axes to a specified absolute (x, y, z) position.
 
         Parameters:
-            distances (list): A list of absolute (x,y,z) position values, in millimeters.
+            distances (list): A list of absolute (x,y,z) position values, in mm.
             velocity (float, optional): The velocity to use for the movement, in mm/s.
             acceleration (float, optional): The acceleration to use for the movement, in mm/s^2.
 
         Notes:
-            velocity and acceleration must be given together. If neither is
+            Velocity and acceleration must be given together. If neither is
             given, the profile from set_motion_profile is used.
 
         """
@@ -319,7 +318,7 @@ class VentionControllerAgent:
     def home(self, session, params):
         """home(timeout=60)
 
-        **Task** - Home the stages, one axis at a time, in x, y, z order.
+        **Task** - Home the stages, one axis at a time, in (x, y, z) order.
 
         Parameters:
             timeout (float, optional): The timeout for homing each axis, in
@@ -351,6 +350,9 @@ class VentionControllerAgent:
         """check_sensors()
 
         **Task** - Return the current [home, end] sensor states for each axis.
+
+        Notes:
+            This task returns the sensor states as boolean values, whereas acq stores them as integers (0/1). 
 
         """
         if not self.initialized:
