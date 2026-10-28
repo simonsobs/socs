@@ -48,14 +48,6 @@ An example site-config-file block::
                    '--port', '32',
                    '--sensor-type', 'DWL']},
 
-An example for SLP2::
-
-    {'agent-class': 'WiregridTiltSensorAgent',
-     'instance-id': 'wg-tilt-sensor',
-     'arguments': ['--ip-address', '10.10.10.71',
-                   '--port', '32',
-                   '--sensor-type', 'slp2']},
-
 - ``ip-address`` is an IP address of the serial-to-ethernet converter.
 - ``port`` is an assigned port for the tilt sensor.
   (The converter has four D-sub ports, 23, 26, 29, 32, to control
