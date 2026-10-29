@@ -9,6 +9,9 @@ ON_RTD = os.environ.get('READTHEDOCS') == 'True'
 if not ON_RTD:
     try:
         asyncioreactor.install(asyncio.get_event_loop())
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
     except ReactorAlreadyInstalledError:
         print('Error: Failed to install the asyncioreactor.')
 # /asyncioreactor setup
