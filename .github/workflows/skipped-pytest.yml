@@ -13,7 +13,7 @@ on:
 
 jobs:
   unit-test:
-    name: Run unit tests (3.11)
+    name: Run unit tests (3.12)
     runs-on: ubuntu-latest
 
     steps:
