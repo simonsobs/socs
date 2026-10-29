@@ -9,6 +9,7 @@ pyserial
 pysnmp
 pysmi
 pyasn1
+machine-logic-sdk
 
 # common dependencies - used by multiple agents
 numpy
