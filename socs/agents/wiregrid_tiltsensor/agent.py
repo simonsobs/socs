@@ -1,3 +1,4 @@
+# Code developed with AI assistance.
 import time
 
 from ocs import ocs_agent, site_config
@@ -17,10 +18,10 @@ class WiregridTiltSensorAgent:
             multiple devices is determined
             by the ethernet port number of converter.
         sensor_type (str): Type of tilt sensor
-            There are twp types of tilt sensor,
+            There are three types of tilt sensor,
             and this argument is used for specifying
             to communicate with whichtilt sensor.
-            This argument should be 'DWL' or 'sherborne'.
+            This argument should be 'DWL', 'sherborne' or 'slp2'.
     """
 
     def __init__(self, agent, ip, port, sensor_type=None):
@@ -71,7 +72,11 @@ class WiregridTiltSensorAgent:
                     'temperatureX': the temperature in X-axis of tilt sensor
                                     this is available for only sherborne,
                     'temperatureY': the temperature in Y-axis of tilt sensor
-                                    this is available for only sherborne
+                                    this is available for only sherborne,
+                    'temperature': the temperature of tilt sensor
+                                   (common to both axes)
+                                   this is available for only slp2
+                                   and replaces temperatureX/Y
                     },
                 'timestamp': timestamp when it updates tilt sensor data
                 }
@@ -79,9 +84,9 @@ class WiregridTiltSensorAgent:
 
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
-                self.log.warn(
-                    'Could not start acq because {} is already running'
-                )
+                msg = f'Could not start acq because {self.lock.job} is already running'
+                self.log.warn(msg)
+                return False, msg
 
             # Initialize a take_data flag
             self.take_data = True
@@ -93,10 +98,14 @@ class WiregridTiltSensorAgent:
                 'data': {
                     'angleX': -999,
                     'angleY': -999,
-                    'temperatureX': -999,
-                    'temperatureY': -999,
                 },
             }
+            # slp2 has a single temperature sensor common to both axes
+            if self.sensor_type == 'slp2':
+                tiltsensor_data['data']['temperature'] = -999
+            else:
+                tiltsensor_data['data']['temperatureX'] = -999
+                tiltsensor_data['data']['temperatureY'] = -999
 
             self.log.info("Starting the count!")
 
@@ -112,14 +121,20 @@ class WiregridTiltSensorAgent:
                 # data taking
                 current_time = time.time()
                 try:
+                    # reconnect if the previous connection was dropped
+                    if self.tiltsensor is None:
+                        self._connect()
                     msg, angles = self.tiltsensor.get_angle()
                     self.log.debug(f'self.tiltsensor.get_angle(): {msg}')
-                except (ValueError, RuntimeError, TypeError) as e:
+                    if self.sensor_type == 'slp2':
+                        msg, temperature = self.tiltsensor.get_temp()
+                        self.log.debug(f'self.tiltsensor.get_temp(): {msg}')
+                except (ValueError, RuntimeError, TypeError, OSError) as e:
                     self.log.warn(e)
-                    msg = 'Failed to get angle. -> Reconnect to the sensor'
+                    msg = 'Failed to get data. -> Reconnect to the sensor'
                     self.log.warn(msg)
-                    del self.tiltsensor
-                    self._connect()
+                    # close the connection and reconnect in the next loop
+                    self.tiltsensor = None
                     self.pm.sleep()  # DAQ interval
                     continue
 
@@ -140,6 +155,8 @@ class WiregridTiltSensorAgent:
                 tiltsensor_data['timestamp'] = current_time
                 tiltsensor_data['data']['angleX'] = angles[0]
                 tiltsensor_data['data']['angleY'] = angles[1]
+                if self.sensor_type == 'slp2':
+                    tiltsensor_data['data']['temperature'] = temperature
                 # if self.sensor_type == 'sherborne':
                 #     tiltsensor_data['data']['temperatureX'] = temperatures[0]
                 #     tiltsensor_data['data']['temperatureY'] = temperatures[1]
@@ -148,12 +165,7 @@ class WiregridTiltSensorAgent:
 
                 # store the session data
                 session.data = {
-                    'tiltsensor_data': {
-                        'angleX': tiltsensor_data['data']['angleX'],
-                        'angleY': tiltsensor_data['data']['angleY'],
-                        'temperatureX': tiltsensor_data['data']['temperatureX'],
-                        'temperatureY': tiltsensor_data['data']['temperatureY']
-                    },
+                    'tiltsensor_data': dict(tiltsensor_data['data']),
                     'timestamp': current_time
                 }
 
@@ -189,12 +201,15 @@ class WiregridTiltSensorAgent:
 
         with self.lock.acquire_timeout(timeout=3.0, job='reset') as acquired:
             if not acquired:
-                self.log.warn("Lock could not be acquired because it "
-                              + f"is held by {self.lock.job}")
-                return False
+                msg = ("Lock could not be acquired because it "
+                       + f"is held by {self.lock.job}")
+                self.log.warn(msg)
+                return False, msg
 
             if self.sensor_type != 'sherborne':
                 return False, "This type of tiltsensor cannot reset."
+            elif self.tiltsensor is None:
+                return False, "The tiltsensor is not connected."
             else:
                 # Log the text provided to the Agent logs
                 self.log.info("running reset")
@@ -215,13 +230,14 @@ def make_parser(parser_in=None):
 
     pgroup = parser_in.add_argument_group('Agent Options')
     pgroup.add_argument('--ip-address', dest='ip', type=str, default=None,
-                        help='The ip adress of the serial-to-ethernet converter')
+                        help='The ip address of the serial-to-ethernet converter')
     pgroup.add_argument('--port', dest='port', type=str, default=None,
-                        help='The assigned port of the serial-to-ethernet converter '
-                             'for the tilt sensor')
+                        help='The assigned port of the serial-to-ethernet converter'
+                             ' for the tilt sensor')
     pgroup.add_argument('--sensor-type',
                         dest='sensor_type',
                         type=str, default=None,
+                        choices=['DWL', 'sherborne', 'slp2'],
                         help='The type of tilt sensor '
                              'running wiregrid tilt sensor DAQ')
     return parser_in
