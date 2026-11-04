@@ -1,9 +1,6 @@
 import argparse
-import os
 import time
-from operator import pos
 
-import yaml
 from machinelogic import ActuatorGroup, Machine, MotionProfile
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
