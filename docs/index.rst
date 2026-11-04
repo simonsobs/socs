@@ -88,6 +88,7 @@ API Reference        Full API documentation for core parts of the SOCS library.
     agents/ucsc_radiometer
     agents/ups
     agents/vantage_pro2
+    agents/vention_controller
     agents/wiregrid_actuator
     agents/wiregrid_encoder
     agents/wiregrid_kikusui
