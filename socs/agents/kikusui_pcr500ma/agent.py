@@ -1,19 +1,67 @@
 #!/usr/bin/env python3
+# Code developed with AI assistance.
 import argparse
+import math
 import os
 import time
+from dataclasses import dataclass
 
 import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
-from socs.agents.kikusui_pcr500ma.drivers import PCR500MA, VOLT_ULIM_SOFT
+from socs.agents.kikusui_pcr500ma.drivers import (PCR500MA, VOLT_ULIM_SOFT,
+                                                  PCRException)
 
 PORT_DEFAULT = 5025
 
 LOCK_RELEASE_SEC = 1.
 LOCK_RELEASE_TIMEOUT = 10
 ACQ_TIMEOUT = 5
+VOLT_STEP = 1.
+VOLT_ALLOW = 1.2
+RAMP_TIME_STEP = 7.
+
+
+class PCRStateError(Exception):
+    """A requested operation is not allowed in the current device state."""
+
+
+@dataclass(frozen=True)
+class PCRState:
+    """Device readbacks and the safety rules for control operations."""
+
+    output: bool
+    volt_set: float
+    measured: float
+
+    def check_output_on(self):
+        """Require a zero voltage setting before enabling the output."""
+        if self.volt_set != 0:
+            raise PCRStateError('Voltage setting must be zero to turn output on.')
+
+    def check_output_off(self):
+        """Require a low measured voltage before disabling the output."""
+        if not math.isfinite(self.measured) or self.measured >= 0.2:
+            raise PCRStateError('Measured voltage too high to turn output off.')
+
+    def check_voltage_consistency(self):
+        """Check that valid voltage readbacks agree with the setting."""
+        if not (0 <= self.volt_set <= VOLT_ULIM_SOFT and self.measured >= 0):
+            raise PCRStateError('Invalid voltage readback.')
+        if abs(self.volt_set - self.measured) > VOLT_ALLOW:
+            raise PCRStateError(f'Voltage discrepancy: setting {self.volt_set} V, measured {self.measured} V.')
+
+    def check_voltage_step(self, next_voltage):
+        """Check a proposed ramp step after checking voltage consistency."""
+        if not self.output:
+            raise PCRStateError('Output turned off during ramp.')
+        lower = max(0, self.volt_set - VOLT_STEP)
+        upper = min(VOLT_ULIM_SOFT, self.volt_set + VOLT_STEP)
+        if not lower <= next_voltage <= upper:
+            raise PCRStateError(f'Voltage step must stay within 0 to {VOLT_ULIM_SOFT} V and change by at most {VOLT_STEP} V.')
+        if abs(next_voltage - self.measured) > VOLT_ALLOW:
+            raise PCRStateError(f'Next voltage {next_voltage} V is too far from measured {self.measured} V.')
 
 
 class PCR500MAAgent:
@@ -32,6 +80,7 @@ class PCR500MAAgent:
         self.agent = agent
         self.log = agent.log
         self.lock = TimeoutLock()
+        self.lock_ramp = TimeoutLock()  # Lock to protect control during ramping operations
         self.take_data = False
 
         self._dev = PCR500MA(ip_addr=ip_addr, port=port)
@@ -48,7 +97,7 @@ class PCR500MAAgent:
     def acq(self, session, params):
         """acq(sampling_frequency=0.2)
 
-        **Process** - Monitor status of the relay.
+        **Process** - Monitor power supply measurements and settings.
 
         Parameters
         ----------
@@ -65,6 +114,7 @@ class PCR500MAAgent:
              "P_AC": 0.0,
              "f_AC": 60.0,
              "output": 0,
+             "volt_set": 0.0,
              "timestamp": 1737367649.2595236
             }
         """
@@ -98,6 +148,7 @@ class PCR500MAAgent:
                     p_ac = self._dev.meas_power_ac()
                     f_ac = self._dev.meas_freq()
                     sw_status = self._dev.get_output()
+                    volt_set = self._dev.get_volt_ac()
                     if session.degraded:
                         self.log.info('Connection re-established.')
                         session.degraded = False
@@ -112,12 +163,14 @@ class PCR500MAAgent:
                 data['data']['P_AC'] = p_ac
                 data['data']['f_AC'] = f_ac
                 data['data']['output'] = 1 if sw_status else 0
+                data['data']['volt_set'] = volt_set
 
                 field_dict = {'I_AC': i_ac,
                               'V_AC': v_ac,
                               'P_AC': p_ac,
                               'f_AC': f_ac,
-                              'output': 1 if sw_status else 0}
+                              'output': 1 if sw_status else 0,
+                              'volt_set': volt_set}
 
                 session.data.update(field_dict)
 
@@ -161,6 +214,12 @@ class PCR500MAAgent:
         change in applied voltage.
         Set `force` option to `True` when this behavior is unwanted.
         """
+        with self.lock_ramp.acquire_timeout(0, job='set_output') as control_acquired:
+            if not control_acquired:
+                return False, f'Control operation {self.lock_ramp.job} is already running.'
+            return self._set_output(session, params)
+
+    def _set_output(self, session, params):
         with self.lock.acquire_timeout(ACQ_TIMEOUT, job='set_output') as acquired:
             if not acquired:
                 self.log.warn('Could not start set_output because '
@@ -168,57 +227,24 @@ class PCR500MAAgent:
                 return False, 'Could not acquire lock.'
 
             output_on = params['output']
-            force = params['force']
-            # Use measurement value when checking turning off threshold.
-            use_meas_val = not output_on
+            if not params['force']:
+                state = self._read_voltage_state()
+                try:
+                    if output_on:
+                        state.check_output_on()
+                    else:
+                        state.check_output_off()
+                except PCRStateError as err:
+                    return False, str(err)
 
-            if force:
-                self._dev.set_output(output=output_on)
-            else:
-                if use_meas_val:
-                    volt_ac = self._dev.meas_volt_ac()
-                    if volt_ac >= 0.2:
-                        return False, 'Voltage too high to turn on/off.'
-                else:
-                    volt_set = self._dev.get_volt_ac()
-                    if volt_set != 0:
-                        return False, 'Voltage too high to turn on/off.'
-
-                self._dev.set_output(output=output_on)
+            self._dev.set_output(output=output_on)
 
         return True, f'Set output for PCR: {params["output"]}'
 
-    @ocs_agent.param('_')
-    def get_output(self, session, params=None):
-        """get_output()
-
-        **Task** - Get output status.
-
-        Notes
-        -----
-        The most recent data collected is stored in session.data in the
-        structure::
-
-            >>> response.session['data']
-            {'output': True,
-             'timestamp': 1737367649.2595236
-            }
-        """
-        with self.lock.acquire_timeout(ACQ_TIMEOUT, job='get_output') as acquired:
-            if not acquired:
-                self.log.warn('Could not start get_output because '
-                              f'{self.lock.job} is already running')
-                return False, 'Could not acquire lock.'
-
-            d_status = self._dev.get_output()
-            session.data = {'output': d_status,
-                            'timestamp': time.time()}
-
-        return True, f'Got output status of PCR: {d_status}'
-
     @ocs_agent.param('volt_set', type=float, check=lambda x: 0 <= x <= VOLT_ULIM_SOFT)
+    @ocs_agent.param('force', default=False, type=bool)
     def set_volt_ac(self, session, params=None):
-        """set_volt_ac(volt_set)
+        """set_volt_ac(volt_set, force=False)
 
         **Task** - Set AC voltage value.
 
@@ -226,44 +252,140 @@ class PCR500MAAgent:
         ----------
         volt_set : float
             AC voltage setting in V. Values must be in range [0, 51].
+        force : bool, default False
+            Must be True to change the voltage immediately.
         """
-        with self.lock.acquire_timeout(ACQ_TIMEOUT, job='set_volt_ac') as acquired:
-            if not acquired:
-                self.log.warn('Could not start set_volt_ac because '
-                              f'{self.lock.job} is already running')
-                return False, 'Could not acquire lock.'
+        if not params['force']:
+            return False, 'Use ramp_to_voltage, or pass force=True for an immediate voltage change.'
 
-            self._dev.set_volt_ac(volt=params['volt_set'])
+        with self.lock_ramp.acquire_timeout(0, job='set_volt_ac') as control_acquired:
+            if not control_acquired:
+                return False, f'Control operation {self.lock_ramp.job} is already running.'
+            with self.lock.acquire_timeout(ACQ_TIMEOUT, job='set_volt_ac') as acquired:
+                if not acquired:
+                    return False, 'Could not acquire lock.'
+
+                self._dev.set_volt_ac(volt=params['volt_set'])
 
         return True, f'Set voltage for PCR: {params["volt_set"]}'
 
-    @ocs_agent.param('_')
-    def get_volt_ac(self, session, params=None):
-        """get_volt_ac()
+    def _read_voltage_state(self, session=None):
+        """Read fresh state with the device lock already held."""
+        state = PCRState(output=self._dev.get_output(),
+                         volt_set=self._dev.get_volt_ac(),
+                         measured=self._dev.meas_volt_ac())
+        if session is not None:
+            session.data.update({'output': state.output,
+                                 'volt_set': state.volt_set,
+                                 'V_AC': state.measured,
+                                 'timestamp': time.time()})
+        return state
 
-        **Task** - Get AC voltage setting.
+    def _prepare_ramp(self, session, target):
+        """Prepare the output with the device lock already held.
+
+        Return True if the zero target is reached with the output off.
+        """
+        if session.status == 'stopping':
+            return False
+        output = self._dev.get_output()
+        if session.status == 'stopping' or output:
+            return False
+
+        self._dev.set_volt_ac(volt=0)
+        state = self._read_voltage_state(session)
+        if state.output:
+            raise PCRStateError('Output turned on during ramp preparation.')
+        state.check_output_on()
+        if target == 0:
+            return True
+        if session.status == 'stopping':
+            return False
+
+        self._dev.set_output(output=True, verify=True)
+        return False
+
+    @ocs_agent.param('volt_set', type=float, check=lambda x: 0 <= x <= VOLT_ULIM_SOFT)
+    def ramp_to_voltage(self, session, params=None):
+        """ramp_to_voltage(volt_set)
+
+        **Task** - Safely ramp to an AC voltage and manage the output state.
+
+        Parameters
+        ----------
+        volt_set : float
+            Target AC voltage in V, in the range [0, 51]. A target of zero
+            ramps down and turns the output off.
 
         Notes
         -----
-        The most recent data collected is stored in session.data in the
-        structure::
+        Uses steps of at most 1 V with at least 7 seconds to settle. Fresh
+        measurements must be within 1.2 V of the current and next settings.
 
-            >>> response.session['data']
-            {'volt_set': 10.0,
-             'timestamp': 1737367649.2595236
-            }
+        An inactive output is reset to zero, then enabled for nonzero
+        targets only. Shutdown requires a measured voltage below 0.2 V.
+
+        Acquisition continues; other control tasks (even forced) are
+        rejected. Abort or failure leaves the last commanded state in place.
         """
-        with self.lock.acquire_timeout(ACQ_TIMEOUT, job='get_volt_ac') as acquired:
-            if not acquired:
-                self.log.warn('Could not start get_volt_ac because '
-                              f'{self.lock.job} is already running')
-                return False, 'Could not acquire lock.'
+        target = params['volt_set']
+        session.data = {'target_voltage': target}
+        with self.lock_ramp.acquire_timeout(0, job='ramp_to_voltage') as control_acquired:
+            if not control_acquired:
+                return False, f'Control operation {self.lock_ramp.job} is already running.'
 
-            volt_set = self._dev.get_volt_ac()
-            session.data = {'volt_set': volt_set,
-                            'timestamp': time.time()}
+            try:
+                with self.lock.acquire_timeout(LOCK_RELEASE_TIMEOUT, job='ramp_to_voltage') as acquired:
+                    if not acquired:
+                        return False, 'Could not acquire lock.'
+                    complete = self._prepare_ramp(session, target)
+                if complete:
+                    return True, 'Voltage reset to 0 V; output remains off.'
 
-        return True, f'Got AC voltage setting: {volt_set}'
+                while session.status != 'stopping':
+                    with self.lock.acquire_timeout(LOCK_RELEASE_TIMEOUT, job='ramp_to_voltage') as acquired:
+                        if not acquired:
+                            return False, 'Could not acquire lock.'
+
+                        state = self._read_voltage_state(session)
+                        if session.status == 'stopping':
+                            break
+
+                        state.check_voltage_consistency()
+
+                        current = state.volt_set
+                        if current == target and state.output:
+                            if target == 0:
+                                state.check_output_off()
+                                self._dev.set_output(output=False, verify=True)
+                                self._read_voltage_state(session)
+                            return True, f'Ramped voltage to {target} V.'
+
+                        if target > current:
+                            next_voltage = min(target, current + VOLT_STEP)
+                        else:
+                            next_voltage = max(target, current - VOLT_STEP)
+                        state.check_voltage_step(next_voltage)
+                        self._dev.set_volt_ac(volt=next_voltage, verify=True)
+
+                    # Release the device lock while settling so acq can monitor.
+                    deadline = time.monotonic() + RAMP_TIME_STEP
+                    while session.status != 'stopping':
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            break
+                        time.sleep(min(0.2, remaining))
+            except PCRStateError as err:
+                return False, str(err)
+            except (ConnectionError, PCRException, ValueError) as err:
+                session.degraded = True
+                return False, f'Ramp stopped after a device error: {err}'
+
+        return False, 'Voltage ramp aborted; no further changes made.'
+
+    def _abort_ramp(self, session, params=None):
+        session.set_status('stopping')
+        return True, 'Requested to abort voltage ramp.'
 
 
 def make_parser(parser=None):
@@ -300,18 +422,14 @@ def main(args=None):
     )
 
     agent_inst.register_task(
-        'get_output',
-        pcr_agent.get_output
-    )
-
-    agent_inst.register_task(
         'set_volt_ac',
         pcr_agent.set_volt_ac
     )
 
     agent_inst.register_task(
-        'get_volt_ac',
-        pcr_agent.get_volt_ac
+        'ramp_to_voltage',
+        pcr_agent.ramp_to_voltage,
+        aborter=pcr_agent._abort_ramp
     )
 
     agent_inst.register_process(
