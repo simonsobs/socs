@@ -1179,37 +1179,47 @@ class PysmurfController:
 
             # this register being unresponsive is a symptom of an rssi lock-up
             slot_reg = "AMCc.FpgaTopLevel.AmcCarrierCore.AmcCarrierBsi.SlotNumber"
+            restart_cmd = "AMCc.RestartRssi"
 
-            # if the system is locked up, spawning a SmurfControl instance will hang
-            # so we use a rogue client
+            # If the link is locked up, starting a SmurfControl instance would
+            # hang, so talk to the rogue server with a bare VirtualClient.
+            # VirtualClient is a per-(addr, port) singleton shared with any
+            # SmurfControl living in this process (e.g. check_state's), so it
+            # must not be stopped here: use it and leave it alone.
             server_port = 9000 + 3 * int(self.slot)
-            server_addr = "localhost"
-            with VirtualClient(addr=server_addr, port=server_port) as client:
+            try:
+                client = VirtualClient(addr="localhost", port=server_port)
+            except Exception as e:
+                return False, f"Could not connect to the rogue server on port {server_port}: {e}"
+            # Bound the request time (the default after connect is unbounded).
+            # Same values pysmurf uses, so a shared instance is unaffected.
+            client.setTimeout(5000, 30000)  # warn every 5s, fail after 30s
+
+            def read_slot():
                 try:
-                    slot = client._root.getNode(slot_reg).get()  # 1s timeout
+                    return client.root.getNode(slot_reg).get()
                 except Exception:
-                    slot = None
+                    return None
 
-                # reset if RSSI is locked-up
-                success = True
-                msg = ""
-                if slot is not None:  # query suceeded
-                    success, msg = True, "RSSI is not locked-up -- Doing nothing."
-                else:
-                    # send the reset command
-                    client._root.getNode("AMCc.RestartRssi").set(1)
+            slot = read_slot()
+            if slot is not None:  # query succeeded
+                success, msg = True, "RSSI is not locked-up -- Doing nothing."
+            else:
+                cmd = client.root.getNode(restart_cmd)
+                if cmd is None:
+                    return False, f"{restart_cmd} not found on the server (no PCIe link?)"
+                # RestartRssi is a rogue command: call() runs it, set() only
+                # stores a value and does nothing.
+                cmd.call()
 
-                    # check the system has recovered
-                    try:
-                        slot = client._root.getNode(slot_reg).get()  # 1s timeout
-                        success = True
-                    except Exception:
-                        success = False
-                    msg = "RSSI has recovered" if success else "RSSI remains locked-up"
+                # check the system has recovered
+                slot = read_slot()
+                success = slot is not None
+                msg = "RSSI has recovered" if success else "RSSI remains locked-up"
 
             # store state in the session data
             session.data.update({
-                "rssi_responsive": success,
+                "rssi_responsive": slot is not None,
                 "last_updated": time.time()
             })
 
