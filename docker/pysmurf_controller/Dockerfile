@@ -1,4 +1,4 @@
-FROM simonsobs/so_smurf_base:rogue6-rc5
+FROM simonsobs/so_smurf_base:v0.1.1
 
 #################################################################
 # sodetlib Install
@@ -10,6 +10,8 @@ USER cryo
 RUN git config --global --add safe.directory /sodetlib
 USER root
 WORKDIR /sodetlib
+# TODO: pin to the release tag cut after simonsobs/sodetlib#485 merges
+# (restore `git clone --branch <tag> --depth 1` above).
 RUN git checkout 0979e7c67e6f7901c41e010208f884685be434ac  # tpm/rogue6
 RUN pip3 install -U pip
 RUN pip3 install -e .
@@ -22,7 +24,7 @@ ENV OCS_CONFIG_DIR=/config
 ENV PYTHONUNBUFFERED=1
 
 # SOCS installation
-RUN python3 -m pip install git+https://github.com/simonsobs/socs.git@tpm/rogue6
+RUN python3 -m pip install git+https://github.com/simonsobs/socs.git@main
 
 RUN python3 -m pip install dumb-init
 
