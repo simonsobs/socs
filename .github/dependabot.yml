@@ -7,6 +7,8 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 0  # disable for ocs image updates
 
   - package-ecosystem: "github-actions"
     directory: "/"
