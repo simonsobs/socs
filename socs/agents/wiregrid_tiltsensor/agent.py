@@ -18,10 +18,10 @@ class WiregridTiltSensorAgent:
             multiple devices is determined
             by the ethernet port number of converter.
         sensor_type (str): Type of tilt sensor
-            There are three types of tilt sensor,
+            There are two types of tilt sensor,
             and this argument is used for specifying
             to communicate with whichtilt sensor.
-            This argument should be 'DWL', 'sherborne' or 'slp2'.
+            This argument should be 'DWL' or 'slp2'.
     """
 
     def __init__(self, agent, ip, port, sensor_type=None):
@@ -69,14 +69,8 @@ class WiregridTiltSensorAgent:
                 {'tiltsensor_data': {
                     'angleX': the angle in X-axis of tilt sensor,
                     'angleY': the angle in Y-axis of tilt sensor,
-                    'temperatureX': the temperature in X-axis of tilt sensor
-                                    this is available for only sherborne,
-                    'temperatureY': the temperature in Y-axis of tilt sensor
-                                    this is available for only sherborne,
                     'temperature': the temperature of tilt sensor
-                                   (common to both axes)
-                                   this is available for only slp2
-                                   and replaces temperatureX/Y
+                                   this is available for only slp2.
                     },
                 'timestamp': timestamp when it updates tilt sensor data
                 }
@@ -104,8 +98,7 @@ class WiregridTiltSensorAgent:
             if self.sensor_type == 'slp2':
                 tiltsensor_data['data']['temperature'] = -999
             else:
-                tiltsensor_data['data']['temperatureX'] = -999
-                tiltsensor_data['data']['temperatureY'] = -999
+                tiltsensor_data['data']['temperature'] = -999
 
             self.log.info("Starting the count!")
 
@@ -138,28 +131,11 @@ class WiregridTiltSensorAgent:
                     self.pm.sleep()  # DAQ interval
                     continue
 
-                # the driver for sensor_type = 'sherborne' does NOT have
-                # the function of `get_temp()` now, so ignore the below lines
-                # We also may drop support for the 'sherborne' sensor type soon.
-                # if self.sensor_type == 'sherborne':
-                #    msg, temperatures = self.tiltsensor.get_temp()
-                #    self.log.info(f'self.tiltsensor.get_temp(): {msg}')
-                #    if temperatures[0] == -999:
-                #        msg = 'Failed to get temperature. -> Reconnect to the sensor'
-                #        self.log.warn(msg)
-                #        del self.tiltsensor
-                #        self._connect()
-                #        self.pm.sleep()  # DAQ interval
-                #        continue
-
                 tiltsensor_data['timestamp'] = current_time
                 tiltsensor_data['data']['angleX'] = angles[0]
                 tiltsensor_data['data']['angleY'] = angles[1]
                 if self.sensor_type == 'slp2':
                     tiltsensor_data['data']['temperature'] = temperature
-                # if self.sensor_type == 'sherborne':
-                #     tiltsensor_data['data']['temperatureX'] = temperatures[0]
-                #     tiltsensor_data['data']['temperatureY'] = temperatures[1]
 
                 self.agent.publish_to_feed('wgtiltsensor', tiltsensor_data)
 
@@ -184,45 +160,6 @@ class WiregridTiltSensorAgent:
         else:
             return False, 'acq is not currently running.'
 
-    def reset(self, session, params=None):
-        """reset()
-
-        **Task** - Reset the tiltsensor if the type of tiltsensor is sherborne.
-
-        Notes:
-            The most recent data collected is stored in session.data in the
-            structure::
-
-                >>> response.session['data']
-                {'reset': bool whether the reset successful or not
-                 'timestamp': timestamp when this command is performed
-                }
-        """
-
-        with self.lock.acquire_timeout(timeout=3.0, job='reset') as acquired:
-            if not acquired:
-                msg = ("Lock could not be acquired because it "
-                       + f"is held by {self.lock.job}")
-                self.log.warn(msg)
-                return False, msg
-
-            if self.sensor_type != 'sherborne':
-                return False, "This type of tiltsensor cannot reset."
-            elif self.tiltsensor is None:
-                return False, "The tiltsensor is not connected."
-            else:
-                # Log the text provided to the Agent logs
-                self.log.info("running reset")
-                # Execute reset()
-                self.tiltsensor.reset()
-                # Store the timestamp when reset is performed in session.data
-                session.data = {'reset': True,
-                                'timestamp': time.time()}
-
-        # True if task succeeds, False if not
-        return True, 'Reset the tiltsensor'
-
-
 def make_parser(parser_in=None):
     if parser_in is None:
         import argparse
@@ -237,7 +174,7 @@ def make_parser(parser_in=None):
     pgroup.add_argument('--sensor-type',
                         dest='sensor_type',
                         type=str, default=None,
-                        choices=['DWL', 'sherborne', 'slp2'],
+                        choices=['DWL', 'slp2'],
                         help='The type of tilt sensor '
                              'running wiregrid tilt sensor DAQ')
     return parser_in
