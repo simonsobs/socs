@@ -38,7 +38,8 @@ class LS372_Agent:
     """
 
     def __init__(self, agent, name, ip, dwell_time_delay=0,
-                 enable_control_chan=False, configfile=None):
+                 enable_control_chan=False, configfile=None,
+                 sample_rate=10):
 
         # self._acq_proc_lock is held for the duration of the acq Process.
         # Tasks that require acq to not be running, at all, should use
@@ -64,6 +65,7 @@ class LS372_Agent:
         self._reconnect_backoff = 5
         self.control_chan_enabled = enable_control_chan
         self.configfile = configfile
+        self.sample_rate = sample_rate
 
         self.agent = agent
         # Registers temperature feeds
@@ -242,7 +244,7 @@ class LS372_Agent:
                 }
 
         """
-        pm = Pacemaker(10, quantize=True)
+        pm = Pacemaker(self.sample_rate, quantize=True)
 
         with self._acq_proc_lock.acquire_timeout(timeout=0, job='acq') \
                 as acq_acquired, \
@@ -1244,6 +1246,8 @@ def make_parser(parser=None):
     pgroup.add_argument('--enable-control-chan', action='store_true',
                         help='Enable reading of the control input each acq cycle')
     pgroup.add_argument('--configfile', type=str, help='Yaml file for initializing 372 settings')
+    pgroup.add_argument('--sample-rate', type=float, default=None,
+                        help='Sampling rate for data acquisition in Hz.')
 
     return parser
 
@@ -1276,10 +1280,16 @@ def main(args=None):
 
     agent, runner = ocs_agent.init_site_agent(args)
 
+    kwargs = {
+        'dwell_time_delay': args.dwell_time_delay,
+        'enable_control_chan': args.enable_control_chan,
+        'configfile': args.configfile,
+    }
+    if args.sample_rate is not None:
+        kwargs['sample_rate'] = args.sample_rate
+
     lake_agent = LS372_Agent(agent, args.serial_number, args.ip_address,
-                             dwell_time_delay=args.dwell_time_delay,
-                             enable_control_chan=args.enable_control_chan,
-                             configfile=args.configfile)
+                             **kwargs)
 
     agent.register_task('init_lakeshore', lake_agent.init_lakeshore,
                         startup=init_params)
