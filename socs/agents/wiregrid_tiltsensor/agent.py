@@ -94,10 +94,8 @@ class WiregridTiltSensorAgent:
                     'angleY': -999,
                 },
             }
-            # slp2 has a single temperature sensor common to both axes
+            # slp2 has a single temperature sensor
             if self.sensor_type == 'slp2':
-                tiltsensor_data['data']['temperature'] = -999
-            else:
                 tiltsensor_data['data']['temperature'] = -999
 
             self.log.info("Starting the count!")

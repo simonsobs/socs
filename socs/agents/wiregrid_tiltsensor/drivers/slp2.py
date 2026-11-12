@@ -99,10 +99,10 @@ class SLP2:
         tcp_port (int): TCP port
         """
         if tcp_ip is None or tcp_port is None:
-            raise Exception(
-                "Aborted SLP2._conn() due to no "
-                "TCP port specified")
-        elif tcp_ip is not None and tcp_port is not None:
+            raise TypeError(
+                "Aborted SLP2._conn() because "
+                "no TCP/IP address or port was specified")
+        else:
             self.ser = mx.Serial_TCPServer((tcp_ip, tcp_port), timeout, encoded=False)
             self.tcp_ip = tcp_ip
             self.tcp_port = int(tcp_port)
@@ -116,9 +116,6 @@ class SLP2:
                 self.ser.write(command)
                 tm.sleep(0.5)
                 self.clean_serial()
-        else:
-            raise Exception(
-                "Aborted SLP2._conn() due to unknown error")
         return msg
 
     def wait(self):
