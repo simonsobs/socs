@@ -1,5 +1,6 @@
 # Lakeshore372.py
 
+import re
 import sys
 import time
 
@@ -208,6 +209,17 @@ class LS372(TCPInterface):
         self.sample_heater = Heater(self, 0)
         self.still_heater = Heater(self, 2)
 
+    _garbled_re = re.compile(r'^;*$')
+
+    def _is_valid_response(self, resp):
+        """Check if a response from the LS372 is valid.
+
+        Invalid responses are empty strings or strings containing only
+        semicolons (the LS372 command separator), which indicate a TCP
+        framing error or stale buffer contents.
+        """
+        return resp != '' and not self._garbled_re.match(resp)
+
     def msg(self, message):
         """Send message to the Lakeshore 372 over TCP.
 
@@ -221,12 +233,28 @@ class LS372(TCPInterface):
         str
             Response string from the Lakeshore, if any. Else, an empty string.
 
+        Raises
+        ------
+        ConnectionError
+            If the response is invalid after a retry attempt.
+
         """
         msg_str = f'{message}\r\n'.encode()
 
         if '?' in message:
             self.send(msg_str)
             resp = str(self.recv(reset_on_error=True), 'utf-8').strip()
+
+            if not self._is_valid_response(resp):
+                print(f"Warning: Invalid response to '{message}': {resp!r}. "
+                      "Resetting connection and retrying.")
+                self._reset()
+                self.send(msg_str)
+                resp = str(self.recv(reset_on_error=True), 'utf-8').strip()
+
+                if not self._is_valid_response(resp):
+                    raise ConnectionError(
+                        f"Invalid response to '{message}' after retry: {resp!r}")
         else:
             self.send(msg_str)
             resp = ''
@@ -263,10 +291,16 @@ class LS372(TCPInterface):
         assert unit.lower() in ['ohms', 'kelvin']
 
         if unit == 'ohms':
-            # Sensor is same as Resistance Query
-            return float(self.msg('SRDG? %s' % c))
-        if unit == 'kelvin':
-            return float(self.msg('KRDG? %s' % c))
+            cmd = 'SRDG? %s' % c
+        elif unit == 'kelvin':
+            cmd = 'KRDG? %s' % c
+
+        resp = self.msg(cmd)
+        try:
+            return float(resp)
+        except ValueError:
+            raise ConnectionError(
+                f"Invalid reading from '{cmd}': {resp!r}")
 
     def get_autoscan(self):
         """Determine state of autoscan.
@@ -275,7 +309,15 @@ class LS372(TCPInterface):
         :rtype: bool
         """
         resp = self.msg('SCAN?')
-        scan_state = bool(int(resp.split(',')[1]))
+        parts = resp.split(',')
+        if len(parts) < 2:
+            raise ConnectionError(
+                f"Invalid SCAN? response: {resp!r}")
+        try:
+            scan_state = bool(int(parts[1]))
+        except ValueError:
+            raise ConnectionError(
+                f"Invalid autoscan value in SCAN? response: {resp!r}")
         self.autoscan = scan_state
         return scan_state
 
@@ -319,8 +361,19 @@ class LS372(TCPInterface):
         :rtype: Channel Object
         """
         resp = self.msg("SCAN?")
-        channel_number = int(resp.split(',')[0])
+        parts = resp.split(',')
+        if len(parts) < 2:
+            raise ConnectionError(
+                f"Invalid SCAN? response: {resp!r}")
+        try:
+            channel_number = int(parts[0])
+        except ValueError:
+            raise ConnectionError(
+                f"Invalid channel number in SCAN? response: {resp!r}")
         channel_list = [_.channel_num for _ in self.channels]
+        if channel_number not in channel_list:
+            raise ConnectionError(
+                f"Channel {channel_number} from SCAN? not in channel list")
         idx = channel_list.index(channel_number)
         return self.channels[idx]
 
@@ -335,7 +388,11 @@ class LS372(TCPInterface):
         :type channel: int
         """
         resp = self.msg("SCAN?")
-        autoscan_setting = resp.split(',')[1]
+        parts = resp.split(',')
+        if len(parts) < 2:
+            raise ConnectionError(
+                f"Invalid SCAN? response: {resp!r}")
+        autoscan_setting = parts[1]
         self.msg('SCAN {},{}'.format(channel, autoscan_setting))
 
     # NET?

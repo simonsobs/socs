@@ -7,7 +7,6 @@ import txaio
 import yaml
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
-from twisted.internet import reactor
 
 from socs.Lakeshore.Lakeshore372 import LS372
 
@@ -62,6 +61,7 @@ class LS372_Agent:
         self.log = agent.log
         self.initialized = False
         self.take_data = False
+        self._reconnect_backoff = 5
         self.control_chan_enabled = enable_control_chan
         self.configfile = configfile
 
@@ -134,21 +134,30 @@ class LS372_Agent:
                               f"{self._acq_proc_lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            try:
-                self.module = LS372(self.ip)
-            except ConnectionError:
-                self.log.error("Could not connect to the LS372. Exiting.")
-                reactor.callFromThread(reactor.stop)
-                return False, 'Lakeshore initialization failed'
-            except Exception as e:
-                self.log.error(f"Unhandled exception encountered: {e}")
-                reactor.callFromThread(reactor.stop)
+            max_attempts = 5
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    self.module = LS372(self.ip)
+                    break
+                except Exception as e:
+                    self.log.error(
+                        f"Initialization attempt {attempt}/{max_attempts} "
+                        f"failed: {e}")
+                    if attempt < max_attempts:
+                        time.sleep(self._reconnect_backoff)
+            else:
+                self.log.error(
+                    "Could not connect to the LS372 after "
+                    f"{max_attempts} attempts.")
                 return False, 'Lakeshore initialization failed'
 
-            print("Initialized Lakeshore module: {!s}".format(self.module))
-            session.add_message("Lakeshore initilized with ID: %s" % self.module.id)
+            self.log.info("Initialized Lakeshore module: {!s}".format(
+                self.module))
+            session.add_message(
+                "Lakeshore initialized with ID: %s" % self.module.id)
 
-            self.thermometers = [channel.name for channel in self.module.channels]
+            self.thermometers = [
+                channel.name for channel in self.module.channels]
 
             self.initialized = True
 
@@ -191,6 +200,19 @@ class LS372_Agent:
             self.log.debug("Sleeping for {t} more seconds...",
                            t=total_time - i)
             time.sleep(1)
+
+    def _try_reconnect(self):
+        """Attempt to re-establish connection to the LS372."""
+        self.log.info("Attempting to reconnect to LS372...")
+        try:
+            self.module = LS372(self.ip)
+            self.log.info("Reconnected to LS372 successfully.")
+            self.initialized = True
+            return True
+        except Exception as e:
+            self.log.warn(f"Reconnect failed: {e}")
+            self.initialized = False
+            return False
 
     @ocs_agent.param('sample_heater', default=False, type=bool)
     @ocs_agent.param('run_once', default=False, type=bool)
@@ -244,6 +266,12 @@ class LS372_Agent:
             while self.take_data:
                 pm.sleep()
 
+                if not self.initialized:
+                    self._try_reconnect()
+                    if not self.initialized:
+                        time.sleep(self._reconnect_backoff)
+                        continue
+
                 # Relinquish sampling lock occasionally.
                 if time.time() - last_release > 1.:
                     last_release = time.time()
@@ -253,12 +281,6 @@ class LS372_Agent:
                         continue
 
                 try:
-                    # The 372 reports the last updated measurement repeatedly
-                    # during the "pause change time", this results in several
-                    # stale datapoints being recorded. To get around this we
-                    # query the pause time and skip data collection during it
-                    # if the channel has changed (as it would if autoscan is
-                    # enabled.)
                     active_channel = self.module.get_active_channel()
 
                     if previous_channel != active_channel:
@@ -267,25 +289,33 @@ class LS372_Agent:
                                 active_channel,
                                 previous_channel)
 
-                        # Track the last channel we measured
                         previous_channel = self.module.get_active_channel()
 
-                    # Collect both temperature and resistance values from each Channel
                     channel_str = active_channel.name.replace(' ', '_')
                     temp_reading = self.module.get_temp(unit='kelvin',
                                                         chan=active_channel.channel_num)
                     res_reading = self.module.get_temp(unit='ohms',
                                                        chan=active_channel.channel_num)
+
+                    if self.control_chan_enabled:
+                        ctrl_temp = self.module.get_temp(unit='kelvin', chan=0)
+                        ctrl_res = self.module.get_temp(unit='ohms', chan=0)
+
+                    if params.get("sample_heater", False):
+                        heater = self.module.sample_heater
+                        hout = heater.get_sample_heater_output()
+
                     if session.degraded:
                         self.log.info("Connection re-established.")
                         session.degraded = False
-                except ConnectionError:
-                    self.log.error("Failed to get data from LS372. Check network connection.")
+
+                except Exception as e:
+                    self.log.error(
+                        f"Caught {type(e).__name__} during acq: {e}")
+                    self.initialized = False
                     session.degraded = True
-                    time.sleep(1)
                     continue
 
-                # For data feed
                 current_time = time.time()
                 data = {
                     'timestamp': current_time,
@@ -298,58 +328,30 @@ class LS372_Agent:
                 session.app.publish_to_feed('temperatures', data)
                 self.log.debug("{data}", data=session.data)
 
-                # For session.data
                 field_dict = {channel_str: {"T": temp_reading,
                                             "R": res_reading,
                                             "timestamp": current_time}}
                 session.data['fields'].update(field_dict)
 
-                # Also queries control channel if enabled
                 if self.control_chan_enabled:
-                    try:
-                        temp = self.module.get_temp(unit='kelvin', chan=0)
-                        res = self.module.get_temp(unit='ohms', chan=0)
-                        if session.degraded:
-                            self.log.info("Connection re-established.")
-                            session.degraded = False
-                    except ConnectionError:
-                        self.log.error("Failed to get data from LS372. Check network connection.")
-                        session.degraded = True
-                        time.sleep(1)
-                        continue
-
                     cur_time = time.time()
                     data = {
-                        'timestamp': time.time(),
+                        'timestamp': cur_time,
                         'block_name': 'control_chan',
                         'data': {
-                            'control_T': temp,
-                            'control_R': res
+                            'control_T': ctrl_temp,
+                            'control_R': ctrl_res
                         }
                     }
                     session.app.publish_to_feed('temperatures', data)
                     self.log.debug("{data}", data=session.data)
-                    # Updates session data w/ control field
                     session.data['fields'].update({
                         'control': {
-                            'T': temp, 'R': res, 'timestamp': cur_time
+                            'T': ctrl_temp, 'R': ctrl_res, 'timestamp': cur_time
                         }
                     })
 
                 if params.get("sample_heater", False):
-                    # Sample Heater
-                    heater = self.module.sample_heater
-                    try:
-                        hout = heater.get_sample_heater_output()
-                        if session.degraded:
-                            self.log.info("Connection re-established.")
-                            session.degraded = False
-                    except ConnectionError:
-                        self.log.error("Failed to get data from LS372. Check network connection.")
-                        session.degraded = True
-                        time.sleep(1)
-                        continue
-
                     current_time = time.time()
                     htr_data = {
                         'timestamp': current_time,
@@ -357,7 +359,6 @@ class LS372_Agent:
                         'data': {}
                     }
                     htr_data['data']['sample_heater_output'] = hout
-
                     session.app.publish_to_feed('temperatures', htr_data)
 
                 if params['run_once']:
@@ -401,19 +402,24 @@ class LS372_Agent:
                 return False, "Could not acquire lock"
 
             heater_string = params.get('heater', 'sample')
-            if heater_string.lower() == 'sample':
-                heater = self.module.sample_heater
-            elif heater_string.lower() == 'still':
-                heater = self.module.still_heater
 
-            current_range = heater.get_heater_range()
-            self.log.debug(f"Current heater range: {current_range}")
+            try:
+                if heater_string.lower() == 'sample':
+                    heater = self.module.sample_heater
+                elif heater_string.lower() == 'still':
+                    heater = self.module.still_heater
 
-            if params['range'] == current_range:
-                print("Current heater range matches commanded value. Proceeding unchanged.")
-            else:
-                heater.set_heater_range(params['range'])
-                time.sleep(params.get('wait', 0))
+                current_range = heater.get_heater_range()
+                self.log.debug(f"Current heater range: {current_range}")
+
+                if params['range'] == current_range:
+                    print("Current heater range matches commanded value. Proceeding unchanged.")
+                else:
+                    heater.set_heater_range(params['range'])
+                    time.sleep(params.get('wait', 0))
+            except Exception as e:
+                self.log.error(f"set_heater_range failed: {e}")
+                return False, f"Error: {e}"
 
         return True, f'Set {heater_string} heater range to {params["range"]}'
 
@@ -437,7 +443,11 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            self.module.channels[params['channel']].set_excitation_mode(params['mode'])
+            try:
+                self.module.channels[params['channel']].set_excitation_mode(params['mode'])
+            except Exception as e:
+                self.log.error(f"set_excitation_mode failed: {e}")
+                return False, f"Error: {e}"
             session.add_message(f'post message in agent for Set channel {params["channel"]} excitation mode to {params["mode"]}')
             print(f'print statement in agent for Set channel {params["channel"]} excitation mode to {params["mode"]}')
 
@@ -465,15 +475,19 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            current_excitation = self.module.channels[params['channel']].get_excitation()
-            mode = self.module.channels[params["channel"]].get_excitation_mode()
-            units = 'amps' if mode == 'current' else 'volts'
+            try:
+                current_excitation = self.module.channels[params['channel']].get_excitation()
+                mode = self.module.channels[params["channel"]].get_excitation_mode()
+                units = 'amps' if mode == 'current' else 'volts'
 
-            if params['value'] == current_excitation:
-                session.add_message(f'Channel {params["channel"]} excitation {mode} already set to {params["value"]} {units}')
-            else:
-                self.module.channels[params['channel']].set_excitation(params['value'])
-                session.add_message(f'Set channel {params["channel"]} excitation {mode} to {params["value"]} {units}')
+                if params['value'] == current_excitation:
+                    session.add_message(f'Channel {params["channel"]} excitation {mode} already set to {params["value"]} {units}')
+                else:
+                    self.module.channels[params['channel']].set_excitation(params['value'])
+                    session.add_message(f'Set channel {params["channel"]} excitation {mode} to {params["value"]} {units}')
+            except Exception as e:
+                self.log.error(f"set_excitation failed: {e}")
+                return False, f"Error: {e}"
 
         return True, f'Set channel {params["channel"]} excitation to {params["value"]} {units}'
 
@@ -494,9 +508,13 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            current_excitation = self.module.channels[params["channel"]].get_excitation()
-            mode = self.module.channels[params["channel"]].get_excitation_mode()
-            units = 'amps' if mode == 'current' else 'volts'
+            try:
+                current_excitation = self.module.channels[params["channel"]].get_excitation()
+                mode = self.module.channels[params["channel"]].get_excitation_mode()
+                units = 'amps' if mode == 'current' else 'volts'
+            except Exception as e:
+                self.log.error(f"get_excitation failed: {e}")
+                return False, f"Error: {e}"
             session.add_message(f'Channel {params["channel"]} excitation {mode} is {current_excitation} {units}')
             session.data = {"excitation": current_excitation}
 
@@ -527,13 +545,17 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            current_resistance_range = self.module.channels[params['channel']].get_resistance_range()
+            try:
+                current_resistance_range = self.module.channels[params['channel']].get_resistance_range()
 
-            if params['resistance_range'] == current_resistance_range:
-                session.add_message(f'Channel {params["channel"]} resistance_range already set to {params["resistance_range"]}')
-            else:
-                self.module.channels[params['channel']].set_resistance_range(params['resistance_range'])
-                session.add_message(f'Set channel {params["channel"]} resistance range to {params["resistance_range"]}')
+                if params['resistance_range'] == current_resistance_range:
+                    session.add_message(f'Channel {params["channel"]} resistance_range already set to {params["resistance_range"]}')
+                else:
+                    self.module.channels[params['channel']].set_resistance_range(params['resistance_range'])
+                    session.add_message(f'Set channel {params["channel"]} resistance range to {params["resistance_range"]}')
+            except Exception as e:
+                self.log.error(f"set_resistance_range failed: {e}")
+                return False, f"Error: {e}"
 
         return True, f'Set channel {params["channel"]} resistance range to {params["resistance_range"]}'
 
@@ -553,7 +575,11 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            current_resistance_range = self.module.channels[params['channel']].get_resistance_range()
+            try:
+                current_resistance_range = self.module.channels[params['channel']].get_resistance_range()
+            except Exception as e:
+                self.log.error(f"get_resistance_range failed: {e}")
+                return False, f"Error: {e}"
             session.add_message(f'Channel {params["channel"]} resistance range is {current_resistance_range}')
             session.data = {"resistance_range": current_resistance_range}
 
@@ -578,7 +604,11 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            self.module.channels[params["channel"]].set_dwell(params["dwell"])
+            try:
+                self.module.channels[params["channel"]].set_dwell(params["dwell"])
+            except Exception as e:
+                self.log.error(f"set_dwell failed: {e}")
+                return False, f"Error: {e}"
             session.add_message(f'Set dwell to {params["dwell"]}')
 
         return True, f'Set channel {params["channel"]} dwell time to {params["dwell"]}'
@@ -599,7 +629,11 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            current_dwell = self.module.channels[params["channel"]].get_dwell()
+            try:
+                current_dwell = self.module.channels[params["channel"]].get_dwell()
+            except Exception as e:
+                self.log.error(f"get_dwell failed: {e}")
+                return False, f"Error: {e}"
             session.add_message(f'Dwell time for channel {params["channel"]} is {current_dwell}')
             session.data = {"dwell_time": current_dwell}
 
@@ -628,7 +662,11 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            self.module.sample_heater.set_pid(params["P"], params["I"], params["D"])
+            try:
+                self.module.sample_heater.set_pid(params["P"], params["I"], params["D"])
+            except Exception as e:
+                self.log.error(f"set_pid failed: {e}")
+                return False, f"Error: {e}"
             session.add_message(f'post message text for Set PID to {params["P"]}, {params["I"]}, {params["D"]}')
             print(f'print text for Set PID to {params["P"]}, {params["I"]}, {params["D"]}')
 
@@ -650,7 +688,11 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            self.module.set_active_channel(params["channel"])
+            try:
+                self.module.set_active_channel(params["channel"])
+            except Exception as e:
+                self.log.error(f"set_active_channel failed: {e}")
+                return False, f"Error: {e}"
             session.add_message(f'post message text for set channel to {params["channel"]}')
             print(f'print text for set channel to {params["channel"]}')
 
@@ -672,12 +714,16 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            if params['autoscan']:
-                self.module.enable_autoscan()
-                self.log.info('enabled autoscan')
-            else:
-                self.module.disable_autoscan()
-                self.log.info('disabled autoscan')
+            try:
+                if params['autoscan']:
+                    self.module.enable_autoscan()
+                    self.log.info('enabled autoscan')
+                else:
+                    self.module.disable_autoscan()
+                    self.log.info('disabled autoscan')
+            except Exception as e:
+                self.log.error(f"set_autoscan failed: {e}")
+                return False, f"Error: {e}"
 
         return True, 'Set autoscan to {}'.format(params['autoscan'])
 
@@ -697,31 +743,35 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            # Check we're in correct control mode for servo.
-            if self.module.sample_heater.mode != 'Closed Loop':
-                session.add_message('Changing control to Closed Loop mode for servo.')
-                self.module.sample_heater.set_mode("Closed Loop")
+            try:
+                # Check we're in correct control mode for servo.
+                if self.module.sample_heater.mode != 'Closed Loop':
+                    session.add_message('Changing control to Closed Loop mode for servo.')
+                    self.module.sample_heater.set_mode("Closed Loop")
 
-            # Check we aren't autoscanning.
-            if self.module.get_autoscan() is True:
-                session.add_message('Autoscan is enabled, disabling for PID control on dedicated channel.')
-                self.module.disable_autoscan()
+                # Check we aren't autoscanning.
+                if self.module.get_autoscan() is True:
+                    session.add_message('Autoscan is enabled, disabling for PID control on dedicated channel.')
+                    self.module.disable_autoscan()
 
-            # Check we're scanning same channel expected by heater for control.
-            if self.module.get_active_channel().channel_num != int(self.module.sample_heater.input):
-                session.add_message('Changing active channel to expected heater control input')
-                self.module.set_active_channel(int(self.module.sample_heater.input))
+                # Check we're scanning same channel expected by heater for control.
+                if self.module.get_active_channel().channel_num != int(self.module.sample_heater.input):
+                    session.add_message('Changing active channel to expected heater control input')
+                    self.module.set_active_channel(int(self.module.sample_heater.input))
 
-            # Check we're setup to take correct units.
-            if self.module.get_active_channel().units != 'kelvin':
-                session.add_message('Setting preferred units to Kelvin on heater control input.')
-                self.module.get_active_channel().set_units('kelvin')
+                # Check we're setup to take correct units.
+                if self.module.get_active_channel().units != 'kelvin':
+                    session.add_message('Setting preferred units to Kelvin on heater control input.')
+                    self.module.get_active_channel().set_units('kelvin')
 
-            # Make sure we aren't servoing too high in temperature.
-            if params["temperature"] > 1:
-                return False, 'Servo temperature is set above 1K. Aborting.'
+                # Make sure we aren't servoing too high in temperature.
+                if params["temperature"] > 1:
+                    return False, 'Servo temperature is set above 1K. Aborting.'
 
-            self.module.sample_heater.set_setpoint(params["temperature"])
+                self.module.sample_heater.set_setpoint(params["temperature"])
+            except Exception as e:
+                self.log.error(f"servo_to_temperature failed: {e}")
+                return False, f"Error: {e}"
 
         return True, f'Setpoint now set to {params["temperature"]} K'
 
@@ -744,10 +794,14 @@ class LS372_Agent:
 
             channel = params['channel']
             state = params['state']
-            if state == 'on':
-                self.module.channels[channel].enable_channel()
-            else:
-                self.module.channels[channel].disable_channel()
+            try:
+                if state == 'on':
+                    self.module.channels[channel].enable_channel()
+                else:
+                    self.module.channels[channel].disable_channel()
+            except Exception as e:
+                self.log.error(f"engage_channel failed: {e}")
+                return False, f"Error: {e}"
 
         return True, "Channel {} powered {}".format(channel, state)
 
@@ -770,10 +824,14 @@ class LS372_Agent:
 
             channel = params['channel']
             state = params['state']
-            if state == 'on':
-                self.module.channels[channel].enable_autorange()
-            else:
-                self.module.channels[channel].disable_autorange()
+            try:
+                if state == 'on':
+                    self.module.channels[channel].enable_autorange()
+                else:
+                    self.module.channels[channel].disable_autorange()
+            except Exception as e:
+                self.log.error(f"engage_autorange failed: {e}")
+                return False, f"Error: {e}"
 
         return True, "Channel {} autorange status is {}".format(channel, state)
 
@@ -798,7 +856,11 @@ class LS372_Agent:
 
             channel = params['channel']
             curve_number = params['curve_number']
-            self.module.channels[channel].set_calibration_curve(curve_number)
+            try:
+                self.module.channels[channel].set_calibration_curve(curve_number)
+            except Exception as e:
+                self.log.error(f"set_calibration_curve failed: {e}")
+                return False, f"Error: {e}"
 
         return True, f"Assigned channel {channel} to curve number {curve_number}."
 
@@ -833,8 +895,12 @@ class LS372_Agent:
 
             channel = params['channel']
 
-            ls_chann_setting = self.module.channels[channel]
-            input_setup = ls_chann_setting.get_input_setup()
+            try:
+                ls_chann_setting = self.module.channels[channel]
+                input_setup = ls_chann_setting.get_input_setup()
+            except Exception as e:
+                self.log.error(f"get_input_setup failed: {e}")
+                return False, f"Error: {e}"
 
             session.data = {"mode": ls_chann_setting.mode,
                             "excitation": ls_chann_setting.excitation,
@@ -867,16 +933,20 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            setpoint = float(self.module.sample_heater.get_setpoint())
+            try:
+                setpoint = float(self.module.sample_heater.get_setpoint())
 
-            if params is None:
-                params = {'measurements': 10, 'threshold': 0.5e-3}
+                if params is None:
+                    params = {'measurements': 10, 'threshold': 0.5e-3}
 
-            test_temps = []
+                test_temps = []
 
-            for i in range(params['measurements']):
-                test_temps.append(self.module.get_temp())
-                time.sleep(.1)  # sampling rate is 10 readings/sec, so wait 0.1 s for a new reading
+                for i in range(params['measurements']):
+                    test_temps.append(self.module.get_temp())
+                    time.sleep(.1)
+            except Exception as e:
+                self.log.error(f"check_temperature_stability failed: {e}")
+                return False, f"Error: {e}"
 
             mean = np.mean(test_temps)
             session.add_message(f'Average of {params["measurements"]} measurements is {mean} K.')
@@ -891,7 +961,6 @@ class LS372_Agent:
 
             else:
                 print("we're in the else")
-                # adjust_heater(t,rest)
 
         return False, f"Temperature not stable within {params['threshold']}."
 
@@ -915,10 +984,14 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            if params['heater'].lower() == 'still':
-                self.module.still_heater.set_mode(params['mode'])
-            if params['heater'].lower() == 'sample':
-                self.module.sample_heater.set_mode(params['mode'])
+            try:
+                if params['heater'].lower() == 'still':
+                    self.module.still_heater.set_mode(params['mode'])
+                if params['heater'].lower() == 'sample':
+                    self.module.sample_heater.set_mode(params['mode'])
+            except Exception as e:
+                self.log.error(f"set_output_mode failed: {e}")
+                return False, f"Error: {e}"
             self.log.info("Set {} output mode to {}".format(params['heater'], params['mode']))
 
         return True, "Set {} output mode to {}".format(params['heater'], params['mode'])
@@ -958,11 +1031,15 @@ class LS372_Agent:
 
             display = params.get('display', None)
 
-            if heater == 'still':
-                self.module.still_heater.set_heater_output(output, display_type=display)
-            if heater.lower() == 'sample':
-                self.log.info("display: {}\toutput: {}".format(display, output))
-                self.module.sample_heater.set_heater_output(output, display_type=display)
+            try:
+                if heater == 'still':
+                    self.module.still_heater.set_heater_output(output, display_type=display)
+                if heater.lower() == 'sample':
+                    self.log.info("display: {}\toutput: {}".format(display, output))
+                    self.module.sample_heater.set_heater_output(output, display_type=display)
+            except Exception as e:
+                self.log.error(f"set_heater_output failed: {e}")
+                return False, f"Error: {e}"
 
             self.log.info("Set {} heater display to {}, output to {}".format(heater, display, output))
 
@@ -995,7 +1072,11 @@ class LS372_Agent:
 
             output = params['output']
 
-            self.module.still_heater.set_still_output(output)
+            try:
+                self.module.still_heater.set_still_output(output)
+            except Exception as e:
+                self.log.error(f"set_still_output failed: {e}")
+                return False, f"Error: {e}"
 
             self.log.info("Set still output to {}".format(output))
 
@@ -1027,7 +1108,11 @@ class LS372_Agent:
                               f"{self._lock.job} is already running")
                 return False, "Could not acquire lock"
 
-            still_output = self.module.still_heater.get_still_output()
+            try:
+                still_output = self.module.still_heater.get_still_output()
+            except Exception as e:
+                self.log.error(f"get_still_output failed: {e}")
+                return False, f"Error: {e}"
 
             self.log.info("Current still output is {}".format(still_output))
 
@@ -1064,63 +1149,66 @@ class LS372_Agent:
             with open(configfile) as f:
                 config = yaml.safe_load(f)
 
-            ls = self.module
-            ls_serial = ls.id.split(',')[2]
+            try:
+                ls = self.module
+                ls_serial = ls.id.split(',')[2]
 
-            device_config = config[ls_serial]['device_settings']
-            ls_chann_settings = config[ls_serial]['channel']
+                device_config = config[ls_serial]['device_settings']
+                ls_chann_settings = config[ls_serial]['channel']
 
-            # enable/disable autoscan
-            if device_config['autoscan'] == 'on':
-                ls.enable_autoscan()
-                self.log.info("autoscan enabled")
-            elif device_config['autoscan'] == 'off':
-                ls.disable_autoscan()
-                self.log.info("autoscan disabled")
+                # enable/disable autoscan
+                if device_config['autoscan'] == 'on':
+                    ls.enable_autoscan()
+                    self.log.info("autoscan enabled")
+                elif device_config['autoscan'] == 'off':
+                    ls.disable_autoscan()
+                    self.log.info("autoscan disabled")
 
-            for i in ls_chann_settings:
-                # enable/disable channel
-                if ls_chann_settings[i]['enable'] == 'on':
-                    ls.channels[i].enable_channel()
-                    self.log.info("CH.{channel} enabled".format(channel=i))
-                elif ls_chann_settings[i]['enable'] == 'off':
-                    ls.channels[i].disable_channel()
-                    self.log.info("CH.{channel} disabled".format(channel=i))
+                for i in ls_chann_settings:
+                    # enable/disable channel
+                    if ls_chann_settings[i]['enable'] == 'on':
+                        ls.channels[i].enable_channel()
+                        self.log.info("CH.{channel} enabled".format(channel=i))
+                    elif ls_chann_settings[i]['enable'] == 'off':
+                        ls.channels[i].disable_channel()
+                        self.log.info("CH.{channel} disabled".format(channel=i))
 
-                # autorange
-                if ls_chann_settings[i]['autorange'] == 'on':
-                    ls.channels[i].enable_autorange()
-                    self.log.info("autorange on")
-                elif ls_chann_settings[i]['autorange'] == 'off':
-                    ls.channels[i].disable_autorange()
-                    self.log.info("autorange off")
-                    # set to desired resistance range after disabling autorange
-                    resistance_range = ls_chann_settings[i]['resistance_range']
-                    ls.channels[i].set_resistance_range(resistance_range)
-                    self.log.info("resistance range for CH.{channel} set to {get_res}, the closest valid range to {res}".format(channel=i, get_res=ls.channels[i].get_resistance_range(), res=resistance_range))
+                    # autorange
+                    if ls_chann_settings[i]['autorange'] == 'on':
+                        ls.channels[i].enable_autorange()
+                        self.log.info("autorange on")
+                    elif ls_chann_settings[i]['autorange'] == 'off':
+                        ls.channels[i].disable_autorange()
+                        self.log.info("autorange off")
+                        resistance_range = ls_chann_settings[i]['resistance_range']
+                        ls.channels[i].set_resistance_range(resistance_range)
+                        self.log.info("resistance range for CH.{channel} set to {get_res}, the closest valid range to {res}".format(channel=i, get_res=ls.channels[i].get_resistance_range(), res=resistance_range))
 
-                excitation_mode = ls_chann_settings[i]['excitation_mode']
-                ls.channels[i].set_excitation_mode(excitation_mode)
-                self.log.info("excitation mode for CH.{channel} set to {exc_mode}".format(channel=i, exc_mode=excitation_mode))
+                    excitation_mode = ls_chann_settings[i]['excitation_mode']
+                    ls.channels[i].set_excitation_mode(excitation_mode)
+                    self.log.info("excitation mode for CH.{channel} set to {exc_mode}".format(channel=i, exc_mode=excitation_mode))
 
-                excitation_value = ls_chann_settings[i]['excitation_value']
-                ls.channels[i].set_excitation(excitation_value)
-                self.log.info("excitation for CH.{channel} set to {exc}".format(channel=i, exc=excitation_value))
+                    excitation_value = ls_chann_settings[i]['excitation_value']
+                    ls.channels[i].set_excitation(excitation_value)
+                    self.log.info("excitation for CH.{channel} set to {exc}".format(channel=i, exc=excitation_value))
 
-                dwell = ls_chann_settings[i]['dwell']
-                ls.channels[i].set_dwell(dwell)
-                self.log.info("dwell for CH.{channel} is set to {dwell}".format(channel=i, dwell=dwell))
+                    dwell = ls_chann_settings[i]['dwell']
+                    ls.channels[i].set_dwell(dwell)
+                    self.log.info("dwell for CH.{channel} is set to {dwell}".format(channel=i, dwell=dwell))
 
-                pause = ls_chann_settings[i]['pause']
-                ls.channels[i].set_pause(pause)
-                self.log.info("pause for CH.{channel} is set to {pause}".format(channel=i, pause=pause))
+                    pause = ls_chann_settings[i]['pause']
+                    ls.channels[i].set_pause(pause)
+                    self.log.info("pause for CH.{channel} is set to {pause}".format(channel=i, pause=pause))
 
-                calibration_curvenum = ls_chann_settings[i]['calibration_curve_num']
-                ls.channels[i].set_calibration_curve(calibration_curvenum)
-                self.log.info("calibration curve for CH.{channel} set to {cal_curve}".format(channel=i, cal_curve=calibration_curvenum))
-                tempco = ls_chann_settings[i]['temperature_coeff']
-                ls.channels[i].set_temperature_coefficient(tempco)
-                self.log.info("temperature coeff. for CH.{channel} set to {tempco}".format(channel=i, tempco=tempco))
+                    calibration_curvenum = ls_chann_settings[i]['calibration_curve_num']
+                    ls.channels[i].set_calibration_curve(calibration_curvenum)
+                    self.log.info("calibration curve for CH.{channel} set to {cal_curve}".format(channel=i, cal_curve=calibration_curvenum))
+                    tempco = ls_chann_settings[i]['temperature_coeff']
+                    ls.channels[i].set_temperature_coefficient(tempco)
+                    self.log.info("temperature coeff. for CH.{channel} set to {tempco}".format(channel=i, tempco=tempco))
+            except Exception as e:
+                self.log.error(f"input_configfile failed: {e}")
+                return False, f"Error: {e}"
 
         return True, "Uploaded {}".format(configfile)
 
