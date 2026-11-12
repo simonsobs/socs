@@ -79,7 +79,7 @@ class WiregridTiltSensorAgent:
         with self.lock.acquire_timeout(timeout=0, job='acq') as acquired:
             if not acquired:
                 msg = f'Could not start acq because {self.lock.job} is already running'
-                self.log.warn(msg)
+                self.log.error(msg)
                 return False, msg
 
             # Initialize a take_data flag
