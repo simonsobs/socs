@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+# Code developed with AI assistance.
 '''PCR500MA driver using SCPI-RAW protocol'''
+import math
 import sys
 from enum import Enum
 
@@ -70,7 +72,7 @@ class PCR500MA(TCPInterface):
         """Reset PCR500MA device"""
         return self._send('*RST')
 
-    def set_output(self, output):
+    def set_output(self, output, verify=False):
         """Set output status
 
         Parameters
@@ -78,9 +80,23 @@ class PCR500MA(TCPInterface):
         output : bool
             True : output on
             False : output off
+        verify : bool, optional
+            If True, immediately read back and check the output state.
+            Defaults to False.
+
+        Raises
+        ------
+        PCRException
+            If the output readback does not match the requested state
+            when verify is True.
         """
         message = f'OUTP {"1" if output else "0"}'
         self._send(message)
+
+        if verify:
+            readback = self.get_output()
+            if readback != bool(output):
+                raise PCRException(f'Output state was not applied: requested {bool(output)}, read back {readback}.')
 
     def turn_on(self):
         """Turn on"""
@@ -216,7 +232,7 @@ class PCR500MA(TCPInterface):
         message = self._query('FREQ?')
         return float(message)
 
-    def set_volt_ac(self, volt, volt_llim=None, volt_ulim=None):
+    def set_volt_ac(self, volt, volt_llim=None, volt_ulim=None, verify=False):
         """Set AC voltage
 
         Parameters
@@ -227,6 +243,15 @@ class PCR500MA(TCPInterface):
             AC voltage lower limit in V.
         volt_ulim : float
             AC voltage upper limit in V.
+        verify : bool, optional
+            If True, immediately read back the voltage setting and check
+            agreement within 1e-6 V. Defaults to False.
+
+        Raises
+        ------
+        PCRException
+            If only one voltage limit is supplied, or the setting readback
+            does not match the requested voltage when verify is True.
         """
         assert 0 <= volt <= VOLT_ULIM_SOFT, f'Voltage should be within [0, {VOLT_ULIM_SOFT}] V'
 
@@ -239,6 +264,11 @@ class PCR500MA(TCPInterface):
             message = f'VOLT {volt},{volt_llim},{volt_ulim}'
 
         self._send(message)
+
+        if verify:
+            readback = self.get_volt_ac()
+            if not math.isclose(readback, volt, abs_tol=1e-6):
+                raise PCRException(f'Voltage setting was not applied: requested {volt} V, read back {readback} V.')
 
     def get_volt_ac(self):
         """Get AC voltage setting
