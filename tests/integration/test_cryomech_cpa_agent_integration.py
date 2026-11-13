@@ -2,8 +2,8 @@ import os
 
 import ocs
 import pytest
-from integration.util import docker_compose_file  # noqa: F401
-from integration.util import create_crossbar_fixture
+from integration.util import (create_crossbar_fixture,  # noqa: F401
+                              docker_compose_file)
 from ocs.base import OpCode
 from ocs.testing import create_agent_runner_fixture, create_client_fixture
 
