@@ -62,8 +62,8 @@ An example docker compose configuration::
 - Since the agent within the container needs to communicate with hardware on the
   host network you must use ``network_mode: "host"`` in your compose file.
 
-Details
--------
+Description
+-----------
 
 There are two types of tilt sensors, DWL and Pacico SLP2.
 The tilt sensor data is sent via serial-to-ethernet converter.
