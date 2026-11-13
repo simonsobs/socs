@@ -1,7 +1,10 @@
+# Code developed with AI assistance.
 # DWL drivers
 from socs.agents.wiregrid_tiltsensor.drivers.dwl import DWL
 # sherborne drivers
 from socs.agents.wiregrid_tiltsensor.drivers.sherborne import Sherborne
+# SLP2 drivers
+from socs.agents.wiregrid_tiltsensor.drivers.slp2 import SLP2
 
 
 def connect(ip, port, sensor_type):
@@ -9,6 +12,8 @@ def connect(ip, port, sensor_type):
         tiltsensor = DWL(tcp_ip=ip, tcp_port=port, timeout=0.5, isSingle=False, verbose=0)
     elif sensor_type == 'sherborne':
         tiltsensor = Sherborne(tcp_ip=ip, tcp_port=port, reset_boot=False, timeout=0.5, verbose=0)
+    elif sensor_type == 'slp2':
+        tiltsensor = SLP2(tcp_ip=ip, tcp_port=port, timeout=0.5, verbose=0)
     else:
-        raise ('Invalid tiltsensor type')
+        raise ValueError(f'Invalid tiltsensor type: {sensor_type}')
     return tiltsensor
