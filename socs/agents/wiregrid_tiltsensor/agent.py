@@ -196,7 +196,6 @@ def main(args=None):
                            tiltsensor_agent.acq,
                            tiltsensor_agent.stop_acq,
                            startup=True)
-    agent.register_task('reset', tiltsensor_agent.reset)
 
     runner.run(agent, auto_reconnect=True)
 
