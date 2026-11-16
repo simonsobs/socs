@@ -121,7 +121,7 @@ class WiregridTiltSensorAgent:
                         msg, temperature = self.tiltsensor.get_temp()
                         self.log.debug(f'self.tiltsensor.get_temp(): {msg}')
                 except (ValueError, RuntimeError, TypeError, OSError) as e:
-                    self.log.warn(e)
+                    self.log.warn(str(e))
                     msg = 'Failed to get data. -> Reconnect to the sensor'
                     self.log.warn(msg)
                     # close the connection and reconnect in the next loop
