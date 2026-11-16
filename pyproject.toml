@@ -85,11 +85,10 @@ pfeiffer = [
     "pfeiffer-vacuum-protocol==0.4",
 ]
 # Pysmurf Controller Agent
+# TODO get from pip
 pysmurf = [
-    "pyepics",
-    # "pysmurf-slac @ git+https://github.com/slaclab/pysmurf.git@main",
-    "sodetlib",
-    "sotodlib",
+    # "sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master",
+    # "sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master",
 ]
 # SMuRF File Emulator, SMuRF Stream Simulator
 smurf_sim = [
