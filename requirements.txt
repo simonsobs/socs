@@ -38,9 +38,9 @@ opencv-python
 pfeiffer-vacuum-protocol==0.4
 
 # pysmurf controller
+# TODO should be able to get these from pip now
 sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
-# pin to just before 3.8 support dropped
-sotodlib @ git+https://github.com/simonsobs/sotodlib.git@5d613d5915b1716c401abecb5446088bce5fc1a4
+sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
 
 # timing master monitor
 pyepics
