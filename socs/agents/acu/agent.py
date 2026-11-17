@@ -2112,6 +2112,7 @@ class ACUAgent:
                      choices=['end', 'mid', 'az_endpoint1', 'az_endpoint2',
                               'mid_inc', 'mid_dec'])
     @ocs_agent.param('az_drift', type=float, default=None)
+    @ocs_agent.param('az_vel_drift', type=float, default=None)
     @ocs_agent.param('scan_type', default=1, choices=[1, 2, 3])
     @ocs_agent.param('az_vel_ref', type=float, default=None)
     @ocs_agent.param('turnaround_method', default=None,
@@ -2413,8 +2414,24 @@ class ACUAgent:
                                        az_vel_ref=az_vel_ref,
                                        az_first_pos=plan['init_az'],
                                        **scan_params)
+        
+        if params['scan_type'] == 5:
+            track_axes = ['az']
+            free_form = True
+
+            g = sh.generate_velocity_sweep_scan(az_endpoint1=az_endpoint1,
+                                                   az_endpoint2=az_endpoint2,
+                                                   az_speed=az_speed, acc=az_accel,
+                                                   turnaround_method="standard_gen",
+                                                   el_endpoint1=el_endpoint1,
+                                                   el_endpoint2=el_endpoint2,
+                                                   el_speed=el_speed,
+                                                   az_vel_drift=az_vel_drift,
+                                                   az_first_pos=plan['init_az'],
+                                                   **scan_params)
+        
         else:
-            raise ValueError("Scan type must be 1, 2, or 3")
+            raise ValueError("Scan type must be 1, 2, 3, or 5")
 
         scan_params_bundle = {'session_id': session.session_id,
                               'schema': 1,
