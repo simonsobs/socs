@@ -2111,7 +2111,7 @@ class ACUAgent:
     @ocs_agent.param('az_start', default='end',
                      choices=['end', 'mid', 'az_endpoint1', 'az_endpoint2',
                               'mid_inc', 'mid_dec'])
-    @ocs_agent.param('az_drift', type=float, default=None)
+    @ocs_agent.param('az_drift', type=float, default=0.)
     @ocs_agent.param('scan_type', default=1, choices=[1, 2, 3])
     @ocs_agent.param('az_vel_ref', type=float, default=None)
     @ocs_agent.param('turnaround_method', default=None,
@@ -2128,7 +2128,7 @@ class ACUAgent:
                          el_mode=None, \
                          num_scans=None, start_time=None, \
                          wait_to_start=None, step_time=None, \
-                         az_start='end', az_drift=None, \
+                         az_start='end', az_drift=0., \
                          scan_type=1, az_vel_ref=None, \
                          turnaround_method=None, \
                          scan_upload_length=None)
@@ -2430,6 +2430,7 @@ class ACUAgent:
             'el2': el_endpoint2,
             'el_freq': el_freq,
             'type': params['scan_type'],
+            'az_drift': params['az_drift'],
             'turnaround_type': sh.TURNAROUNDS_ENUM[turnaround_method],
             'track_axes': ','.join(track_axes),
         })
@@ -2574,8 +2575,9 @@ class ACUAgent:
         scan_params_bundle.update({
             'az1': az,
             'az2': az,
-            'az_vel': 0,
-            'az_accel': 0,
+            'az_vel': 0.,
+            'az_accel': 0.,
+            'az_drift': 0.,
             'el1': el_endpoint1,
             'el2': el_endpoint2,
             'el_freq': el_freq,
