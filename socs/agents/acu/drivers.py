@@ -407,7 +407,7 @@ def _get_target_az(current_az, current_t, increasing, az_endpoint1, az_endpoint2
         target = max(az_endpoint1, az_endpoint2)
     else:
         target = min(az_endpoint1, az_endpoint2)
-    if az_drift is not None:
+    if az_drift not in [None, 0.]:
         v = az_speed if increasing else -az_speed
         target = target + az_drift / (v - az_drift) * (
             (target - current_az + v * current_t))
@@ -729,7 +729,7 @@ def generate_type3_scan(az_endpoint1, az_endpoint2, az_speed,
     if az_endpoint1 == az_endpoint2:
         raise ValueError('Generator requires two different az endpoints!')
 
-    if az_drift is not None:
+    if az_drift not in [None, 0.]:
         raise ValueError("Az drift not supported for type 2 or 3 scans!")
 
     # Get center of az range
