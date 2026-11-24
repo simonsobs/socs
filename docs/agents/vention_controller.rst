@@ -27,7 +27,7 @@ Vention's `machinelogic <https://pypi.org/project/machine-logic-sdk/>`_ package 
 
     $ pip install machine-logic-sdk
 
-`Machinelogic <https://pypi.org/project/machine-logic-sdk/>`_ requires Python 3.10. Therefore, this Agent should be run in its own Docker container based on a Python 3.10 image build. 
+`Machinelogic <https://pypi.org/project/machine-logic-sdk/>`_ requires Python 3.10. Therefore, this Agent should be run in its own Docker container based on a Python 3.10 image build.
 
 Configuration File Examples
 ---------------------------
