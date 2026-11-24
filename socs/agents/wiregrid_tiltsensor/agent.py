@@ -1,8 +1,8 @@
 # Code developed with AI assistance.
 import os
 import time
-import txaio
 
+import txaio
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
 
