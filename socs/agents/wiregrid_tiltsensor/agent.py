@@ -1,5 +1,7 @@
 # Code developed with AI assistance.
+import os
 import time
+import txaio
 
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import Pacemaker, TimeoutLock
@@ -180,6 +182,7 @@ def make_parser(parser_in=None):
 
 
 def main(args=None):
+    txaio.start_logging(level=os.environ.get("LOGLEVEL", "info"))
     parser_in = make_parser()
     args = site_config.parse_args(agent_class='WiregridTiltSensorAgent',
                                   parser=parser_in,
