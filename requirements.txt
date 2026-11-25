@@ -38,13 +38,15 @@ opencv-python
 pfeiffer-vacuum-protocol==0.4
 
 # pysmurf controller
-pyepics
-pysmurf-slac @ git+https://github.com/slaclab/pysmurf.git@main
-sodetlib
-sotodlib
+# TODO should be able to get these from pip now
+sodetlib @ git+https://github.com/simonsobs/sodetlib.git@master
+sotodlib @ git+https://github.com/simonsobs/sotodlib.git@master
 
 # timing master monitor
 pyepics
+
+# smurf hammer (also needs sodetlib, above)
+pyzmq
 
 # xy_stage
 xy_stage_control @ git+https://github.com/kmharrington/xy_stage_control.git@main

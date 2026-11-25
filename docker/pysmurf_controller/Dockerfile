@@ -1,15 +1,18 @@
-FROM simonsobs/so_smurf_base:v0.0.9
+FROM simonsobs/so_smurf_base:v0.1.1
 
 #################################################################
 # sodetlib Install
 #################################################################
 WORKDIR /
-RUN git clone --branch v0.6.8 --depth 1 https://github.com/simonsobs/sodetlib.git
+RUN git clone https://github.com/simonsobs/sodetlib.git
 # allow versioneer to determine sodetlib version safely
 USER cryo
 RUN git config --global --add safe.directory /sodetlib
 USER root
 WORKDIR /sodetlib
+# TODO: pin to the release tag cut after simonsobs/sodetlib#485 merges
+# (restore `git clone --branch <tag> --depth 1` above).
+RUN git checkout 0979e7c67e6f7901c41e010208f884685be434ac  # tpm/rogue6
 RUN pip3 install -U pip
 RUN pip3 install -e .
 RUN pip3 install -r requirements.txt

@@ -14,7 +14,6 @@ import sys
 import time
 from typing import Optional
 
-import epics
 import numpy as np
 import sodetlib as sdl
 from ocs import ocs_agent, site_config
@@ -22,6 +21,12 @@ from ocs.ocs_agent import log_formatter
 from ocs.ocs_twisted import TimeoutLock
 from sodetlib.det_config import DetConfig
 from sodetlib.operations import bias_dets
+
+# only need this for Rssi restart
+try:
+    from pyrogue.interfaces import VirtualClient
+except ModuleNotFoundError:
+    print("pyrogue is not installed. restart_rssi not available.")
 
 from socs.agents.pysmurf_controller.smurf_subprocess_util import (
     QuantileData, RunCfg, RunResult, run_smurf_func)
@@ -319,7 +324,7 @@ class PysmurfController:
         S, cfg = self._get_smurf_control(load_tune=False, no_dir=True)
         reg = sdl.Registers(S)
 
-        kw = {'retry_on_fail': False}
+        kw = {}
         while session.status in ['starting', 'running']:
             try:
 
@@ -328,7 +333,7 @@ class PysmurfController:
                     num_active_channels += len(S.which_on(band))
 
                 d = dict(
-                    channel_mask=S.get_channel_mask(**kw).tolist(),
+                    channel_mask=S.get_channel_mask(**kw),
                     downsample_factor=S.get_downsample_factor(**kw),
                     agg_time=reg.agg_time.get(**kw),
                     open_g3stream=reg.open_g3stream.get(**kw),
@@ -348,8 +353,8 @@ class PysmurfController:
                              'num_active_channels': d['num_active_channels']}
                 }
                 self.agent.publish_to_feed('state_results', data)
-            except (RuntimeError, epics.ca.ChannelAccessGetFailure):
-                self.log.warn("Could not connect to epics server! Waiting and "
+            except Exception:  # TODO can we make this more specific?
+                self.log.warn("Failed to reach streamer! Waiting and "
                               "then trying again")
 
             time.sleep(params['poll_interval'])
@@ -486,7 +491,7 @@ class PysmurfController:
 
     @ocs_agent.param('bands', default=None)
     @ocs_agent.param('kwargs', default=None)
-    @ocs_agent.param('run_in_main_procsess', default=False)
+    @ocs_agent.param('run_in_main_process', default=False)
     def uxm_setup(self, session, params):
         """uxm_setup(bands=None, kwargs=None, run_in_main_process=False)
 
@@ -1173,24 +1178,44 @@ class PysmurfController:
                 return False, f"Operation failed: {self.lock.job} is running."
 
             # this register being unresponsive is a symptom of an rssi lock-up
-            slot_reg = f"smurf_server_s{self.slot}:AMCc:FpgaTopLevel:AmcCarrierCore:AmcCarrierBsi:SlotNumber"
+            slot_reg = "AMCc.FpgaTopLevel.AmcCarrierCore.AmcCarrierBsi.SlotNumber"
+            restart_cmd = "AMCc.RestartRssi"
 
-            # if the system is locked up, spawning a SmurfControl instance will hang so we use epics
-            slot = epics.caget(slot_reg, timeout=2)
+            # If the link is locked up, starting a SmurfControl instance would
+            # hang, so talk to the rogue server with a bare VirtualClient.
+            # VirtualClient is a per-(addr, port) singleton shared with any
+            # SmurfControl living in this process (e.g. check_state's), so it
+            # must not be stopped here: use it and leave it alone.
+            server_port = 9000 + 3 * int(self.slot)
+            try:
+                client = VirtualClient(addr="localhost", port=server_port)
+            except Exception as e:
+                return False, f"Could not connect to the rogue server on port {server_port}: {e}"
+            # Bound the request time (the default after connect is unbounded).
+            # Same values pysmurf uses, so a shared instance is unaffected.
+            client.setTimeout(5000, 30000)  # warn every 5s, fail after 30s
 
-            # reset if RSSI is locked-up
-            success = True
-            msg = ""
-            if slot is not None:  # query suceeded
+            def read_slot():
+                try:
+                    return client.root.getNode(slot_reg).get()
+                except Exception:
+                    return None
+
+            slot = read_slot()
+            if slot is not None:  # query succeeded
                 success, msg = True, "RSSI is not locked-up -- Doing nothing."
             else:
-                # send the reset command
-                epics.caput(f"smurf_server_s{self.slot}:AMCc:RestartRssi", 1)
+                cmd = client.root.getNode(restart_cmd)
+                if cmd is None:
+                    return False, f"{restart_cmd} not found on the server (no PCIe link?)"
+                # RestartRssi is a rogue command: call() runs it, set() only
+                # stores a value and does nothing.
+                cmd.call()
 
                 # check the system has recovered
-                slot = epics.caget(slot_reg, timeout=2)
+                slot = read_slot()
                 success = slot is not None
-                msg = "RSSI remains locked-up" if slot is None else "RSSI has recovered"
+                msg = "RSSI has recovered" if success else "RSSI remains locked-up"
 
             # store state in the session data
             session.data.update({
