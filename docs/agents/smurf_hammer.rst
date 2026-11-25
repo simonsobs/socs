@@ -27,23 +27,11 @@ The SMuRF Hammer Agent requires the following packages:
 
     - `sodetlib <https://github.com/simonsobs/sodetlib>`_
 
-jackhammer requires EPICS to be installed on the host. The easiest
-way to do this is to follow the installation steps present in the
-`Dockerfile from smurf_docker <https://github.com/simonsobs/smurf_dockers/blob/v0.0.9/smurf_base/Dockerfile>`_
-To build that version of EPICS I found I needed to use the following
-compiler flags:
-
-.. code-block:: bash
-
-    -std=c++98 -fno-access-control
-
-Note that it is also necessary to set the EPICS environment variables
-from the Dockerfile in the host's .bashrc and also the following:
-
-.. code-block:: bash
-
-    EPICS_CA_ADDR_LIST=127.255.255.255
-    EPICS_CA_MAX_ARRAY_BYTES=80000000
+Both jackhammer and the monitor process talk to each slot's rogue server
+directly over its ZMQ request socket (``pyzmq``), so neither EPICS nor
+pyrogue needs to be installed where the agent runs. The agent must run on
+the SMuRF server itself, since the rogue servers only listen on
+``localhost`` ports ``9000 + 3 * slot``.
 
 Additionally, ``socs`` should be installed with the ``pysmurf`` group:
 
@@ -79,13 +67,13 @@ The agent exposes two operations:
 **hammer** (task)
     Resets and reconfigures the specified SMuRF slots by calling
     ``sodetlib.hammers.jackhammer.hammer()``. The sequence reboots the
-    carriers, waits for EPICS connectivity, and runs pysmurf setup. Failures
+    carriers, waits for each rogue server to answer, and runs pysmurf setup. Failures
     at each stage are caught per-slot, and the remaining slots continue.
 
 **monitor** (process)
-    Continuously polls each slot's EPICS registers using ``epics.caget()``
-    directly (bypassing pysmurf, so it works even when the system is
-    degraded). Two registers are queried per slot every 10 seconds:
+    Continuously polls each slot's rogue server over ZMQ directly
+    (bypassing pysmurf, so it works even when the system is degraded).
+    Two registers are read per slot every 10 seconds:
 
     - ``AMCc.SmurfApplication.SystemConfigured`` -- whether pysmurf setup
       has completed.

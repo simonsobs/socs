@@ -5,11 +5,107 @@ import os
 import time
 import traceback
 
-import epics
 import txaio
+import zmq
 from ocs import ocs_agent, site_config
 from ocs.ocs_twisted import TimeoutLock
 from sodetlib.hammers.jackhammer import hammer, sys_config
+
+# Registers polled by the monitor process, relative to the rogue root.
+CONFIGURED_REG = 'AMCc.SmurfApplication.SystemConfigured'
+CONFIGURING_REG = 'AMCc.SmurfApplication.ConfiguringInProgress'
+
+
+def server_port(slot):
+    """Base port of the rogue ZMQ server for a slot (pysmurf convention)."""
+    return 9000 + 3 * int(slot)
+
+
+def read_registers(requests, timeout=2.0, context=None):
+    """Read rogue variables from one or more servers, all at once.
+
+    Each request is sent on its own ZMQ request socket and the replies are
+    collected under a single deadline, so a pass over six unreachable slots
+    costs one ``timeout``, not twelve. This bypasses pysmurf and pyrogue
+    entirely (the same protocol sodetlib's jackhammer uses), so it works
+    when a slot is degraded and does not hang the way starting a
+    ``SmurfControl`` would.
+
+    Parameters
+    ----------
+    requests : list of (int, str)
+        ``(port, path)`` pairs: the base port of the slot's rogue ZMQ
+        server (its binary request/reply socket lives at ``port + 1``) and
+        the dotted path of the variable, e.g.
+        ``AMCc.SmurfApplication.SystemConfigured``.
+    timeout : float
+        Seconds to wait for all replies.
+    context : zmq.Context, optional
+        Context to create the sockets from. Defaults to the global instance.
+
+    Returns
+    -------
+    list
+        One entry per request, in order: the variable's value, or ``None``
+        if that server did not reply in time, the node does not exist, or
+        the server reported an error.
+    """
+    ctx = context if context is not None else zmq.Context.instance()
+    results = [None] * len(requests)
+    # Each request gets its own REQ socket: a REQ socket is strictly
+    # send-then-receive, so one socket could only carry one request at a
+    # time. Several sockets connecting to the same server port is fine; the
+    # server's REP socket accepts any number of clients and answers them in
+    # arrival order.
+    poller = zmq.Poller()
+    socks = []
+    pending = {}  # socket -> index into requests, for the unanswered ones
+    try:
+        for i, (port, path) in enumerate(requests):
+            sock = ctx.socket(zmq.REQ)
+            socks.append(sock)
+            sock.setsockopt(zmq.LINGER, 0)  # discard undelivered on close
+            sock.connect(f"tcp://localhost:{port + 1}")
+            sock.send_pyobj(
+                {'path': path, 'attr': 'get', 'args': [], 'kwargs': {}})
+            poller.register(sock, zmq.POLLIN)
+            pending[sock] = i
+
+        # Wait for the replies with a single deadline. poll(ms) blocks until
+        # at least one registered socket has a message waiting (POLLIN) or
+        # the time runs out, and returns the sockets that are ready. It does
+        # not read them; that is done below with NOBLOCK, which cannot stall
+        # because the poller has just said data is there. Several sockets can
+        # become ready in one wakeup, and sockets that have answered are
+        # dropped from the poller so later wakeups only wait on the rest.
+        # The time budget is recomputed from the deadline on every pass, so
+        # the whole loop takes at most `timeout` however many wakeups there
+        # are. Anything still unanswered at the deadline keeps its None.
+        deadline = time.monotonic() + timeout
+        while pending:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            for sock, _ in poller.poll(remaining * 1000):
+                i = pending.pop(sock)
+                poller.unregister(sock)
+                try:
+                    resp = sock.recv_pyobj(zmq.NOBLOCK)
+                except zmq.ZMQError:
+                    continue
+                # rogue answers a failed operation with a pickled Exception,
+                # and an unknown path with None.
+                if not isinstance(resp, Exception):
+                    results[i] = resp
+    finally:
+        for sock in socks:
+            sock.close()
+    return results
+
+
+def read_register(port, path, timeout=2.0, context=None):
+    """Read one rogue variable; see :func:`read_registers`."""
+    return read_registers([(port, path)], timeout=timeout, context=context)[0]
 
 
 class SmurfHammerAgent:
@@ -73,7 +169,7 @@ class SmurfHammerAgent:
             {'slots': [2, 3],
              'reboot': True,
              'succeeded_slots': [2],
-             'failed_slots': {3: 'EPICS connection timed out ...'},
+             'failed_slots': {3: 'Timed out after 180s waiting for server connection on port 9009'},
              'error': None}
         """
 
@@ -123,7 +219,7 @@ class SmurfHammerAgent:
         """monitor()
 
         **Process** - Continuously monitor the configuration status of
-        each SMuRF slot by querying two EPICS registers:
+        each SMuRF slot by reading two registers from its rogue server:
 
         - ``AMCc.SmurfApplication.SystemConfigured`` — whether setup
           has completed successfully.
@@ -143,8 +239,8 @@ class SmurfHammerAgent:
              }}
 
         For each register, ``True``/``False`` reflect the register
-        value and ``None`` means the EPICS query timed out (slot
-        unreachable).
+        value and ``None`` means the slot's rogue server did not answer
+        (slot unreachable).
         """
         self._monitor_running = True
         session.data = {}
@@ -158,17 +254,12 @@ class SmurfHammerAgent:
                 'data': {},
             }
 
-            pv_names = []
+            # one request per register per slot, all in flight together
+            requests = []
             for slot in self.slot_order:
-                epics_root = f'smurf_server_s{slot}'
-                pv_names.append(f'{epics_root}:AMCc:SmurfApplication:SystemConfigured')
-                pv_names.append(f'{epics_root}:AMCc:SmurfApplication:ConfiguringInProgress')
-
-            try:
-                values = epics.caget_many(pv_names, timeout=5, connection_timeout=5)
-            except Exception as e:
-                self.log.error(f"EPICS query failed with: {e}")
-                values = [None] * len(pv_names)
+                requests.append((server_port(slot), CONFIGURED_REG))
+                requests.append((server_port(slot), CONFIGURING_REG))
+            values = read_registers(requests)
 
             for i, slot in enumerate(self.slot_order):
                 val_configured = values[2 * i]
