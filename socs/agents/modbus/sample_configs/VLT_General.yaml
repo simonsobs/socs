@@ -1,0 +1,25 @@
+read_len: 4
+read_start: 2911
+read_type: holding
+registers:
+  Pump_speed:
+    offset: 0
+    read_as: 16S
+    scale: 0.1
+    units: rpm
+  Low_side_pressure:
+    offset: 1
+    read_as: 16S
+    scale: 0.001
+    units: bar
+  High_side_pressure:
+    offset: 2
+    read_as: 16S
+    scale: 0.001
+    units: bar
+  Setpoint:
+    offset: 3
+    read_as: 16S
+    scale: 0.001
+    units: bar
+block_name: General Data
