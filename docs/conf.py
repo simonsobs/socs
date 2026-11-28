@@ -114,6 +114,7 @@ autodoc_mock_imports = ['spt3g',
                         'src.pid_controller',
                         'cv2',
                         'imutils',
+                        'machinelogic',
                         ]
 from unittest import mock
 
